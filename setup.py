@@ -1,5 +1,10 @@
-from setuptools import setup, find_packages, Extension
+#!/usr/bin/env python3
+"""
+.. codeauthor:: Gavin Suddreys
+"""
 import os
+from typing import List
+from setuptools import setup, find_packages
 
 here = os.path.abspath(os.path.dirname(__file__))
 
@@ -33,8 +38,15 @@ data_folders = [
 ]
 
 
-def package_files(directory):
-    paths = []
+def package_files(directory: List[str]) -> List[str]:
+    """[summary]
+
+    :param directory: [description]
+    :type directory: [type]
+    :return: [description]
+    :rtype: [type]
+    """
+    paths: List[str] = []
     for (pathhere, _, filenames) in os.walk(directory):
         for filename in filenames:
             paths.append(os.path.join('..', pathhere, filename))

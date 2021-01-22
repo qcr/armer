@@ -4,25 +4,25 @@ import importlib
 
 import roboticstoolbox as rtb
 
-from manipulation_driver.driver import ManipulationDriver
+from manipulation_driver import ManipulationDriver
 
 if __name__ == '__main__':
-  rospy.init_node('manipulator')
-  
-  robot: rtb.robot.Robot = None
-  backend: rtb.backends.Connector = None
-
-  if rospy.get_param('~robot', None):
-    module_name, model_name = rospy.get_param('~robot', None).rsplit('.', maxsplit=1)
-    robot_cls = getattr(importlib.import_module(module_name), model_name)
+    rospy.init_node('manipulator')
     
-    robot = robot_cls()
+    robot: rtb.robot.Robot = None
+    backend: rtb.backends.Connector = None
 
-  if rospy.get_param('~backend', None):
-    module_name, backend_name = rospy.get_param('~backend', None).rsplit('.', maxsplit=1)
-    backend_cls = getattr(importlib.import_module(module_name), backend_name)
-    
-    backend = backend_cls()
+    if rospy.get_param('~robot', None):
+        module_name, model_name = rospy.get_param('~robot', None).rsplit('.', maxsplit=1)
+        robot_cls = getattr(importlib.import_module(module_name), model_name)
+        
+        robot = robot_cls()
 
-  manipulator = ManipulationDriver(robot=robot, backend=backend)
-  manipulator.run()
+    if rospy.get_param('~backend', None):
+        module_name, backend_name = rospy.get_param('~backend', None).rsplit('.', maxsplit=1)
+        backend_cls = getattr(importlib.import_module(module_name), backend_name)
+        
+        backend = backend_cls()
+
+    manipulator = ManipulationDriver(robot=robot, backend=backend)
+    manipulator.run()

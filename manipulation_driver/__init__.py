@@ -1,4 +1,9 @@
-from manipulation_driver.driver import ManipulationDriver
+"""
+Manipulation Driver Package
+
+.. codeauthor:: Gavin Suddreys
+"""
+from .driver import ManipulationDriver
 
 __all__ = [
   'ManipulationDriver'

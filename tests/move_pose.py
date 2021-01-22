@@ -1,9 +1,13 @@
 #!/usr/bin/env python2
+"""
+Test script
+
+.. codeauthor:: Gavin Suddreys
+"""
+import timeit
 
 import rospy
 import actionlib
-import sys
-import timeit
 
 from rv_msgs.msg import MoveToPoseAction, MoveToPoseGoal
 from rv_msgs.msg import ServoToPoseAction, ServoToPoseGoal
@@ -78,7 +82,7 @@ ts.twist.linear.z = 0.1
 start_time = timeit.default_timer()
 
 while timeit.default_timer() - start_time < 3:
-  vel_pub.publish(ts)
+    vel_pub.publish(ts)
 
 vel_pub.publish(TwistStamped())
 
@@ -89,7 +93,7 @@ ts.twist.linear.z = -0.1
 start_time = timeit.default_timer()
 
 while timeit.default_timer() - start_time < 3:
-  vel_pub.publish(ts)
+    vel_pub.publish(ts)
 
 vel_pub.publish(TwistStamped())
 
