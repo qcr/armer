@@ -2,7 +2,6 @@
 import rospy
 import actionlib
 import os
-import sys
 import yaml
 import importlib
 import timeit
@@ -15,7 +14,7 @@ from threading import Lock, Event
 from typing import List, Any
 
 from std_srvs.srv import Empty, EmptyRequest, EmptyResponse
-from geometry_msgs.msg import PoseStamped, Pose, TwistStamped, Twist
+from geometry_msgs.msg import PoseStamped, TwistStamped, Twist
 
 from rv_msgs.msg import ManipulatorState
 from rv_msgs.msg import JointVelocity
@@ -26,7 +25,6 @@ from rv_msgs.srv import GetNamesList, GetNamesListRequest, GetNamesListResponse
 from rv_msgs.srv import SetNamedPose, SetNamedPoseRequest, SetNamedPoseResponse
 from rv_msgs.srv import SetNamedPoseConfig, SetNamedPoseConfigRequest, SetNamedPoseConfigResponse
 from rv_msgs.srv import GetNamedPoseConfigs, GetNamedPoseConfigsRequest, GetNamedPoseConfigsResponse
-from rv_msgs.srv import SetPose, SetPoseRequest, SetPoseResponse
 
 class ManipulationDriver(object):
   """
@@ -305,7 +303,7 @@ class ManipulationDriver(object):
     return SetNamedPoseResponse(success=True)
 
 
-  def add_named_pose_config_cb(self, request: SetNamedPoseConfigRequest) -> SetNamedPoseResponse:
+  def add_named_pose_config_cb(self, request: SetNamedPoseConfigRequest) -> SetNamedPoseConfigResponse:
     self.custom_configs.append(request.config_path)
     self.__load_config()
     return True
