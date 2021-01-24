@@ -28,4 +28,4 @@ jobs:
       run: |
         pip install .
         pip install pytest-timeout
-        source /opt/ros/melodic/setup.bash && pytest --timeout=30 --timeout_method thread -s
+        source /opt/ros/melodic/setup.bash && pylint `find . | grep .py$ | xargs`
