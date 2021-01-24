@@ -20,12 +20,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install pylint
-    - name: Install ROS
-      uses: ros-tooling/setup-ros@0.1.1
-      with:
-        required-ros-distributions: melodic
     - name: Analysing the code with pylint
       run: |
         pip install .
         pip install pytest-timeout
-        run: "source /opt/ros/melodic/setup.bash && pytest --timeout=30 --timeout_method thread -s"
