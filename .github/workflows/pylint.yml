@@ -21,7 +21,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install pylint
     - name: Install ROS
-      uses: ros-tooling/setup-ros@0.0.25
+      uses: ros-tooling/setup-ros@0.1.1
       with:
         required-ros-distributions: melodic
     - name: Analysing the code with pylint
