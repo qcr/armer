@@ -1,4 +1,4 @@
-name: Pylint
+name: Build
 
 on: [push]
 
@@ -23,4 +23,17 @@ jobs:
     - name: Analysing the code with pylint
       run: |
         pip install .
+        pylint `find .| grep .py$ | xargs`
+    - name: Install ROS
+      uses: suddrey-qut/setup-ros@master
+      with:
+        required-ros-distributions: noetic
+    - name: ROSDep Install
+      run: |
+        source /opt/ros/noetic/setup.bash && rosdep update
+        source /opt/ros/noetic/setup.bash && rosdep install --from-paths . --ignore-src -r -y
+    - name: Test with pytest
+      run: |
         pip install pytest-timeout
+        source /opt/ros/noetic/setup.bash && pytest --timeout=30 --timeout_method thread -s
+        
