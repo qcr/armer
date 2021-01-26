@@ -312,7 +312,7 @@ class ManipulationDriver:
         with self.lock:
             traj = rtb.tools.trajectory.jtraj(self.robot.q, self.robot.qr, 50)
             self.__traj_move(traj)
-            return EmptyResponse
+            return EmptyResponse()
 
     def get_named_poses_cb(self, req: GetNamesListRequest) -> GetNamesListResponse:
         """
