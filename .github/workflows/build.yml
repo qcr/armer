@@ -35,5 +35,5 @@ jobs:
     - name: Test with pytest
       run: |
         pip install pytest-timeout
-        source /opt/ros/noetic/setup.bash && pytest --timeout=30 --timeout_method thread -s
+        source /opt/ros/noetic/setup.bash && PYTHONPATH=$PYTHONPATH:/usr/lib/$(python --version | sed 's/Python \([0-9]\.[0-9]\).*/python\1/')/dist-packages:/usr/lib/$(python --version | sed 's/Python \([0-9]\)\.[0-9].*/python\1/')/dist-packages pytest --timeout=30 --timeout_method thread -s
         
