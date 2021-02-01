@@ -9,6 +9,7 @@ jobs:
       matrix:
         os: [ubuntu-20.04]
         python-version: [3.8]
+        ros-distro: [noetic]
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python ${{ matrix.python-version }}
@@ -26,15 +27,16 @@ jobs:
     - name: Install ROS
       uses: suddrey-qut/setup-ros@master
       with:
-        required-ros-distributions: noetic
+        required-ros-distributions: ${{ros-distro}}
     - name: ROSDep Install
       run: |
-        source /opt/ros/noetic/setup.bash && rosdep update
-        source /opt/ros/noetic/setup.bash && rosdep install --from-paths . --ignore-src -r -y
+        source /opt/ros/${{ros-distro}}/setup.bash && rosdep update
+        source /opt/ros/${{ros-distro}}/setup.bash && rosdep install --from-paths . --ignore-src -r -y
     - name: Test with pytest
       run: |
         pip install pytest-timeout pytest-cov
-        source /opt/ros/noetic/setup.bash && PYTHONPATH=$PYTHONPATH:/usr/lib/$(python --version | sed 's/Python \([0-9]\.[0-9]\).*/python\1/')/dist-packages:/usr/lib/$(python --version | sed 's/Python \([0-9]\)\.[0-9].*/python\1/')/dist-packages pytest --cov=manipulation_driver --cov-report xml:coverage.xml --timeout=30 --timeout_method thread -s
+        source /opt/ros/${{ros-distro}}/setup.bash && PYTHONPATH=$PYTHONPATH:/usr/lib/$(python --version | sed 's/Python \([0-9]\.[0-9]\).*/python\1/')/dist-packages:/usr/lib/$(python --version | sed 's/Python \([0-9]\)\.[0-9].*/python\1/')/dist-packages pytest --cov=manipulation_driver --cov-report xml:coverage.xml --timeout=30 --timeout_method thread -s
+        coverage report
     - name: upload coverage to Codecov
       uses: codecov/codecov-action@master
       with:
