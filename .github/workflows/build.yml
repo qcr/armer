@@ -7,9 +7,10 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        os: [ubuntu-20.04]
-        python-version: [3.8]
-        ros-distro: [noetic]
+        include:
+          - os: ubuntu-20.04
+            python-version: 3.8
+            ros-distro: noetic
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python ${{ matrix.python-version }}
@@ -22,7 +23,7 @@ jobs:
         pip install pylint
     - name: Analysing the code with pylint
       run: |
-        pip install .[dev]
+        pip install -e .[dev]
         pylint `find .| grep .py$ | xargs`
     - name: Install ROS
       uses: suddrey-qut/setup-ros@master
