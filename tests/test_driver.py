@@ -31,10 +31,10 @@ class TestDriver(unittest.TestCase):
     def tearDownClass(cls):
         cls.core.send_signal(signal.SIGINT)
         cls.core.wait()
-        
+
     def tearDown(self):
         subprocess.Popen(['rosparam', 'delete', '/'])
-        
+
     def test_driver_import(self):
         """
         Test driver import
@@ -43,10 +43,14 @@ class TestDriver(unittest.TestCase):
         self.assertIsInstance(ManipulationDriver, object)
 
     def test_driver_init(self):
+        """
+        Test initialising driver
+        """
         from manipulation_driver import ManipulationDriver #pylint: disable=import-outside-toplevel
         backend = rtb.backends.Swift(display=False)
         driver = ManipulationDriver(backend=backend)
+        self.assertIsInstance(driver, ManipulationDriver)
         driver.close()
-        
+
 if __name__ == '__main__':
     unittest.main()

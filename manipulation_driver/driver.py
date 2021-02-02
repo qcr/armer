@@ -63,7 +63,7 @@ class ManipulationDriver:
 
         if not self.backend:
             self.backend = rtb.backends.Swift()
-        
+
         # Guards used to prevent multiple motion requests conflicting
         self.moving: bool = False
         self.preempted: bool = False
@@ -157,6 +157,9 @@ class ManipulationDriver:
         self.named_pose_server.start()
 
     def close(self):
+        """
+        Close backend and stop action servers
+        """
         self.backend.close()
         self.pose_server.need_to_terminate = True
         self.named_pose_server.need_to_terminate = True
