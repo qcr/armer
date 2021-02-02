@@ -23,7 +23,7 @@ jobs:
         pip install pylint
     - name: Analysing the code with pylint
       run: |
-        pip install .[dev]
+        pip install -e .[dev]
         pylint `find .| grep .py$ | xargs`
     - name: Install ROS
       uses: suddrey-qut/setup-ros@master
