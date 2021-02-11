@@ -11,7 +11,7 @@ here = os.path.abspath(os.path.dirname(__file__))
 req = [
     'numpy>=1.18.0',
     'spatialmath-python>=0.8.7',
-    'roboticstoolbox-python>=0.6',
+    'roboticstoolbox-python>=0.8',
     'pyyaml'
 ]
 
