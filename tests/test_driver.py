@@ -47,8 +47,7 @@ class TestDriver(unittest.TestCase):
         Test initialising driver
         """
         from manipulation_driver import ManipulationDriver #pylint: disable=import-outside-toplevel
-        backend = rtb.backends.Swift(display=False)
-        driver = ManipulationDriver(backend=backend)
+        driver = ManipulationDriver()
         self.assertIsInstance(driver, ManipulationDriver)
         driver.close()
 

@@ -1,9 +1,9 @@
 <launch>
-    <arg name="backend" default="roboticstoolbox.backends.Swift">
-    <arg name="robot" default="roboticstoolbox.robots.Panda">
+    <arg name="backend" default="roboticstoolbox.backends.Swift" />
+    <arg name="robot" default="roboticstoolbox.models.Panda" />
 
     <node pkg="manipulation_driver" type="driver" name="driver">
-        <arg name="backend" value="$(arg backend)" />
-        <arg name="robot" value="$(arg robot)" />
+        <param name="backend" value="$(arg backend)" />
+        <param name="robot" value="$(arg robot)" />
     </node>
 </launch>
