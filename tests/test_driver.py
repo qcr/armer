@@ -9,6 +9,8 @@ import signal
 import time
 import rospy
 
+import roboticstoolbox as rtb
+
 class TestDriver(unittest.TestCase):
     """
     Test Manipulation Driver
@@ -45,7 +47,7 @@ class TestDriver(unittest.TestCase):
         Test initialising driver
         """
         from manipulation_driver import ManipulationDriver #pylint: disable=import-outside-toplevel
-        driver = ManipulationDriver()
+        driver = ManipulationDriver(backend=rtb.backends.Swift(display=False))
         self.assertIsInstance(driver, ManipulationDriver)
         driver.close()
 
