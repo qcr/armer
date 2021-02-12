@@ -95,8 +95,10 @@ class ManipulationDriver:
         # Arm state property
         self.state: ManipulatorState = ManipulatorState()
 
-        self.e_v: np.array = np.zeros(shape=(6,))
-        self.j_v: np.array = np.zeros(shape=(len(self.robot.q),))
+        self.e_v: np.array = np.zeros(shape=(6,)) # cartesian motion
+        self.e_v_frame = None # The operating frame of the cartesian motion
+
+        self.j_v: np.array = np.zeros(shape=(len(self.robot.q),)) # joint motion
 
         self.last_update: float = 0
 
@@ -191,6 +193,11 @@ class ManipulationDriver:
 
         with self.lock:
             target: Twist = msg.twist
+
+            if msg.header.frame_id and msg.header.frame_id != self.robot.base_link.name:
+                self.e_v_frame = msg.header.frame_id
+            else:
+                self.e_v_frame = None
 
             self.e_v = np.array([
                 target.linear.x,
@@ -563,7 +570,13 @@ class ManipulationDriver:
             if any(self.e_v):
                 if timeit.default_timer() - self.last_update > 1.0:
                     self.e_v = np.zeros(shape=self.e_v.shape)
-                self.robot.qd = np.linalg.pinv(self.robot.jacob0(self.robot.q)) @ self.e_v
+
+                if self.e_v_frame:
+                    self.robot.qd = np.linalg.pinv(
+                        self.robot.jacobe(self.robot.q, end=self.e_v_frame)
+                    ) @ self.e_v
+                else:
+                    self.robot.qd = np.linalg.pinv(self.robot.jacob0(self.robot.q)) @ self.e_v
 
             elif any(self.j_v):
                 if timeit.default_timer() - self.last_update > 1.0:
