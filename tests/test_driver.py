@@ -9,8 +9,6 @@ import signal
 import time
 import rospy
 
-import roboticstoolbox as rtb
-
 class TestDriver(unittest.TestCase):
     """
     Test Manipulation Driver

@@ -12,16 +12,16 @@ from typing import List, Any
 
 import rospy
 import actionlib
-import tf_conversions
 import tf2_ros
 import yaml
 
 import roboticstoolbox as rtb
 from spatialmath import SE3, UnitQuaternion
+from spatialmath.base.argcheck import getvector
 import numpy as np
 
 from std_srvs.srv import Empty, EmptyRequest, EmptyResponse
-from geometry_msgs.msg import PoseStamped, TwistStamped, Twist, TransformStamped
+from geometry_msgs.msg import PoseStamped, TwistStamped, Twist
 
 from rv_msgs.msg import ManipulatorState
 from rv_msgs.msg import JointVelocity
@@ -32,6 +32,8 @@ from rv_msgs.srv import GetNamesList, GetNamesListRequest, GetNamesListResponse
 from rv_msgs.srv import SetNamedPose, SetNamedPoseRequest, SetNamedPoseResponse
 from rv_msgs.srv import SetNamedPoseConfig, SetNamedPoseConfigRequest, SetNamedPoseConfigResponse
 from rv_msgs.srv import GetNamedPoseConfigs, GetNamedPoseConfigsRequest, GetNamedPoseConfigsResponse
+
+from .utils import populate_transform_stamped
 
 class ManipulationDriver:
     """
@@ -68,12 +70,12 @@ class ManipulationDriver:
             self.backend = rtb.backends.Swift()
 
         self.is_publishing_transforms = publish_transforms
-        
+
         self.broadcaster: tf2_ros.TransformBroadcaster = None
 
         if self.is_publishing_transforms:
             self.broadcaster = tf2_ros.TransformBroadcaster()
-        
+
         # Guards used to prevent multiple motion requests conflicting
         self.moving: bool = False
         self.preempted: bool = False
@@ -437,33 +439,6 @@ class ManipulationDriver:
         self.preempted = False
         return result
 
-    def publish_transforms(self) -> None:
-        """[summary]
-        """
-        if not self.is_publishing_transforms:
-            return
-        
-        # print(self.robot.ets().eval(self.robot.q))
-        for idx, link in enumerate(self.robot.links):
-            print(link.ets().eval([self.robot.q[idx]]))
-        #     transform_stamped = TransformStamped()
-        #     transform_stamped.header.stamp = rospy.Time.now()
-        #     transform_stamped.header.frame_id = link.parent.name if link.parent else ''
-        #     transform_stamped.child_frame_id = link.name
-        #     transform_stamped.transform.translation.x = link.ets().tx()
-        #     transform_stamped.transform.translation.y = link.ets().tz()
-        #     transform_stamped.transform.translation.z = link.ets().ty()
-        #     ets = link.ets()
-        #     print(ets.rx())
-        #     # transform_stamped.transform.rotation.x = q[0]
-        #     # transform_stamped.transform.rotation.y = q[1]
-        #     # transform_stamped.transform.rotation.z = q[2]
-        #     # transform_stamped.transform.rotation.w = q[3]
-
-            # self.broadcaster.sendTransform(transform_stamped)
-
-
-
     def publish_state(self) -> None:
         """[summary]
         """
@@ -488,6 +463,48 @@ class ManipulationDriver:
         state.joint_poses = list(self.robot.q)
 
         self.state_publisher.publish(state)
+
+
+    def publish_transforms(self) -> None:
+        """[summary]
+        """
+        if not self.is_publishing_transforms:
+            return
+
+        joint_positions = getvector(self.robot.q, self.robot.n)
+
+        for link in self.robot.elinks:
+            if link.parent is None:
+                continue
+
+            if link.isjoint:
+                transform = link.A(joint_positions[link.jindex])
+            else:
+                transform = link.A()
+
+            self.broadcaster.sendTransform(populate_transform_stamped(
+                link.parent.name,
+                link.name,
+                transform
+            ))
+
+        for gripper in self.robot.grippers:
+            joint_positions = getvector(gripper.q, gripper.n)
+
+            for link in gripper.links:
+                if link.parent is None:
+                    continue
+
+                if link.isjoint:
+                    transform = link.A(joint_positions[link.jindex])
+                else:
+                    transform = link.A()
+
+                self.broadcaster.sendTransform(populate_transform_stamped(
+                    link.parent.name,
+                    link.name,
+                    transform
+                ))
 
     def __load_config(self):
         """[summary]
@@ -561,3 +578,8 @@ class ManipulationDriver:
             self.publish_state()
 
             rospy.sleep(0.01)
+
+if __name__ == '__main__':
+    rospy.init_node('manipulator')
+    manipulator = ManipulationDriver(publish_transforms=True)
+    manipulator.run()
