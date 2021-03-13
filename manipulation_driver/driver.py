@@ -12,6 +12,7 @@ from typing import List, Any
 
 import rospy
 import actionlib
+import tf
 import tf2_ros
 import yaml
 
@@ -64,10 +65,12 @@ class ManipulationDriver:
         self.backend: rtb.backends.Connector = backend
 
         if not self.robot:
-            self.robot = rtb.models.URDF.Panda()
+            self.robot = rtb.models.URDF.Panda(**robot_args)
 
         if not self.backend:
-            self.backend = rtb.backends.Swift()
+            self.backend = rtb.backends.ROS(**backend_args)
+
+        self.read_only_backends = [rtb.backends.Swift()]
 
         self.is_publishing_transforms = publish_transforms
 
@@ -105,6 +108,13 @@ class ManipulationDriver:
         # Launch backend
         self.backend.launch()
         self.backend.add(self.robot)
+
+        for backend in self.read_only_backends:
+            backend.launch()
+            backend.add(self.robot, readonly=True)
+
+        # Create Transform Listener
+        self.tf_listener = tf.TransformListener()
 
         # Services
         rospy.Service('arm/home', Empty, self.home_cb)
@@ -237,8 +247,17 @@ class ManipulationDriver:
             self.preempt()
 
         with self.lock:
-            pose = goal.goal_pose.pose
+            goal_pose = goal.goal_pose
 
+            if goal_pose.header.frame_id == '':
+                goal_pose.header.frame_id = self.robot.base_link.name
+
+            goal_pose = self.tf_listener.transformPose(
+                self.robot.base_link.name, 
+                goal_pose
+            )
+            pose = goal_pose.pose
+            
             target = SE3(pose.position.x, pose.position.y, pose.position.z) * UnitQuaternion([
                 pose.orientation.w,
                 pose.orientation.x,
@@ -433,12 +452,12 @@ class ManipulationDriver:
         :rtype: bool
         """
         self.moving = True
-        for pose in traj.q:
+        for vel in traj.y:
             if self.preempted:
                 break
 
             self.event.clear()
-            self.robot.q = pose
+            self.robot.q = vel
             self.event.wait()
 
         self.moving = False
@@ -584,6 +603,10 @@ class ManipulationDriver:
                 self.robot.qd = self.j_v
 
             self.backend.step()
+            
+            for backend in self.read_only_backends:
+                backend.step()
+            
             self.event.set()
 
 

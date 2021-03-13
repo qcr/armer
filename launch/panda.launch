@@ -5,5 +5,6 @@
     <node pkg="manipulation_driver" type="driver" name="driver">
         <param name="backend" value="$(arg backend)" />
         <param name="robot" value="$(arg robot)" />
+        <param name="backend/velocity_topic" value="joint_states" /> 
     </node>
 </launch>
