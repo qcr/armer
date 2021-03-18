@@ -14,6 +14,7 @@ import os
 # import rospy
 # from std_msgs.msg import Float32MultiArray
 from sensor_msgs.msg import JointState
+from rv_msgs.msg import JointVelocity
 
 rospy = None
 
@@ -37,6 +38,10 @@ class ROS(Connector):  # pragma nocover
         super(ROS, self).__init__()
 
         self.robots = {}
+        
+        self.joint_subscribers = {}
+        self.joint_publishers = {}
+
         self.joint_states = {}
         self.joint_indexes = {}
 
@@ -65,11 +70,12 @@ class ROS(Connector):  # pragma nocover
         if ros_ip:
             os.environ["ROS_IP"] = ros_ip
 
-    def step(self, dt=0.05):
+    def step(self, dt=0.01):
         """
         """
         for robot_id in self.joint_states:
             self.robots[robot_id].q = self.joint_states[robot_id]
+            self.joint_publishers[robot_id].publish(JointVelocity(joints=self.robots[robot_id].qd))
 
         super().step()
 
@@ -101,7 +107,7 @@ class ROS(Connector):  # pragma nocover
     #  Methods to interface with the robots created in other environemnts
     #
 
-    def add(self, ob, joint_state_topic=None):
+    def add(self, ob, joint_state_topic=None, joint_velocity_topic=None):
         """
         """
         if isinstance(ob, rtb.ERobot):
@@ -116,10 +122,13 @@ class ROS(Connector):  # pragma nocover
                 all_angles = np.array(msg.position)
                 self.joint_states[ob.name] = all_angles[self.joint_indexes[ob.name]]
                             
-            self.joint_sub = rospy.Subscriber(
+            self.joint_subscribers[ob.name] = rospy.Subscriber(
                 joint_state_topic if joint_state_topic else '/joint_states', 
                 JointState, 
                 _state_cb
+            )
+            self.joint_publishers[ob.name] = rospy.Publisher(
+              joint_velocity_topic if joint_velocity_topic else '/joint_velocity_node_controller/joint_velocity', JointVelocity, queue_size=1
             )
 
         super().add()
@@ -137,18 +146,17 @@ class ROS(Connector):  # pragma nocover
 
         super().remove()
 
-class VelPub:
+# class VelPub:
 
-    def __init__(self, robot):
-        rospy.init_node('RTB_VelocityPublisher')
-        self.robot = robot
-        self.v = np.zeros(robot.n)
+#     def __init__(self, robot):
+#         self.robot = robot
+#         self.v = np.zeros(robot.n)
 
-        self.velocity_publisher = rospy.Publisher(
-            '/joint_velocity',
-            Float32MultiArray, queue_size=1)
+#         self.velocity_publisher = rospy.Publisher(
+#             '/joint_velocity',
+#             Float32MultiArray, queue_size=1)
 
-        self.relay()
+#         self.relay()
 
     # def relay(self):
 

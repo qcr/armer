@@ -1,10 +1,11 @@
 <launch>
+    <group ns="temp">
     <arg name="backend" default="roboticstoolbox.backends.Swift" />
     <arg name="robot" default="roboticstoolbox.models.Panda" />
 
-    <node pkg="manipulation_driver" type="driver" name="driver">
+    <node pkg="manipulation_driver" type="driver" name="driver" output="screen">
         <param name="backend" value="$(arg backend)" />
         <param name="robot" value="$(arg robot)" />
-        <param name="backend/velocity_topic" value="joint_states" /> 
     </node>
+    </group>
 </launch>

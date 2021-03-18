@@ -15,11 +15,14 @@ import actionlib
 import tf
 import tf2_ros
 import yaml
+import timeit
 
 import roboticstoolbox as rtb
 from spatialmath import SE3, UnitQuaternion
 from spatialmath.base.argcheck import getvector
 import numpy as np
+
+from manipulation_driver.backends import ROS
 
 from std_srvs.srv import Empty, EmptyRequest, EmptyResponse
 from geometry_msgs.msg import PoseStamped, TwistStamped, Twist
@@ -35,6 +38,18 @@ from rv_msgs.srv import SetNamedPoseConfig, SetNamedPoseConfigRequest, SetNamedP
 from rv_msgs.srv import GetNamedPoseConfigs, GetNamedPoseConfigsRequest, GetNamedPoseConfigsResponse
 
 from .utils import populate_transform_stamped
+
+class Timer:
+  def __init__(self, name):
+    self.name = name
+
+  def __enter__(self):
+    self.start = timeit.default_timer()
+    return self
+
+  def __exit__(self, *args):
+    dt = timeit.default_timer() - self.start
+    print('{}: {} ({} hz)'.format(self.name, dt, 1/dt))
 
 class ManipulationDriver:
     """
@@ -65,12 +80,12 @@ class ManipulationDriver:
         self.backend: rtb.backends.Connector = backend
 
         if not self.robot:
-            self.robot = rtb.models.URDF.Panda(**robot_args)
+            self.robot = rtb.models.URDF.Panda()
 
         if not self.backend:
-            self.backend = rtb.backends.ROS(**backend_args)
+            self.backend = ROS()
 
-        self.read_only_backends = [rtb.backends.Swift()]
+        self.read_only_backends = [rtb.backends.Swift(realtime=False)]
 
         self.is_publishing_transforms = publish_transforms
 
@@ -85,6 +100,8 @@ class ManipulationDriver:
 
         self.lock: Lock = Lock()
         self.event: Event = Event()
+
+        # self.rate = rospy.Rate(1000)
 
         # Load host specific arm configuration
         self.config_path: str = rospy.get_param('~config_path', os.path.join(
@@ -586,6 +603,7 @@ class ManipulationDriver:
         Runs the driver. This is a blocking call.
         """
         while not rospy.is_shutdown():
+          with Timer('ROS'):
             if any(self.e_v):
                 if timeit.default_timer() - self.last_update > 1.0:
                     self.e_v = np.zeros(shape=self.e_v.shape)
@@ -596,16 +614,16 @@ class ManipulationDriver:
                     ) @ self.e_v
                 else:
                     self.robot.qd = np.linalg.pinv(self.robot.jacob0(self.robot.q)) @ self.e_v
-
+                    print(self.robot.q, self.robot.qd)
             elif any(self.j_v):
                 if timeit.default_timer() - self.last_update > 1.0:
                     self.j_v = np.zeros(shape=self.j_v.shape)
                 self.robot.qd = self.j_v
 
-            self.backend.step()
+            self.backend.step(dt=0)
             
-            for backend in self.read_only_backends:
-                backend.step()
+            # for backend in self.read_only_backends:
+            #     backend.step()
             
             self.event.set()
 
@@ -613,7 +631,7 @@ class ManipulationDriver:
             self.publish_transforms()
             self.publish_state()
 
-            rospy.sleep(0.01)
+            # self.rate.sleep()
 
 if __name__ == '__main__':
     rospy.init_node('manipulator')
