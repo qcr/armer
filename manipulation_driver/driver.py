@@ -37,7 +37,7 @@ from rv_msgs.srv import SetNamedPose, SetNamedPoseRequest, SetNamedPoseResponse
 from rv_msgs.srv import SetNamedPoseConfig, SetNamedPoseConfigRequest, SetNamedPoseConfigResponse
 from rv_msgs.srv import GetNamedPoseConfigs, GetNamedPoseConfigsRequest, GetNamedPoseConfigsResponse
 
-from .utils import populate_transform_stamped
+from manipulation_driver.utils import populate_transform_stamped
 
 class Timer:
   def __init__(self, name):
@@ -48,7 +48,7 @@ class Timer:
     return self
 
   def __exit__(self, *args):
-    dt = timeit.default_timer() - self.start
+    dt = current_time -  self.start
     print('{}: {} ({} hz)'.format(self.name, dt, 1/dt))
 
 class ManipulationDriver:
@@ -96,6 +96,8 @@ class ManipulationDriver:
 
         # Guards used to prevent multiple motion requests conflicting
         self.moving: bool = False
+        self.last_moving: bool = False
+
         self.preempted: bool = False
 
         self.lock: Lock = Lock()
@@ -116,14 +118,16 @@ class ManipulationDriver:
         self.state: ManipulatorState = ManipulatorState()
 
         self.e_v: np.array = np.zeros(shape=(6,)) # cartesian motion
-        self.e_v_frame = None # The operating frame of the cartesian motion
-
         self.j_v: np.array = np.zeros(shape=(len(self.robot.q),)) # joint motion
 
         self.last_update: float = 0
 
-        if rospy.get_param('~tool_name'):
-            self.robot.grippers[0].tool =  
+        # Tooltip offsets
+        if rospy.has_param('~tool_name'):
+          self.tool_name = rospy.get_param('~tool_name')
+
+        if rospy.has_param('~tool_offset'):
+          self.tool_offset = rospy.get_param('~tool_offset')
 
         # Launch backend
         self.backend.launch()
@@ -322,16 +326,17 @@ class ManipulationDriver:
             self.moving = True
 
             while not arrived and not self.preempted:
-                velocities, arrived = rtb.p_servo(self.robot.fkine(self.robot.q), target, 0.5)
+                velocities, arrived = rtb.p_servo(self.robot.fkine(self.robot.q), target, 0.5, threshold=0.005)
                 self.event.clear()
-                self.robot.qd = np.linalg.pinv(self.robot.jacobe(self.robot.q)) @ velocities
+                self.j_v = np.linalg.pinv(self.robot.jacobe(self.robot.q)) @ velocities
+                self.last_update = timeit.default_timer()
                 self.event.wait()
 
             self.moving = False
             result = not self.preempted
             self.preempted = False
 
-            self.robot.qd *= 0
+            # self.robot.qd *= 0
 
             self.pose_servo_server.set_succeeded(ServoToPoseResult(result=0 if result else 1))
 
@@ -479,7 +484,7 @@ class ManipulationDriver:
             self.event.clear()
             self.robot.q = vel
             self.event.wait()
-
+        
         self.moving = False
         result = not self.preempted
         self.preempted = False
@@ -607,26 +612,27 @@ class ManipulationDriver:
         """
         while not rospy.is_shutdown():
           #with Timer('ROS'):
+            current_time = timeit.default_timer()
+            
             if any(self.e_v):
-                if timeit.default_timer() - self.last_update > 1.0:
-                    self.e_v = np.zeros(shape=self.e_v.shape)
-
-                if self.e_v_frame:
-                    self.robot.qd = np.linalg.pinv(
-                        self.robot.jacobe(self.robot.q, end=self.e_v_frame)
-                    ) @ self.e_v
-                else:
-                    self.robot.qd = np.linalg.pinv(self.robot.jacob0(self.robot.q)) @ self.e_v
-                    print(self.robot.q, self.robot.qd)
+                if current_time - self.last_update > 0.1:
+                    self.e_v *= 0.9 if np.sum(np.absolute(self.e_v)) >= 0.0001 else 0
+                    
+                self.robot.qd = np.linalg.pinv(self.robot.jacob0(self.robot.q)) @ self.e_v
+                    
             elif any(self.j_v):
-                if timeit.default_timer() - self.last_update > 1.0:
-                    self.j_v = np.zeros(shape=self.j_v.shape)
+                if current_time - self.last_update > 0.1:
+                    self.j_v *= 0.9 if np.sum(np.absolute(self.j_v)) >= 0.0001 else 0
+                
                 self.robot.qd = self.j_v
 
-            self.backend.step(dt=0)
+            if (self.moving or self.last_moving) or (current_time - self.last_update < 0.5):
+              self.backend.step(dt=0)
             
-            # for backend in self.read_only_backends:
-            #     backend.step()
+            self.last_moving = self.moving
+            
+            for backend in self.read_only_backends:
+                backend.step()
             
             self.event.set()
 
@@ -638,5 +644,5 @@ class ManipulationDriver:
 
 if __name__ == '__main__':
     rospy.init_node('manipulator')
-    manipulator = ManipulationDriver(publish_transforms=True)
+    manipulator = ManipulationDriver(publish_transforms=False)
     manipulator.run()
