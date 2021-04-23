@@ -85,7 +85,7 @@ class ManipulationDriver:
         if not self.backend:
             self.backend = ROS()
 
-        self.read_only_backends = [rtb.backends.Swift(realtime=False)]
+        self.read_only_backends = [] #rtb.backends.Swift(realtime=False)]
 
         self.is_publishing_transforms = publish_transforms
 
@@ -101,7 +101,7 @@ class ManipulationDriver:
         self.lock: Lock = Lock()
         self.event: Event = Event()
 
-        # self.rate = rospy.Rate(1000)
+        self.rate = rospy.Rate(500)
 
         # Load host specific arm configuration
         self.config_path: str = rospy.get_param('~config_path', os.path.join(
@@ -122,9 +122,12 @@ class ManipulationDriver:
 
         self.last_update: float = 0
 
+        if rospy.get_param('~tool_name'):
+            self.robot.grippers[0].tool =  
+
         # Launch backend
         self.backend.launch()
-        self.backend.add(self.robot)
+        self.backend.add(self.robot, joint_velocity_topic='/arm/joint/velocity')
 
         for backend in self.read_only_backends:
             backend.launch()
@@ -134,44 +137,44 @@ class ManipulationDriver:
         self.tf_listener = tf.TransformListener()
 
         # Services
-        rospy.Service('arm/home', Empty, self.home_cb)
-        rospy.Service('arm/stop', Empty, self.preempt)
+        rospy.Service('home', Empty, self.home_cb)
+        rospy.Service('stop', Empty, self.preempt)
 
-        rospy.Service('arm/get_named_poses', GetNamesList, self.get_named_poses_cb)
-        rospy.Service('arm/set_named_pose', SetNamedPose, self.set_named_pose_cb)
+        rospy.Service('get_named_poses', GetNamesList, self.get_named_poses_cb)
+        rospy.Service('set_named_pose', SetNamedPose, self.set_named_pose_cb)
 
         rospy.Service(
-            'arm/add_named_pose_config',
+            'add_named_pose_config',
             SetNamedPoseConfig,
             self.add_named_pose_config_cb
         )
         rospy.Service(
-            'arm/remove_named_pose_config',
+            'remove_named_pose_config',
             SetNamedPoseConfig,
             self.remove_named_pose_config_cb
         )
         rospy.Service(
-            'arm/get_named_pose_configs',
+            'get_named_pose_configs',
             GetNamedPoseConfigs,
             self.get_named_pose_configs_cb
         )
 
         # Publishers
         self.state_publisher: rospy.Publisher = rospy.Publisher(
-            '/arm/state', ManipulatorState, queue_size=1
+            '/state', ManipulatorState, queue_size=1
         )
 
         # Subscribers
         self.cartesian_velocity_subscriber: rospy.Subscriber = rospy.Subscriber(
-            'arm/cartesian/velocity', TwistStamped, self.velocity_cb
+            'cartesian/velocity', TwistStamped, self.velocity_cb
         )
         self.joint_velocity_subscriber: rospy.Subscriber = rospy.Subscriber(
-            'arm/joint/velocity', JointVelocity, self.joint_velocity_cb
+            'joint/velocity', JointVelocity, self.joint_velocity_cb
         )
 
         # Action Servers
         self.pose_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
-            'arm/cartesian/pose',
+            'cartesian/pose',
             MoveToPoseAction,
             execute_cb=self.pose_cb,
             auto_start=False
@@ -180,7 +183,7 @@ class ManipulationDriver:
         self.pose_server.start()
 
         self.pose_servo_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
-            'arm/cartesian/servo_pose',
+            'cartesian/servo_pose',
             ServoToPoseAction,
             execute_cb=self.servo_cb,
             auto_start=False
@@ -189,7 +192,7 @@ class ManipulationDriver:
         self.pose_servo_server.start()
 
         self.named_pose_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
-            'arm/joint/named',
+            'joint/named',
             MoveToNamedPoseAction,
             execute_cb=self.named_pose_cb,
             auto_start=False
@@ -603,7 +606,7 @@ class ManipulationDriver:
         Runs the driver. This is a blocking call.
         """
         while not rospy.is_shutdown():
-          with Timer('ROS'):
+          #with Timer('ROS'):
             if any(self.e_v):
                 if timeit.default_timer() - self.last_update > 1.0:
                     self.e_v = np.zeros(shape=self.e_v.shape)
@@ -631,7 +634,7 @@ class ManipulationDriver:
             self.publish_transforms()
             self.publish_state()
 
-            # self.rate.sleep()
+            self.rate.sleep()
 
 if __name__ == '__main__':
     rospy.init_node('manipulator')
