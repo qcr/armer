@@ -18,7 +18,7 @@ import yaml
 import timeit
 
 import roboticstoolbox as rtb
-from spatialmath import SE3, UnitQuaternion
+from spatialmath import SE3, SO3, UnitQuaternion
 from spatialmath.base.argcheck import getvector
 import numpy as np
 
@@ -40,16 +40,18 @@ from rv_msgs.srv import GetNamedPoseConfigs, GetNamedPoseConfigsRequest, GetName
 from manipulation_driver.utils import populate_transform_stamped
 
 class Timer:
-  def __init__(self, name):
+  def __init__(self, name, enabled=True):
     self.name = name
+    self.enabled = enabled
 
   def __enter__(self):
     self.start = timeit.default_timer()
     return self
 
   def __exit__(self, *args):
-    dt = current_time -  self.start
-    print('{}: {} ({} hz)'.format(self.name, dt, 1/dt))
+    if self.enabled:
+        dt = timeit.default_timer() -  self.start
+        print('{}: {} ({} hz)'.format(self.name, dt, 1/dt))
 
 class ManipulationDriver:
     """
@@ -82,9 +84,13 @@ class ManipulationDriver:
         if not self.robot:
             self.robot = rtb.models.URDF.Panda()
 
-        if not self.backend:
-            self.backend = ROS()
+        # initialise the robot joints to ready position
+        self.robot.q = self.robot.qr
 
+        if not self.backend:
+            from roboticstoolbox.backends.swift import Swift
+            self.backend = Swift()
+        
         self.read_only_backends = [] #rtb.backends.Swift(realtime=False)]
 
         self.is_publishing_transforms = publish_transforms
@@ -131,7 +137,7 @@ class ManipulationDriver:
 
         # Launch backend
         self.backend.launch()
-        self.backend.add(self.robot, joint_velocity_topic='/arm/joint/velocity')
+        self.backend.add(self.robot)
 
         for backend in self.read_only_backends:
             backend.launch()
@@ -233,7 +239,7 @@ class ManipulationDriver:
             else:
                 self.e_v_frame = None
 
-            self.e_v = np.array([
+            e_v = np.array([
                 target.linear.x,
                 target.linear.y,
                 target.linear.z,
@@ -241,6 +247,12 @@ class ManipulationDriver:
                 target.angular.y,
                 target.angular.z
             ])
+
+            if np.any(e_v - self.e_v):
+                self.e_p = self.robot.fkine(self.robot.q, fast=True)
+
+            self.e_v = e_v
+
             self.last_update = timeit.default_timer()
 
     def joint_velocity_cb(self, msg: JointVelocity) -> None:
@@ -328,7 +340,7 @@ class ManipulationDriver:
             self.moving = True
 
             while not arrived and not self.preempted:
-                velocities, arrived = rtb.p_servo(self.robot.fkine(self.robot.q), target, 0.75 if not goal.scaling else min(1.5, goal.scaling), threshold=0.005)
+                velocities, arrived = rtb.p_servo(self.robot.fkine(self.robot.q), target, 2 if not goal.scaling else min(3, goal.scaling), threshold=0.005)
                 self.event.clear()
                 self.j_v = np.linalg.pinv(self.robot.jacobe(self.robot.q)) @ velocities
                 self.last_update = timeit.default_timer()
@@ -608,33 +620,69 @@ class ManipulationDriver:
         with open(self.config_path, 'w') as handle:
             handle.write(yaml.dump(config))
 
+    def noise(self, e_v):
+        noise = np.random.normal(-0.005, 0.002)
+        e_v = np.copy(e_v)
+        e_v[2] += noise
+        return e_v
+
     def run(self) -> None:
         """
         Runs the driver. This is a blocking call.
         """
+        self.last_tick = timeit.default_timer()
+        
+        # Gains
+        Kp = 1
+
         while not rospy.is_shutdown():
-          #with Timer('ROS'):
-            current_time = timeit.default_timer()
+          with Timer('ROS'):
             
+            # get current time and calculate dt
+            current_time = timeit.default_timer()
+            dt = current_time - self.last_tick
+            
+            # calculate joint velocities from desired cartesian velocity
             if any(self.e_v):
                 if current_time - self.last_update > 0.1:
                     self.e_v *= 0.9 if np.sum(np.absolute(self.e_v)) >= 0.0001 else 0
+
+                wTe = self.robot.fkine(self.robot.q, fast=True)
+                e =  self.e_p @ np.linalg.inv(wTe)
+                # print(e)
+                t = self.e_p[:3,3] #.astype('float64')
+                t += self.e_v[:3] * dt
+                R = SO3(self.e_p[:3,:3])
+
+                # Rdelta = SO3.EulerVec(self.e_v[3:])
+
+                # R = Rdelta * R
+                # R = R.norm()
+                # # print(self.e_p)
+                self.e_p = SE3.Rt(R, t=t).A
+                
+                v_t = self.e_v[:3] + Kp * e[:3,3]
+                v_r = self.e_v[3:] #+ (e[.rpy(]) * 0.5)
+
+                e_v = np.concatenate([v_t, v_r])
+                e_v = self.noise(e_v)
+                
+                self.j_v = np.linalg.pinv(self.robot.jacob0(self.robot.q, fast=True)) @ e_v
                     
-                self.robot.qd = np.linalg.pinv(self.robot.jacob0(self.robot.q)) @ self.e_v
-                    
-            elif any(self.j_v):
+            # apply desired joint velocity to robot
+            if any(self.j_v):
                 if current_time - self.last_update > 0.1:
                     self.j_v *= 0.9 if np.sum(np.absolute(self.j_v)) >= 0.0001 else 0
                 
                 self.robot.qd = self.j_v
-
+            
             if (self.moving or self.last_moving) or (current_time - self.last_update < 0.5):
-              self.backend.step(dt=0)
+              self.backend.step(dt=dt)
             
             self.last_moving = self.moving
             
             for backend in self.read_only_backends:
-                backend.step()
+                backend.step(dt=dt)
             
             self.event.set()
 
@@ -642,6 +690,8 @@ class ManipulationDriver:
             self.publish_transforms()
             self.publish_state()
 
+            self.last_tick = current_time
+            
             self.rate.sleep()
 
 if __name__ == '__main__':
