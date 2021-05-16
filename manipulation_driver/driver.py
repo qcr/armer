@@ -328,7 +328,7 @@ class ManipulationDriver:
             self.moving = True
 
             while not arrived and not self.preempted:
-                velocities, arrived = rtb.p_servo(self.robot.fkine(self.robot.q), target, 0.75 if not goal.scaling else min(1.5, goal.scaling), threshold=0.005)
+                velocities, arrived = rtb.p_servo(self.robot.fkine(self.robot.q), target, 2 if not goal.scaling else min(3, goal.scaling), threshold=0.005)
                 self.event.clear()
                 self.j_v = np.linalg.pinv(self.robot.jacobe(self.robot.q)) @ velocities
                 self.last_update = timeit.default_timer()
