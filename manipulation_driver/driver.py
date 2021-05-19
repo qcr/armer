@@ -23,6 +23,7 @@ from spatialmath.base.argcheck import getvector
 import numpy as np
 
 from manipulation_driver.backends import ROS
+from manipulation_driver.robots import ROSRobot
 
 from std_srvs.srv import Empty, EmptyRequest, EmptyResponse
 from geometry_msgs.msg import PoseStamped, TwistStamped, Twist
@@ -36,6 +37,7 @@ from rv_msgs.srv import GetNamesList, GetNamesListRequest, GetNamesListResponse
 from rv_msgs.srv import SetNamedPose, SetNamedPoseRequest, SetNamedPoseResponse
 from rv_msgs.srv import SetNamedPoseConfig, SetNamedPoseConfigRequest, SetNamedPoseConfigResponse
 from rv_msgs.srv import GetNamedPoseConfigs, GetNamedPoseConfigsRequest, GetNamedPoseConfigsResponse
+from rv_msgs.srv import SetCartesianImpedance, SetCartesianImpedanceResponse, SetCartesianImpedanceRequest
 
 from manipulation_driver.utils import populate_transform_stamped
 
@@ -82,7 +84,7 @@ class ManipulationDriver:
         self.backend: rtb.backends.Connector = backend
 
         if not self.robot:
-            self.robot = rtb.models.URDF.Panda()
+            self.robot = ROSRobot(rtb.models.URDF.Panda())
 
         # initialise the robot joints to ready position
         self.robot.q = self.robot.qr
@@ -148,6 +150,7 @@ class ManipulationDriver:
 
         # Services
         rospy.Service('home', Empty, self.home_cb)
+        rospy.Service('recover', Empty, self.recover_cb)
         rospy.Service('stop', Empty, self.preempt)
 
         rospy.Service('get_named_poses', GetNamesList, self.get_named_poses_cb)
@@ -168,6 +171,13 @@ class ManipulationDriver:
             GetNamedPoseConfigs,
             self.get_named_pose_configs_cb
         )
+
+        rospy.Service(
+            'set_cartesian_impedance', 
+            SetCartesianImpedance, 
+            self.set_cartesian_impedance_cb
+        )
+
 
         # Publishers
         self.state_publisher: rospy.Publisher = rospy.Publisher(
@@ -301,8 +311,8 @@ class ManipulationDriver:
                 pose.orientation.z
             ]).SE3()
 
-            q_pickup = self.robot.ikine_min(target, q0=self.robot.qr)
-            traj = rtb.tools.trajectory.jtraj(self.robot.q, q_pickup.q, 50)
+            dq = self.robot.ikine_min(target, q0=self.robot.q)
+            traj = rtb.tools.trajectory.jtraj(self.robot.q, dq.q, 100)
 
             if self.__traj_move(traj):
                 self.pose_server.set_succeeded(MoveToPoseResult(result=0))
@@ -324,7 +334,16 @@ class ManipulationDriver:
             self.preempt()
 
         with self.lock:
-            pose = goal.stamped_pose.pose
+            goal_pose = goal.stamped_pose
+
+            if goal_pose.header.frame_id == '':
+                goal_pose.header.frame_id = self.robot.base_link.name
+
+            goal_pose = self.tf_listener.transformPose(
+                self.robot.base_link.name, 
+                goal_pose
+            )
+            pose = goal_pose.pose
 
             target = SE3(pose.position.x, pose.position.y, pose.position.z) * UnitQuaternion([
                 pose.orientation.w,
@@ -333,8 +352,6 @@ class ManipulationDriver:
                 pose.orientation.z
             ]).SE3()
             
-            print('Target:', target)
-
             arrived = False
 
             self.moving = True
@@ -377,7 +394,7 @@ class ManipulationDriver:
             traj = rtb.tools.trajectory.jtraj(
                 self.robot.q,
                 np.array(self.named_poses[goal.pose_name]),
-                50
+                100
             )
 
             self.__traj_move(traj)
@@ -396,9 +413,13 @@ class ManipulationDriver:
             self.preempt()
 
         with self.lock:
-            traj = rtb.tools.trajectory.jtraj(self.robot.q, self.robot.qr, 50)
+            traj = rtb.tools.trajectory.jtraj(self.robot.q, self.robot.qr, 200)
             self.__traj_move(traj)
             return EmptyResponse()
+
+    def recover_cb(self, req: EmptyRequest) -> EmptyResponse:
+        self.robot.recover()
+        return EmptyResponse()
 
     def get_named_poses_cb(self, req: GetNamesListRequest) -> GetNamesListResponse:
         """
@@ -471,6 +492,23 @@ class ManipulationDriver:
         """
         return self.custom_configs
 
+    def set_cartesian_impedance_cb(
+        self,
+        request: SetCartesianImpedanceRequest) -> SetCartesianImpedanceResponse:
+        """
+        ROS Service Callback
+        Set the 6-DOF impedance of the end-effector. Higher values should increase the stiffness
+        of the robot while lower values should increase compliance
+
+        :param request: The numeric values representing the EE impedance (6-DOF) that
+        should be set on the arm
+        :type request: GetNamedPoseConfigsRequest
+        :return: True if the impedence values were updated successfully
+        :rtype: GetNamedPoseConfigsResponse
+        """
+        result = self.robot.set_cartesian_impedance(request.cartesian_impedance)
+        return SetCartesianImpedanceResponse(result)
+
 
     def preempt(self, *args: list) -> None:
         """
@@ -491,12 +529,13 @@ class ManipulationDriver:
         :rtype: bool
         """
         self.moving = True
-        for vel in traj.y:
+        for vel in traj.qd:
             if self.preempted:
                 break
 
             self.event.clear()
-            self.robot.q = vel
+            self.j_v = vel
+            self.last_update = timeit.default_timer()
             self.event.wait()
         
         self.moving = False
@@ -507,29 +546,8 @@ class ManipulationDriver:
     def publish_state(self) -> None:
         """[summary]
         """
-        ee_pose = self.robot.fkine(self.robot.q)
-
-        pose_stamped = PoseStamped()
-        pose_stamped.header.frame_id = 'panda_link0'
-
-        pose_stamped.pose.position.x = ee_pose.t[0]
-        pose_stamped.pose.position.y = ee_pose.t[1]
-        pose_stamped.pose.position.z = ee_pose.t[2]
-
-        ee_rot = UnitQuaternion(ee_pose.R)
-
-        pose_stamped.pose.orientation.w = ee_rot.A[0]
-        pose_stamped.pose.orientation.x = ee_rot.A[1]
-        pose_stamped.pose.orientation.y = ee_rot.A[2]
-        pose_stamped.pose.orientation.z = ee_rot.A[3]
-
-        state = ManipulatorState()
-        state.ee_pose = pose_stamped
-        state.joint_poses = list(self.robot.q)
-
-        self.state_publisher.publish(state)
-
-
+        self.state_publisher.publish(self.robot.state())
+        
     def publish_transforms(self) -> None:
         """[summary]
         """
@@ -636,7 +654,7 @@ class ManipulationDriver:
         Kp = 1
 
         while not rospy.is_shutdown():
-          with Timer('ROS'):
+          with Timer('ROS', False):
             
             # get current time and calculate dt
             current_time = timeit.default_timer()
@@ -696,5 +714,5 @@ class ManipulationDriver:
 
 if __name__ == '__main__':
     rospy.init_node('manipulator')
-    manipulator = ManipulationDriver(publish_transforms=False)
+    manipulator = ManipulationDriver(publish_transforms=True)
     manipulator.run()

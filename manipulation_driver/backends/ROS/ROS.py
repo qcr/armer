@@ -11,10 +11,6 @@ import spatialmath as sm
 import time
 import subprocess
 import os
-# import rospy
-# from std_msgs.msg import Float32MultiArray
-from sensor_msgs.msg import JointState
-from rv_msgs.msg import JointVelocity
 
 rospy = None
 
@@ -73,9 +69,8 @@ class ROS(Connector):  # pragma nocover
     def step(self, dt=0.01):
         """
         """
-        for robot_id in self.joint_states:
-            self.robots[robot_id].q = self.joint_states[robot_id]
-            self.joint_publishers[robot_id].publish(JointVelocity(joints=self.robots[robot_id].qd))
+        for robot_id in self.robots:
+            self.robots[robot_id].step(dt)
 
         super().step()
 
@@ -107,29 +102,11 @@ class ROS(Connector):  # pragma nocover
     #  Methods to interface with the robots created in other environemnts
     #
 
-    def add(self, ob, joint_state_topic=None, joint_velocity_topic=None):
+    def add(self, ob,):
         """
         """
-        if isinstance(ob, rtb.ERobot):
+        if isinstance(ob, manipulation_driver.robots.ROSRobot):
             self.robots[ob.name] = ob
-
-            joints = list(map(lambda link: link.name.replace('link', 'joint'), filter(lambda link: link.isjoint, ob.elinks)))
-
-            def _state_cb(msg):
-                if not ob.name in self.joint_indexes:
-                    self.joint_indexes[ob.name] = [idx for idx, joint_name in enumerate(msg.name) if joint_name in joints]
-                            
-                all_angles = np.array(msg.position)
-                self.joint_states[ob.name] = all_angles[self.joint_indexes[ob.name]]
-                            
-            self.joint_subscribers[ob.name] = rospy.Subscriber(
-                joint_state_topic if joint_state_topic else '/joint_states', 
-                JointState, 
-                _state_cb
-            )
-            self.joint_publishers[ob.name] = rospy.Publisher(
-              joint_velocity_topic if joint_velocity_topic else '/joint_velocity_node_controller/joint_velocity', JointVelocity, queue_size=1
-            )
 
         super().add()
 
