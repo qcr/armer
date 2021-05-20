@@ -3,20 +3,18 @@
 @author Jesse Haviland
 """
 
-from roboticstoolbox.backends.Connector import Connector
-import roboticstoolbox as rtb
-import numpy as np
-import spatialmath as sm
-
 import time
 import subprocess
 import os
+import importlib
+
+from roboticstoolbox.backends.Connector import Connector
+
+import armer
 
 rospy = None
 
-
 def _import_ros():     # pragma nocover
-    import importlib
     global rospy
     try:
         rospy = importlib.import_module('rospy')
@@ -34,13 +32,8 @@ class ROS(Connector):  # pragma nocover
     def __init__(self):
         super(ROS, self).__init__()
 
+        self.roscore = None
         self.robots = {}
-
-        self.joint_subscribers = {}
-        self.joint_publishers = {}
-
-        self.joint_states = {}
-        self.joint_indexes = {}
 
         _import_ros()
     #
@@ -103,26 +96,13 @@ class ROS(Connector):  # pragma nocover
     #  Methods to interface with the robots created in other environemnts
     #
 
-    def add(self, ob,):
+    def add(self, ob):
         """
         """
         if isinstance(ob, armer.robots.ROSRobot):
             self.robots[ob.name] = ob
 
         super().add()
-
-    def remove(self):
-        """
-        Remove a robot to the graphical scene
-
-        ``env.remove(robot)`` removes the ``robot`` from the graphical
-            environment.
-        """
-
-        # TODO - shouldn't this have an id argument? which robot does it remove
-        # TODO - it can remove any entity?
-
-        super().remove()
 
 # class VelPub:
 

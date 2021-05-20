@@ -5,19 +5,19 @@ Armer Class
 .. codeauthor:: Gavin Suddreys
 """
 import os
-import timeit
 
 from threading import Lock, Event
 from typing import List, Any
+import timeit
 
 import rospy
 import actionlib
 import tf
 import tf2_ros
 import yaml
-import timeit
 
 import roboticstoolbox as rtb
+from roboticstoolbox.backends.Swift import Swift
 from spatialmath import SE3, SO3, UnitQuaternion
 from spatialmath.base.argcheck import getvector
 import numpy as np
@@ -25,26 +25,43 @@ import numpy as np
 from geometry_msgs.msg import TwistStamped, Twist
 from std_srvs.srv import Empty, EmptyRequest, EmptyResponse
 
-from armer_msgs.msg import *
-from armer_msgs.srv import *
+from armer_msgs.msg import ManipulatorState, JointVelocity
+from armer_msgs.msg import MoveToJointPoseAction, MoveToJointPoseGoal, MoveToJointPoseResult
+from armer_msgs.msg import MoveToNamedPoseAction, MoveToNamedPoseGoal, MoveToNamedPoseResult
+from armer_msgs.msg import MoveToPoseAction, MoveToPoseGoal, MoveToPoseResult
+from armer_msgs.msg import ServoToPoseAction, ServoToPoseGoal, ServoToPoseResult
+
+from armer_msgs.srv import AddNamedPose, \
+    AddNamedPoseRequest, \
+    AddNamedPoseResponse
+
+from armer_msgs.srv import AddNamedPoseConfig, \
+    AddNamedPoseConfigRequest, \
+    AddNamedPoseConfigResponse
+
+from armer_msgs.srv import GetNamedPoseConfigs, \
+    GetNamedPoseConfigsRequest, \
+    GetNamedPoseConfigsResponse
+
+from armer_msgs.srv import GetNamedPoses, \
+    GetNamedPosesRequest, \
+    GetNamedPosesResponse
+
+from armer_msgs.srv import RemoveNamedPose, \
+    RemoveNamedPoseRequest, \
+    RemoveNamedPoseResponse
+
+from armer_msgs.srv import RemoveNamedPoseConfig, \
+    RemoveNamedPoseConfigRequest, \
+    RemoveNamedPoseConfigResponse
+
+from armer_msgs.srv import SetCartesianImpedance, \
+    SetCartesianImpedanceRequest, \
+    SetCartesianImpedanceResponse
 
 from armer.robots import ROSRobot
+from armer.timer import Timer
 from armer.utils import populate_transform_stamped
-
-
-class Timer:
-    def __init__(self, name, enabled=True):
-        self.name = name
-        self.enabled = enabled
-
-    def __enter__(self):
-        self.start = timeit.default_timer()
-        return self
-
-    def __exit__(self, *args):
-        if self.enabled:
-            dt = timeit.default_timer() - self.start
-            print('{}: {} ({} hz)'.format(self.name, dt, 1/dt))
 
 
 class Armer:
@@ -82,7 +99,6 @@ class Armer:
         self.robot.q = self.robot.qr
 
         if not self.backend:
-            from roboticstoolbox.backends.Swift import Swift
             self.backend = Swift()
 
         self.read_only_backends = []  # rtb.backends.Swift(realtime=False)]
@@ -117,6 +133,8 @@ class Armer:
         # Arm state property
         self.state: ManipulatorState = ManipulatorState()
 
+        self.e_v_frame: str = None
+
         self.e_v: np.array = np.zeros(shape=(6,))  # cartesian motion
         self.j_v: np.array = np.zeros(
             shape=(len(self.robot.q),)
@@ -125,6 +143,7 @@ class Armer:
         self.e_p = self.robot.fkine(self.robot.q)
 
         self.last_update: float = 0
+        self.last_tick: float = 0
 
         # Tooltip offsets
         if rospy.has_param('~tool_name'):
@@ -137,9 +156,9 @@ class Armer:
         self.backend.launch()
         self.backend.add(self.robot)
 
-        for backend in self.read_only_backends:
-            backend.launch()
-            backend.add(self.robot, readonly=True)
+        for readonly in self.read_only_backends:
+            readonly.launch()
+            readonly.add(self.robot, readonly=True)
 
         # Create Transform Listener
         self.tf_listener = tf.TransformListener()
@@ -209,6 +228,15 @@ class Armer:
         )
         self.pose_servo_server.register_preempt_callback(self.preempt)
         self.pose_servo_server.start()
+
+        self.joint_pose_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
+            'joint/pose',
+            MoveToJointPoseAction,
+            execute_cb=self.joint_pose_cb,
+            auto_start=False
+        )
+        self.joint_pose_server.register_preempt_callback(self.preempt)
+        self.joint_pose_server.start()
 
         self.named_pose_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
             'joint/named',
@@ -314,9 +342,9 @@ class Armer:
             traj = rtb.tools.trajectory.jtraj(self.robot.q, dq.q, 100)
 
             if self.__traj_move(traj):
-                self.pose_server.set_succeeded(MoveToPoseResult(result=0))
+                self.pose_server.set_succeeded(MoveToPoseResult(success=True))
             else:
-                self.pose_server.set_succeeded(MoveToPoseResult(result=1))
+                self.pose_server.set_aborted(MoveToPoseResult(success=False))
 
     def servo_cb(self, goal: ServoToPoseGoal) -> None:
         """
@@ -356,8 +384,12 @@ class Armer:
             self.moving = True
 
             while not arrived and not self.preempted:
-                velocities, arrived = rtb.p_servo(self.robot.fkine(
-                    self.robot.q), target, 2 if not goal.scaling else min(3, goal.scaling), threshold=0.005)
+                velocities, arrived = rtb.p_servo(
+                    self.robot.fkine(self.robot.q),
+                    target,
+                    min(3, goal.scaling) if goal.scaling else 2,
+                    threshold=goal.threshold if goal.threshold else 0.005
+                )
                 self.event.clear()
                 self.j_v = np.linalg.pinv(
                     self.robot.jacobe(self.robot.q)) @ velocities
@@ -369,9 +401,42 @@ class Armer:
             self.preempted = False
 
             # self.robot.qd *= 0
+            if result:
+                self.pose_servo_server.set_succeeded(
+                    ServoToPoseResult(success=True)
+                )
+            else:
+                self.pose_servo_server.set_aborted(
+                    ServoToPoseResult(success=False)
+                )
 
-            self.pose_servo_server.set_succeeded(
-                ServoToPoseResult(result=0 if result else 1))
+    def joint_pose_cb(self, goal: MoveToJointPoseGoal) -> None:
+        """
+        ROS Action Server callback:
+        Moves the arm the named pose indicated by goal
+
+        :param goal: Goal message containing the name of
+        the joint configuration to which the arm should move
+        :type goal: MoveToNamedPoseGoal
+        """
+        if self.moving:
+            self.preempt()
+
+        with self.lock:
+            traj = rtb.tools.trajectory.jtraj(
+                self.robot.q,
+                np.array(goal.joints),
+                100
+            )
+
+            if self.__traj_move(traj):
+                self.named_pose_server.set_succeeded(
+                    MoveToJointPoseResult(success=True)
+                )
+            else:
+                self.joint_pose_server.set_aborted(
+                    MoveToJointPoseResult(success=False)
+                )
 
     def named_pose_cb(self, goal: MoveToNamedPoseGoal) -> None:
         """
@@ -388,7 +453,7 @@ class Armer:
         with self.lock:
             if not goal.pose_name in self.named_poses:
                 self.named_pose_server.set_aborted(
-                    MoveToNamedPoseResult(result=1),
+                    MoveToNamedPoseResult(success=False),
                     'Unknown named pose'
                 )
 
@@ -398,10 +463,14 @@ class Armer:
                 100
             )
 
-            self.__traj_move(traj)
-
-            self.named_pose_server.set_succeeded(
-                MoveToNamedPoseResult(result=0))
+            if self.__traj_move(traj):
+                self.named_pose_server.set_succeeded(
+                    MoveToNamedPoseResult(success=True)
+                )
+            else:
+                self.named_pose_server.set_aborted(
+                    MoveToNamedPoseResult(success=False)
+                )
 
     def home_cb(self, req: EmptyRequest) -> EmptyResponse:
         """[summary]
@@ -420,6 +489,15 @@ class Armer:
             return EmptyResponse()
 
     def recover_cb(self, req: EmptyRequest) -> EmptyResponse:
+        """[summary]
+        ROS Service callback:
+        Invoke any available error recovery functions on the robot when an error occurs
+
+        :param req: an empty request
+        :type req: EmptyRequest
+        :return: an empty response
+        :rtype: EmptyResponse
+        """
         self.robot.recover()
         return EmptyResponse()
 
@@ -433,7 +511,7 @@ class Armer:
         :return: The list of named poses available for the arm
         :rtype: GetNamesListResponse
         """
-        return GetNamesListResponse(list(self.named_poses.keys()))
+        return GetNamedPosesResponse(list(self.named_poses.keys()))
 
     def add_named_pose_cb(self, req: AddNamedPoseRequest) -> AddNamedPoseResponse:
         """
@@ -662,12 +740,6 @@ class Armer:
         with open(self.config_path, 'w') as handle:
             handle.write(yaml.dump(config))
 
-    def noise(self, e_v):
-        noise = np.random.normal(-0.005, 0.002)
-        e_v = np.copy(e_v)
-        e_v[2] += noise
-        return e_v
-
     def run(self) -> None:
         """
         Runs the driver. This is a blocking call.
@@ -691,24 +763,23 @@ class Armer:
                                                   ) >= 0.0001 else 0
 
                     wTe = self.robot.fkine(self.robot.q, fast=True)
-                    e = self.e_p @ np.linalg.inv(wTe)
+                    error = self.e_p @ np.linalg.inv(wTe)
                     # print(e)
-                    t = self.e_p[:3, 3]  # .astype('float64')
-                    t += self.e_v[:3] * dt
-                    R = SO3(self.e_p[:3, :3])
+                    trans = self.e_p[:3, 3]  # .astype('float64')
+                    trans += self.e_v[:3] * dt
+                    rotation = SO3(self.e_p[:3, :3])
 
                     # Rdelta = SO3.EulerVec(self.e_v[3:])
 
                     # R = Rdelta * R
                     # R = R.norm()
                     # # print(self.e_p)
-                    self.e_p = SE3.Rt(R, t=t).A
+                    self.e_p = SE3.Rt(rotation, t=trans).A
 
-                    v_t = self.e_v[:3] + Kp * e[:3, 3]
+                    v_t = self.e_v[:3] + Kp * error[:3, 3]
                     v_r = self.e_v[3:]  # + (e[.rpy(]) * 0.5)
 
                     e_v = np.concatenate([v_t, v_r])
-                    e_v = self.noise(e_v)
 
                     self.j_v = np.linalg.pinv(
                         self.robot.jacob0(self.robot.q, fast=True)) @ e_v

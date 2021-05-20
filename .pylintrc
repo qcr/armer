@@ -420,8 +420,15 @@ function-naming-style=snake_case
 good-names=i,
            j,
            k,
+           dt,
            ex,
+           wTe,
+           Kp,
+           Kd,
+           Ki,
+           dq,
            Run,
+           ROS,
            _
 
 # Good variable names regexes, separated by a comma. If names match any regex,
@@ -528,13 +535,13 @@ max-locals=15
 max-parents=7
 
 # Maximum number of public methods for a class (see R0904).
-max-public-methods=20
+max-public-methods=25
 
 # Maximum number of return / yield for function / method body.
 max-returns=6
 
 # Maximum number of statements in function / method body.
-max-statements=50
+max-statements=100
 
 # Minimum number of public methods for a class (see R0903).
 min-public-methods=2
