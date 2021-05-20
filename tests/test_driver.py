@@ -9,7 +9,7 @@ import signal
 import time
 import rospy
 
-import roboticstoolbox as rtb
+from roboticstoolbox.backends.Swift import Swift
 
 class TestDriver(unittest.TestCase):
     """
@@ -47,7 +47,7 @@ class TestDriver(unittest.TestCase):
         Test initialising driver
         """
         from armer import Armer #pylint: disable=import-outside-toplevel
-        driver = Armer(backend=rtb.backends.Swift(display=False))
+        driver = Armer(backend=Swift())
         self.assertIsInstance(driver, Armer)
         driver.close()
 
