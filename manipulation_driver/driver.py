@@ -90,7 +90,7 @@ class ManipulationDriver:
         self.robot.q = self.robot.qr
 
         if not self.backend:
-            from roboticstoolbox.backends.swift import Swift
+            from roboticstoolbox.backends.Swift import Swift
             self.backend = Swift()
         
         self.read_only_backends = [] #rtb.backends.Swift(realtime=False)]
