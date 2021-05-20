@@ -13,7 +13,7 @@ import roboticstoolbox as rtb
 
 class TestDriver(unittest.TestCase):
     """
-    Test Manipulation Driver
+    Test Armer Driver
     """
     @classmethod
     def setUpClass(cls):
@@ -39,16 +39,16 @@ class TestDriver(unittest.TestCase):
         """
         Test driver import
         """
-        from manipulation_driver import ManipulationDriver #pylint: disable=import-outside-toplevel
-        self.assertIsInstance(ManipulationDriver, object)
+        from armer import Armer #pylint: disable=import-outside-toplevel
+        self.assertIsInstance(Armer, object)
 
     def test_driver_init(self):
         """
         Test initialising driver
         """
-        from manipulation_driver import ManipulationDriver #pylint: disable=import-outside-toplevel
-        driver = ManipulationDriver(backend=rtb.backends.Swift(display=False))
-        self.assertIsInstance(driver, ManipulationDriver)
+        from armer import Armer #pylint: disable=import-outside-toplevel
+        driver = Armer(backend=rtb.backends.Swift(display=False))
+        self.assertIsInstance(driver, Armer)
         driver.close()
 
 if __name__ == '__main__':

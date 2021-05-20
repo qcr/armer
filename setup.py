@@ -58,17 +58,17 @@ for data_folder in data_folders:
     extra_files += package_files(data_folder)
 
 setup(
-    name='manipulation-driver',
+    name='armer',
 
     version='0.1.0',
 
-    description='A ROSlibrary for driving manipulators',
+    description='Armer - The ROS Arm drivEr',
 
     long_description=long_description,
 
     long_description_content_type='text/markdown',
 
-    url='https://github.com/suddrey-qut/manipulation_driver',
+    url='https://github.com/suddrey-qut/armer',
 
     author='Gavin Suddrey',
 
@@ -97,8 +97,8 @@ setup(
 
     project_urls={
         # 'Documentation': 'https://petercorke.github.io/roboticstoolbox-python',
-        'Source': 'https://github.com/suddrey-qut/manipulation_driver',
-        'Tracker': 'https://github.com/suddrey-qut/manipulation_driver/issues'#,
+        'Source': 'https://github.com/suddrey-qut/armer',
+        'Tracker': 'https://github.com/suddrey-qut/armer/issues'#,
         # 'Coverage': 'https://codecov.io/gh/petercorke/roboticstoolbox-python'
     },
 
@@ -107,7 +107,7 @@ setup(
              ' control simulation robot-manipulator mobile-robot ros',
 
     packages=find_packages(exclude=['tests']),
-    package_data={'manipulation_driver': extra_files},
+    package_data={'armer': extra_files},
 
     include_package_data=True,
 

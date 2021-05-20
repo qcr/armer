@@ -1,11 +1,11 @@
 <launch>
     <group ns="arm">
-    <arg name="backend" default="roboticstoolbox.backends.swift.Swift" />
-    <arg name="robot" default="roboticstoolbox.models.Panda" />
+        <arg name="backend" default="roboticstoolbox.backends.Swift.Swift" />
+        <arg name="robot" default="roboticstoolbox.models.Panda" />
 
-    <node pkg="manipulation_driver" type="driver" name="driver" output="screen">
-        <param name="backend" value="$(arg backend)" />
-        <param name="robot" value="$(arg robot)" />
-    </node>
+        <node pkg="armer" type="armer" name="armer" output="screen">
+            <param name="backend" value="$(arg backend)" />
+            <param name="robot" value="$(arg robot)" />
+        </node>
     </group>
 </launch>

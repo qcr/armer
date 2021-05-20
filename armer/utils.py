@@ -1,5 +1,5 @@
 """
-Utility functions used by the Manipulation Driver
+Utility functions used by Armer
 
 .. codeauthor:: Gavin Suddreys
 """

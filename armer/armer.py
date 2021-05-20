@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Manipulation Driver Class
+Armer Class
 
 .. codeauthor:: Gavin Suddreys
 """
@@ -22,40 +22,32 @@ from spatialmath import SE3, SO3, UnitQuaternion
 from spatialmath.base.argcheck import getvector
 import numpy as np
 
-from manipulation_driver.backends import ROS
-from manipulation_driver.robots import ROSRobot
-
+from geometry_msgs.msg import TwistStamped, Twist
 from std_srvs.srv import Empty, EmptyRequest, EmptyResponse
-from geometry_msgs.msg import PoseStamped, TwistStamped, Twist
 
-from rv_msgs.msg import ManipulatorState
-from rv_msgs.msg import JointVelocity
-from rv_msgs.msg import MoveToPoseAction, MoveToPoseGoal, MoveToPoseResult
-from rv_msgs.msg import MoveToNamedPoseAction, MoveToNamedPoseGoal, MoveToNamedPoseResult
-from rv_msgs.msg import ServoToPoseAction, ServoToPoseGoal, ServoToPoseResult
-from rv_msgs.srv import GetNamesList, GetNamesListRequest, GetNamesListResponse
-from rv_msgs.srv import SetNamedPose, SetNamedPoseRequest, SetNamedPoseResponse
-from rv_msgs.srv import SetNamedPoseConfig, SetNamedPoseConfigRequest, SetNamedPoseConfigResponse
-from rv_msgs.srv import GetNamedPoseConfigs, GetNamedPoseConfigsRequest, GetNamedPoseConfigsResponse
-from rv_msgs.srv import SetCartesianImpedance, SetCartesianImpedanceResponse, SetCartesianImpedanceRequest
+from armer_msgs.msg import *
+from armer_msgs.srv import *
 
-from manipulation_driver.utils import populate_transform_stamped
+from armer.robots import ROSRobot
+from armer.utils import populate_transform_stamped
+
 
 class Timer:
-  def __init__(self, name, enabled=True):
-    self.name = name
-    self.enabled = enabled
+    def __init__(self, name, enabled=True):
+        self.name = name
+        self.enabled = enabled
 
-  def __enter__(self):
-    self.start = timeit.default_timer()
-    return self
+    def __enter__(self):
+        self.start = timeit.default_timer()
+        return self
 
-  def __exit__(self, *args):
-    if self.enabled:
-        dt = timeit.default_timer() -  self.start
-        print('{}: {} ({} hz)'.format(self.name, dt, 1/dt))
+    def __exit__(self, *args):
+        if self.enabled:
+            dt = timeit.default_timer() - self.start
+            print('{}: {} ({} hz)'.format(self.name, dt, 1/dt))
 
-class ManipulationDriver:
+
+class Armer:
     """
     The Manipulator Driver.
 
@@ -73,11 +65,11 @@ class ManipulationDriver:
     # pylint: disable=too-many-instance-attributes
 
     def __init__(
-        self,
-        robot: rtb.robot.Robot = None,
-        gripper: rtb.robot.Robot = None,
-        backend: rtb.backends.Connector=None,
-        publish_transforms: bool=False) -> None:
+            self,
+            robot: rtb.robot.Robot = None,
+            gripper: rtb.robot.Robot = None,
+            backend: rtb.backends.Connector = None,
+            publish_transforms: bool = False) -> None:
 
         self.robot: rtb.robot.Robot = robot
         self.gripper: rtb.robot.Robot = gripper
@@ -92,8 +84,8 @@ class ManipulationDriver:
         if not self.backend:
             from roboticstoolbox.backends.Swift import Swift
             self.backend = Swift()
-        
-        self.read_only_backends = [] #rtb.backends.Swift(realtime=False)]
+
+        self.read_only_backends = []  # rtb.backends.Swift(realtime=False)]
 
         self.is_publishing_transforms = publish_transforms
 
@@ -116,7 +108,7 @@ class ManipulationDriver:
         # Load host specific arm configuration
         self.config_path: str = rospy.get_param('~config_path', os.path.join(
             os.getenv('HOME', '/root'),
-            '.ros/configs/manipulation_driver.yaml'
+            '.ros/configs/armer.yaml'
         ))
         self.custom_configs: List[str] = []
 
@@ -125,17 +117,21 @@ class ManipulationDriver:
         # Arm state property
         self.state: ManipulatorState = ManipulatorState()
 
-        self.e_v: np.array = np.zeros(shape=(6,)) # cartesian motion
-        self.j_v: np.array = np.zeros(shape=(len(self.robot.q),)) # joint motion
+        self.e_v: np.array = np.zeros(shape=(6,))  # cartesian motion
+        self.j_v: np.array = np.zeros(
+            shape=(len(self.robot.q),)
+        )  # joint motion
+
+        self.e_p = self.robot.fkine(self.robot.q)
 
         self.last_update: float = 0
 
         # Tooltip offsets
         if rospy.has_param('~tool_name'):
-          self.tool_name = rospy.get_param('~tool_name')
+            self.tool_name = rospy.get_param('~tool_name')
 
         if rospy.has_param('~tool_offset'):
-          self.tool_offset = rospy.get_param('~tool_offset')
+            self.tool_offset = rospy.get_param('~tool_offset')
 
         # Launch backend
         self.backend.launch()
@@ -153,17 +149,21 @@ class ManipulationDriver:
         rospy.Service('recover', Empty, self.recover_cb)
         rospy.Service('stop', Empty, self.preempt)
 
-        rospy.Service('get_named_poses', GetNamesList, self.get_named_poses_cb)
-        rospy.Service('set_named_pose', SetNamedPose, self.set_named_pose_cb)
+        rospy.Service('get_named_poses', GetNamedPoses,
+                      self.get_named_poses_cb)
+
+        rospy.Service('set_named_pose', AddNamedPose, self.add_named_pose_cb)
+        rospy.Service('remove_named_pose', RemoveNamedPose,
+                      self.remove_named_pose_cb)
 
         rospy.Service(
             'add_named_pose_config',
-            SetNamedPoseConfig,
+            AddNamedPoseConfig,
             self.add_named_pose_config_cb
         )
         rospy.Service(
             'remove_named_pose_config',
-            SetNamedPoseConfig,
+            RemoveNamedPoseConfig,
             self.remove_named_pose_config_cb
         )
         rospy.Service(
@@ -173,11 +173,10 @@ class ManipulationDriver:
         )
 
         rospy.Service(
-            'set_cartesian_impedance', 
-            SetCartesianImpedance, 
+            'set_cartesian_impedance',
+            SetCartesianImpedance,
             self.set_cartesian_impedance_cb
         )
-
 
         # Publishers
         self.state_publisher: rospy.Publisher = rospy.Publisher(
@@ -299,11 +298,11 @@ class ManipulationDriver:
                 goal_pose.header.frame_id = self.robot.base_link.name
 
             goal_pose = self.tf_listener.transformPose(
-                self.robot.base_link.name, 
+                self.robot.base_link.name,
                 goal_pose
             )
             pose = goal_pose.pose
-            
+
             target = SE3(pose.position.x, pose.position.y, pose.position.z) * UnitQuaternion([
                 pose.orientation.w,
                 pose.orientation.x,
@@ -340,7 +339,7 @@ class ManipulationDriver:
                 goal_pose.header.frame_id = self.robot.base_link.name
 
             goal_pose = self.tf_listener.transformPose(
-                self.robot.base_link.name, 
+                self.robot.base_link.name,
                 goal_pose
             )
             pose = goal_pose.pose
@@ -351,15 +350,17 @@ class ManipulationDriver:
                 pose.orientation.y,
                 pose.orientation.z
             ]).SE3()
-            
+
             arrived = False
 
             self.moving = True
 
             while not arrived and not self.preempted:
-                velocities, arrived = rtb.p_servo(self.robot.fkine(self.robot.q), target, 2 if not goal.scaling else min(3, goal.scaling), threshold=0.005)
+                velocities, arrived = rtb.p_servo(self.robot.fkine(
+                    self.robot.q), target, 2 if not goal.scaling else min(3, goal.scaling), threshold=0.005)
                 self.event.clear()
-                self.j_v = np.linalg.pinv(self.robot.jacobe(self.robot.q)) @ velocities
+                self.j_v = np.linalg.pinv(
+                    self.robot.jacobe(self.robot.q)) @ velocities
                 self.last_update = timeit.default_timer()
                 self.event.wait()
 
@@ -369,8 +370,8 @@ class ManipulationDriver:
 
             # self.robot.qd *= 0
 
-            self.pose_servo_server.set_succeeded(ServoToPoseResult(result=0 if result else 1))
-
+            self.pose_servo_server.set_succeeded(
+                ServoToPoseResult(result=0 if result else 1))
 
     def named_pose_cb(self, goal: MoveToNamedPoseGoal) -> None:
         """
@@ -399,7 +400,8 @@ class ManipulationDriver:
 
             self.__traj_move(traj)
 
-            self.named_pose_server.set_succeeded(MoveToNamedPoseResult(result=0))
+            self.named_pose_server.set_succeeded(
+                MoveToNamedPoseResult(result=0))
 
     def home_cb(self, req: EmptyRequest) -> EmptyResponse:
         """[summary]
@@ -421,7 +423,7 @@ class ManipulationDriver:
         self.robot.recover()
         return EmptyResponse()
 
-    def get_named_poses_cb(self, req: GetNamesListRequest) -> GetNamesListResponse:
+    def get_named_poses_cb(self, req: GetNamedPosesRequest) -> GetNamedPosesResponse:
         """
         ROS Service callback:
         Retrieves the list of named poses available to the arm
@@ -433,45 +435,65 @@ class ManipulationDriver:
         """
         return GetNamesListResponse(list(self.named_poses.keys()))
 
-    def set_named_pose_cb(self, req: SetNamedPoseRequest) -> SetNamedPoseResponse:
+    def add_named_pose_cb(self, req: AddNamedPoseRequest) -> AddNamedPoseResponse:
         """
         ROS Service callback:
         Adds the current arm pose as a named pose and saves it to the host config
 
         :param req: The name of the pose as well as whether to overwrite if the pose already exists
-        :type req: SetNamedPoseRequest
+        :type req: AddNamedPoseRequest
         :return: True if the named pose was written successfully otherwise false
-        :rtype: SetNamedPoseResponse
+        :rtype: AddNamedPoseResponse
         """
         if req.pose_name in self.named_poses and not req.overwrite:
             rospy.logerr('Named pose already exists.')
-            return SetNamedPoseResponse(success=False)
+            return AddNamedPoseResponse(success=False)
 
         self.named_poses[req.pose_name] = self.robot.q.tolist()
         self.__write_config('named_poses', self.named_poses)
 
-        return SetNamedPoseResponse(success=True)
+        return AddNamedPoseResponse(success=True)
 
+    def remove_named_pose_cb(self, req: RemoveNamedPoseRequest) -> RemoveNamedPoseResponse:
+        """
+        ROS Service callback:
+        Adds the current arm pose as a named pose and saves it to the host config
+
+        :param req: The name of the pose as well as whether to overwrite if the pose already exists
+        :type req: AddNamedPoseRequest
+        :return: True if the named pose was written successfully otherwise false
+        :rtype: AddNamedPoseResponse
+        """
+        if req.pose_name not in self.named_poses and not req.overwrite:
+            rospy.logerr('Named pose does not exists.')
+            return AddNamedPoseResponse(success=False)
+
+        del self.named_poses[req.pose_name]
+        self.__write_config('named_poses', self.named_poses)
+
+        return AddNamedPoseResponse(success=True)
 
     def add_named_pose_config_cb(
-        self,
-        request: SetNamedPoseConfigRequest) -> SetNamedPoseConfigResponse:
+            self,
+            request: AddNamedPoseConfigRequest) -> AddNamedPoseConfigResponse:
         """[summary]
 
         :param request: [description]
-        :type request: SetNamedPoseConfigRequest
+        :type request: AddNamedPoseConfigRequest
         :return: [description]
-        :rtype: SetNamedPoseConfigResponse
+        :rtype: AddNamedPoseConfigResponse
         """
         self.custom_configs.append(request.config_path)
         self.__load_config()
         return True
 
-    def remove_named_pose_config_cb(self, request: SetNamedPoseRequest):
+    def remove_named_pose_config_cb(
+            self,
+            request: RemoveNamedPoseConfigRequest) -> RemoveNamedPoseConfigResponse:
         """[summary]
 
         :param request: [description]
-        :type request: SetNamedPoseRequest
+        :type request: AddNamedPoseRequest
         :return: [description]
         :rtype: [type]
         """
@@ -481,8 +503,8 @@ class ManipulationDriver:
         return True
 
     def get_named_pose_configs_cb(
-        self,
-        request: GetNamedPoseConfigsRequest) -> GetNamedPoseConfigsResponse:
+            self,
+            request: GetNamedPoseConfigsRequest) -> GetNamedPoseConfigsResponse:
         """[summary]
 
         :param request: [description]
@@ -493,8 +515,8 @@ class ManipulationDriver:
         return self.custom_configs
 
     def set_cartesian_impedance_cb(
-        self,
-        request: SetCartesianImpedanceRequest) -> SetCartesianImpedanceResponse:
+            self,
+            request: SetCartesianImpedanceRequest) -> SetCartesianImpedanceResponse:
         """
         ROS Service Callback
         Set the 6-DOF impedance of the end-effector. Higher values should increase the stiffness
@@ -506,9 +528,9 @@ class ManipulationDriver:
         :return: True if the impedence values were updated successfully
         :rtype: GetNamedPoseConfigsResponse
         """
-        result = self.robot.set_cartesian_impedance(request.cartesian_impedance)
+        result = self.robot.set_cartesian_impedance(
+            request.cartesian_impedance)
         return SetCartesianImpedanceResponse(result)
-
 
     def preempt(self, *args: list) -> None:
         """
@@ -537,7 +559,7 @@ class ManipulationDriver:
             self.j_v = vel
             self.last_update = timeit.default_timer()
             self.event.wait()
-        
+
         self.moving = False
         result = not self.preempted
         self.preempted = False
@@ -547,7 +569,7 @@ class ManipulationDriver:
         """[summary]
         """
         self.state_publisher.publish(self.robot.state())
-        
+
     def publish_transforms(self) -> None:
         """[summary]
         """
@@ -599,11 +621,13 @@ class ManipulationDriver:
                 if config and 'named_poses' in config:
                     self.named_poses.update(config['named_poses'])
             except IOError:
-                rospy.logwarn('Unable to locate configuration file: {}'.format(config_name))
+                rospy.logwarn(
+                    'Unable to locate configuration file: {}'.format(config_name))
 
         if os.path.exists(self.config_path):
             try:
-                config = yaml.load(open(self.config_path), Loader=yaml.SafeLoader)
+                config = yaml.load(open(self.config_path),
+                                   Loader=yaml.SafeLoader)
                 if config and 'named_poses' in config:
                     self.named_poses.update(config['named_poses'])
 
@@ -633,7 +657,7 @@ class ManipulationDriver:
         except IOError:
             pass
 
-        config.update({ key: value })
+        config.update({key: value})
 
         with open(self.config_path, 'w') as handle:
             handle.write(yaml.dump(config))
@@ -649,70 +673,73 @@ class ManipulationDriver:
         Runs the driver. This is a blocking call.
         """
         self.last_tick = timeit.default_timer()
-        
+
         # Gains
         Kp = 1
 
         while not rospy.is_shutdown():
-          with Timer('ROS', False):
-            
-            # get current time and calculate dt
-            current_time = timeit.default_timer()
-            dt = current_time - self.last_tick
-            
-            # calculate joint velocities from desired cartesian velocity
-            if any(self.e_v):
-                if current_time - self.last_update > 0.1:
-                    self.e_v *= 0.9 if np.sum(np.absolute(self.e_v)) >= 0.0001 else 0
+            with Timer('ROS', False):
 
-                wTe = self.robot.fkine(self.robot.q, fast=True)
-                e =  self.e_p @ np.linalg.inv(wTe)
-                # print(e)
-                t = self.e_p[:3,3] #.astype('float64')
-                t += self.e_v[:3] * dt
-                R = SO3(self.e_p[:3,:3])
+                # get current time and calculate dt
+                current_time = timeit.default_timer()
+                dt = current_time - self.last_tick
 
-                # Rdelta = SO3.EulerVec(self.e_v[3:])
+                # calculate joint velocities from desired cartesian velocity
+                if any(self.e_v):
+                    if current_time - self.last_update > 0.1:
+                        self.e_v *= 0.9 if np.sum(np.absolute(self.e_v)
+                                                  ) >= 0.0001 else 0
 
-                # R = Rdelta * R
-                # R = R.norm()
-                # # print(self.e_p)
-                self.e_p = SE3.Rt(R, t=t).A
-                
-                v_t = self.e_v[:3] + Kp * e[:3,3]
-                v_r = self.e_v[3:] #+ (e[.rpy(]) * 0.5)
+                    wTe = self.robot.fkine(self.robot.q, fast=True)
+                    e = self.e_p @ np.linalg.inv(wTe)
+                    # print(e)
+                    t = self.e_p[:3, 3]  # .astype('float64')
+                    t += self.e_v[:3] * dt
+                    R = SO3(self.e_p[:3, :3])
 
-                e_v = np.concatenate([v_t, v_r])
-                e_v = self.noise(e_v)
-                
-                self.j_v = np.linalg.pinv(self.robot.jacob0(self.robot.q, fast=True)) @ e_v
-                    
-            # apply desired joint velocity to robot
-            if any(self.j_v):
-                if current_time - self.last_update > 0.1:
-                    self.j_v *= 0.9 if np.sum(np.absolute(self.j_v)) >= 0.0001 else 0
-                
-                self.robot.qd = self.j_v
-            
-            if (self.moving or self.last_moving) or (current_time - self.last_update < 0.5):
-              self.backend.step(dt=dt)
-            
-            self.last_moving = self.moving
-            
-            for backend in self.read_only_backends:
-                backend.step(dt=dt)
-            
-            self.event.set()
+                    # Rdelta = SO3.EulerVec(self.e_v[3:])
 
+                    # R = Rdelta * R
+                    # R = R.norm()
+                    # # print(self.e_p)
+                    self.e_p = SE3.Rt(R, t=t).A
 
-            self.publish_transforms()
-            self.publish_state()
+                    v_t = self.e_v[:3] + Kp * e[:3, 3]
+                    v_r = self.e_v[3:]  # + (e[.rpy(]) * 0.5)
 
-            self.last_tick = current_time
-            
-            self.rate.sleep()
+                    e_v = np.concatenate([v_t, v_r])
+                    e_v = self.noise(e_v)
+
+                    self.j_v = np.linalg.pinv(
+                        self.robot.jacob0(self.robot.q, fast=True)) @ e_v
+
+                # apply desired joint velocity to robot
+                if any(self.j_v):
+                    if current_time - self.last_update > 0.1:
+                        self.j_v *= 0.9 if np.sum(np.absolute(self.j_v)
+                                                  ) >= 0.0001 else 0
+
+                    self.robot.qd = self.j_v
+
+                if (self.moving or self.last_moving) or (current_time - self.last_update < 0.5):
+                    self.backend.step(dt=dt)
+
+                self.last_moving = self.moving
+
+                for backend in self.read_only_backends:
+                    backend.step(dt=dt)
+
+                self.event.set()
+
+                self.publish_transforms()
+                self.publish_state()
+
+                self.last_tick = current_time
+
+                self.rate.sleep()
+
 
 if __name__ == '__main__':
     rospy.init_node('manipulator')
-    manipulator = ManipulationDriver(publish_transforms=True)
+    manipulator = Armer(publish_transforms=True)
     manipulator.run()

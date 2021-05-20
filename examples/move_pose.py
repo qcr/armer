@@ -9,8 +9,8 @@ import timeit
 import rospy
 import actionlib
 
-from rv_msgs.msg import MoveToPoseAction, MoveToPoseGoal
-from rv_msgs.msg import ServoToPoseAction, ServoToPoseGoal
+from armer_msgs.msg import MoveToPoseAction, MoveToPoseGoal
+from armer_msgs.msg import ServoToPoseAction, ServoToPoseGoal
 from geometry_msgs.msg import PoseStamped, TwistStamped
 
 from std_srvs.srv import Empty

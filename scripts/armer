@@ -4,7 +4,8 @@ import importlib
 
 import roboticstoolbox as rtb
 
-from manipulation_driver import ManipulationDriver
+from armer import Armer
+from armer.robots import ROSRobot
 
 if __name__ == '__main__':
     rospy.init_node('manipulator')
@@ -16,7 +17,7 @@ if __name__ == '__main__':
         module_name, model_name = rospy.get_param('~robot', None).rsplit('.', maxsplit=1)
         robot_cls = getattr(importlib.import_module(module_name), model_name)
         
-        robot = robot_cls()
+        robot = ROSRobot(robot_cls())
 
     if rospy.get_param('~backend', None):
         module_name, backend_name = rospy.get_param('~backend', None).rsplit('.', maxsplit=1)
@@ -24,5 +25,5 @@ if __name__ == '__main__':
         
         backend = backend_cls()
 
-    manipulator = ManipulationDriver(robot=robot, backend=backend, publish_transforms=True)
+    manipulator = Armer(robot=robot, backend=backend, publish_transforms=True)
     manipulator.run()

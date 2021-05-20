@@ -30,11 +30,12 @@ class ROS(Connector):  # pragma nocover
     """
 
     """
+
     def __init__(self):
         super(ROS, self).__init__()
 
         self.robots = {}
-        
+
         self.joint_subscribers = {}
         self.joint_publishers = {}
 
@@ -105,7 +106,7 @@ class ROS(Connector):  # pragma nocover
     def add(self, ob,):
         """
         """
-        if isinstance(ob, manipulation_driver.robots.ROSRobot):
+        if isinstance(ob, armer.robots.ROSRobot):
             self.robots[ob.name] = ob
 
         super().add()
