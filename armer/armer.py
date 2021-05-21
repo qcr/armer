@@ -88,12 +88,12 @@ class Armer:
             backend: rtb.backends.Connector = None,
             publish_transforms: bool = False) -> None:
 
-        self.robot: rtb.robot.Robot = robot
+        self.robot: ROSRobot = robot
         self.gripper: rtb.robot.Robot = gripper
         self.backend: rtb.backends.Connector = backend
 
         if not self.robot:
-            self.robot = ROSRobot(rtb.models.URDF.Panda())
+            self.robot = ROSRobot(rtb.models.URDF.UR5())
 
         # initialise the robot joints to ready position
         self.robot.q = self.robot.qr
@@ -320,7 +320,7 @@ class Armer:
             self.preempt()
 
         with self.lock:
-            goal_pose = goal.goal_pose
+            goal_pose = goal.pose_stamped
 
             if goal_pose.header.frame_id == '':
                 goal_pose.header.frame_id = self.robot.base_link.name
@@ -338,10 +338,10 @@ class Armer:
                 pose.orientation.z
             ]).SE3()
 
-            dq = self.robot.ikine_min(target, q0=self.robot.q)
+            dq = self.robot.ikine_LMS(target, q0=self.robot.q)
             traj = rtb.tools.trajectory.jtraj(self.robot.q, dq.q, 100)
 
-            if self.__traj_move(traj):
+            if self.__traj_move(traj, goal.speed if goal.speed else 0.4):
                 self.pose_server.set_succeeded(MoveToPoseResult(success=True))
             else:
                 self.pose_server.set_aborted(MoveToPoseResult(success=False))
@@ -361,7 +361,7 @@ class Armer:
             self.preempt()
 
         with self.lock:
-            goal_pose = goal.stamped_pose
+            goal_pose = goal.pose_stamped
 
             if goal_pose.header.frame_id == '':
                 goal_pose.header.frame_id = self.robot.base_link.name
@@ -387,7 +387,7 @@ class Armer:
                 velocities, arrived = rtb.p_servo(
                     self.robot.fkine(self.robot.q),
                     target,
-                    min(3, goal.scaling) if goal.scaling else 2,
+                    min(3, goal.gain) if goal.gain else 2,
                     threshold=goal.threshold if goal.threshold else 0.005
                 )
                 self.event.clear()
@@ -426,10 +426,10 @@ class Armer:
             traj = rtb.tools.trajectory.jtraj(
                 self.robot.q,
                 np.array(goal.joints),
-                100
+                100,
             )
 
-            if self.__traj_move(traj):
+            if self.__traj_move(traj, goal.speed if goal.speed else 0.4):
                 self.named_pose_server.set_succeeded(
                     MoveToJointPoseResult(success=True)
                 )
@@ -463,7 +463,7 @@ class Armer:
                 100
             )
 
-            if self.__traj_move(traj):
+            if self.__traj_move(traj, goal.speed if goal.speed else 0.4):
                 self.named_pose_server.set_succeeded(
                     MoveToNamedPoseResult(success=True)
                 )
@@ -620,7 +620,7 @@ class Armer:
         self.j_v *= 0
         self.robot.qd *= 0
 
-    def __traj_move(self, traj: np.array) -> bool:
+    def __traj_move(self, traj: np.array, max_speed=0.4) -> bool:
         """[summary]
 
         :param traj: [description]
@@ -628,15 +628,32 @@ class Armer:
         :return: [description]
         :rtype: bool
         """
+        Kp = 15
         self.moving = True
-        for vel in traj.qd:
+
+        for dq in traj.q[1:]:
             if self.preempted:
                 break
 
-            self.event.clear()
-            self.j_v = vel
-            self.last_update = timeit.default_timer()
-            self.event.wait()
+            error = [-1] * self.robot.n
+            while np.max(np.fabs(error)) > 0.05 and not self.preempted:
+                error = dq - self.robot.q
+
+                jV = Kp * error
+
+                jacob0 = self.robot.jacob0(self.robot.q, fast=True)
+
+                T = jacob0 @ jV
+                V = np.linalg.norm(T[:3])
+
+                if V > max_speed:
+                    T = T / V * max_speed
+                    jV = (np.linalg.pinv(jacob0) @ T)
+
+                self.event.clear()
+                self.j_v = jV
+                self.last_update = timeit.default_timer()
+                self.event.wait()
 
         self.moving = False
         result = not self.preempted

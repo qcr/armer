@@ -71,7 +71,7 @@ class ROSRobot(rtb.ERobot):
         ee_pose = self.fkine(self.q)
 
         pose_stamped = PoseStamped()
-        pose_stamped.header.frame_id = 'panda_link0'
+        pose_stamped.header.frame_id = self.base_link.name
 
         pose_stamped.pose.position.x = ee_pose.t[0]
         pose_stamped.pose.position.y = ee_pose.t[1]
