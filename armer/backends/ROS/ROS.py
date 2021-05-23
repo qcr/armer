@@ -47,15 +47,6 @@ class ROS(Connector):  # pragma nocover
         if ros_ip:
             os.environ["ROS_IP"] = ros_ip
 
-    def step(self, dt=0.01): # pylint: disable=arguments-differ
-        """
-        Step each robot in the environment
-        """
-        for robot_id in self.robots:
-            self.robots[robot_id].step(dt)
-
-        super().step()
-
     #
     #  Methods to interface with the robots created in other environemnts
     #

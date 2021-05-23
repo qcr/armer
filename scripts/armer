@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from typing import List
+
 import rospy
 import importlib
 
@@ -10,11 +12,11 @@ from armer.robots import ROSRobot
 if __name__ == '__main__':
     rospy.init_node('manipulator')
     
-    robot: rtb.robot.Robot = None
+    robots: List[rtb.robot.Robot] = None
     backend: rtb.backends.Connector = None
 
     if rospy.get_param('~robot', None):
-        module_name, model_name = rospy.get_param('~robot', None).rsplit('.', maxsplit=1)
+        module_name, model_name = rospy.get_param('~robot', []).rsplit('.', maxsplit=1)
         robot_cls = getattr(importlib.import_module(module_name), model_name)
         
         robot = ROSRobot(robot_cls())
@@ -25,5 +27,5 @@ if __name__ == '__main__':
         
         backend = backend_cls()
 
-    manipulator = Armer(robot=robot, backend=backend, publish_transforms=True)
+    manipulator = Armer(robots=robots, backend=backend, publish_transforms=False)
     manipulator.run()
