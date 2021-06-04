@@ -4,11 +4,11 @@ Armer Class
 
 .. codeauthor:: Gavin Suddreys
 """
-import os
+from __future__ import annotations
 
-
-from typing import List, Any
+from typing import List
 import timeit
+import importlib
 
 import rospy
 import tf2_ros
@@ -24,39 +24,13 @@ from armer.utils import populate_transform_stamped
 from armer.robots import ROSRobot
 from armer.timer import Timer
 
-from armer_msgs.srv import AddNamedPose, \
-    AddNamedPoseRequest, \
-    AddNamedPoseResponse
-
-from armer_msgs.srv import AddNamedPoseConfig, \
-    AddNamedPoseConfigRequest, \
-    AddNamedPoseConfigResponse
-
-from armer_msgs.srv import GetNamedPoseConfigs, \
-    GetNamedPoseConfigsRequest, \
-    GetNamedPoseConfigsResponse
-
-from armer_msgs.srv import GetNamedPoses, \
-    GetNamedPosesRequest, \
-    GetNamedPosesResponse
-
-from armer_msgs.srv import RemoveNamedPose, \
-    RemoveNamedPoseRequest, \
-    RemoveNamedPoseResponse
-
-from armer_msgs.srv import RemoveNamedPoseConfig, \
-    RemoveNamedPoseConfigRequest, \
-    RemoveNamedPoseConfigResponse
-
 
 class Armer:
     """
-    The Manipulator Driver.
+    The Armer Driver.
 
-    :param robot: [description], defaults to None
-    :type robot: rtb.robot.Robot, optional
-    :param gripper: [description], defaults to None
-    :type gripper: rtb.robot.Robot, optional
+    :param robot: [description], List of robots to be managed by the driver
+    :type robots: List[rtb.robot.Robot], optional
     :param backend: [description], defaults to None
     :type backend: rtb.backends.Connector, optional
 
@@ -73,16 +47,14 @@ class Armer:
             publish_transforms: bool = False) -> None:
 
         self.robots: List[ROSRobot] = robots
-
         self.backend: rtb.backends.Connector = backend
+        self.read_only_backends : List[rtb.backends.Connector] = []
 
         if not self.robots:
             self.robots = [ROSRobot(self, rtb.models.URDF.UR5())]
 
         if not self.backend:
             self.backend = Swift()
-
-        self.read_only_backends = []  # rtb.backends.Swift(realtime=False)]
 
         self.is_publishing_transforms = publish_transforms
 
@@ -92,22 +64,7 @@ class Armer:
             self.broadcaster = tf2_ros.TransformBroadcaster()
 
         self.rate = rospy.Rate(500)
-
-        # Load host specific arm configuration
-        self.config_path: str = rospy.get_param('~config_path', os.path.join(
-            os.getenv('HOME', '/root'),
-            '.ros/configs/armer.yaml'
-        ))
-        self.custom_configs: List[str] = []
-
-        self.__load_config()
-
-        # Tooltip offsets
-        if rospy.has_param('~tool_name'):
-            self.tool_name = rospy.get_param('~tool_name')
-
-        if rospy.has_param('~tool_offset'):
-            self.tool_offset = rospy.get_param('~tool_offset')
+        self.last_tick = timeit.default_timer()
 
         # Launch backend
         self.backend.launch()
@@ -117,181 +74,19 @@ class Armer:
 
         for readonly in self.read_only_backends:
             readonly.launch()
-            readonly.add(self.robot, readonly=True)
 
-        rospy.Service('get_named_poses', GetNamedPoses,
-                      self.get_named_poses_cb)
+            for robot in self.robots:
+                readonly.add(robot, readonly=True)
 
-        rospy.Service('set_named_pose', AddNamedPose, self.add_named_pose_cb)
-        rospy.Service('remove_named_pose', RemoveNamedPose,
-                      self.remove_named_pose_cb)
-
-        rospy.Service(
-            'add_named_pose_config',
-            AddNamedPoseConfig,
-            self.add_named_pose_config_cb
-        )
-        rospy.Service(
-            'remove_named_pose_config',
-            RemoveNamedPoseConfig,
-            self.remove_named_pose_config_cb
-        )
-        rospy.Service(
-            'get_named_pose_configs',
-            GetNamedPoseConfigs,
-            self.get_named_pose_configs_cb
-        )
 
     def close(self):
         """
         Close backend and stop action servers
         """
         self.backend.close()
-        self.pose_server.need_to_terminate = True
-        self.named_pose_server.need_to_terminate = True
-        self.pose_servo_server.need_to_terminate = True
 
-    def get_named_poses_cb(self, req: GetNamedPosesRequest) -> GetNamedPosesResponse:
-        """
-        ROS Service callback:
-        Retrieves the list of named poses available to the arm
-
-        :param req: An empty request
-        :type req: GetNamesListRequest
-        :return: The list of named poses available for the arm
-        :rtype: GetNamesListResponse
-        """
-        return GetNamedPosesResponse(list(self.named_poses.keys()))
-
-    def add_named_pose_cb(self, req: AddNamedPoseRequest) -> AddNamedPoseResponse:
-        """
-        ROS Service callback:
-        Adds the current arm pose as a named pose and saves it to the host config
-
-        :param req: The name of the pose as well as whether to overwrite if the pose already exists
-        :type req: AddNamedPoseRequest
-        :return: True if the named pose was written successfully otherwise false
-        :rtype: AddNamedPoseResponse
-        """
-        if req.pose_name in self.named_poses and not req.overwrite:
-            rospy.logerr('Named pose already exists.')
-            return AddNamedPoseResponse(success=False)
-
-        self.named_poses[req.pose_name] = self.robot.q.tolist()
-        self.__write_config('named_poses', self.named_poses)
-
-        return AddNamedPoseResponse(success=True)
-
-    def remove_named_pose_cb(self, req: RemoveNamedPoseRequest) -> RemoveNamedPoseResponse:
-        """
-        ROS Service callback:
-        Adds the current arm pose as a named pose and saves it to the host config
-
-        :param req: The name of the pose as well as whether to overwrite if the pose already exists
-        :type req: AddNamedPoseRequest
-        :return: True if the named pose was written successfully otherwise false
-        :rtype: AddNamedPoseResponse
-        """
-        if req.pose_name not in self.named_poses and not req.overwrite:
-            rospy.logerr('Named pose does not exists.')
-            return AddNamedPoseResponse(success=False)
-
-        del self.named_poses[req.pose_name]
-        self.__write_config('named_poses', self.named_poses)
-
-        return AddNamedPoseResponse(success=True)
-
-    def add_named_pose_config_cb(
-            self,
-            request: AddNamedPoseConfigRequest) -> AddNamedPoseConfigResponse:
-        """[summary]
-
-        :param request: [description]
-        :type request: AddNamedPoseConfigRequest
-        :return: [description]
-        :rtype: AddNamedPoseConfigResponse
-        """
-        self.custom_configs.append(request.config_path)
-        self.__load_config()
-        return True
-
-    def remove_named_pose_config_cb(
-            self,
-            request: RemoveNamedPoseConfigRequest) -> RemoveNamedPoseConfigResponse:
-        """[summary]
-
-        :param request: [description]
-        :type request: AddNamedPoseRequest
-        :return: [description]
-        :rtype: [type]
-        """
-        if request.config_path in self.custom_configs:
-            self.custom_configs.remove(request.config_path)
-            self.__load_config()
-        return True
-
-    def get_named_pose_configs_cb(
-            self,
-            request: GetNamedPoseConfigsRequest) -> GetNamedPoseConfigsResponse:
-        """[summary]
-
-        :param request: [description]
-        :type request: GetNamedPoseConfigsRequest
-        :return: [description]
-        :rtype: GetNamedPoseConfigsResponse
-        """
-        return self.custom_configs
-
-    def __load_config(self):
-        """[summary]
-        """
-        self.named_poses = {}
-        for config_name in self.custom_configs:
-            try:
-                config = yaml.load(open(config_name))
-                if config and 'named_poses' in config:
-                    self.named_poses.update(config['named_poses'])
-            except IOError:
-                rospy.logwarn(
-                    'Unable to locate configuration file: {}'.format(config_name))
-
-        if os.path.exists(self.config_path):
-            try:
-                config = yaml.load(open(self.config_path),
-                                   Loader=yaml.SafeLoader)
-                if config and 'named_poses' in config:
-                    self.named_poses.update(config['named_poses'])
-
-            except IOError:
-                pass
-
-    def __write_config(self, key: str, value: Any):
-        """[summary]
-
-        :param key: [description]
-        :type key: str
-        :param value: [description]
-        :type value: Any
-        """
-        if not os.path.exists(os.path.dirname(self.config_path)):
-            os.makedirs(os.path.dirname(self.config_path))
-
-        config = {}
-
-        try:
-            with open(self.config_path) as handle:
-                current = yaml.load(handle.read())
-
-                if current:
-                    config = current
-
-        except IOError:
-            pass
-
-        config.update({key: value})
-
-        with open(self.config_path, 'w') as handle:
-            handle.write(yaml.dump(config))
+        for robot in self.robots:
+            robot.close()
 
     def publish_transforms(self) -> None:
         """[summary]
@@ -334,6 +129,37 @@ class Armer:
                         link.name,
                         transform
                     ))
+
+    @staticmethod
+    def load(path: str) -> Armer:
+        """
+        Generates an Armer Driver instance from the configuration file at path
+
+        :param path: The path to the configuration file
+        :type path: str
+        :return: An Armer driver instance
+        :rtype: Armer
+        """
+        with open(path, 'r') as handle:
+            config = yaml.load(handle, Loader=yaml.SafeLoader)
+
+        robots: List[rtb.robot.Robot] = []
+
+        for spec in config['robots']:
+            module_name, model_name = spec['model'].rsplit('.', maxsplit=1)
+            robot_cls = getattr(importlib.import_module(module_name), model_name)
+            del spec['model']
+
+            wrapper = ROSRobot
+
+            if 'type' in spec:
+                module_name, model_name = spec['type'].rsplit('.', maxsplit=1)
+                wrapper = getattr(importlib.import_module(module_name), model_name)
+                del spec['type']
+
+            robots.append(wrapper(robot_cls(), **spec))
+
+        return Armer(robots=robots)
 
     def run(self) -> None:
         """
