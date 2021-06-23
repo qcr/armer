@@ -1,31 +1,13 @@
 #!/usr/bin/env python3
+import os
 from typing import List
 
 import rospy
-import importlib
-
-import roboticstoolbox as rtb
-
 from armer import Armer
-from armer.robots import ROSRobot
+
+__path__ = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
 
 if __name__ == '__main__':
     rospy.init_node('manipulator')
-    
-    robots: List[rtb.robot.Robot] = None
-    backend: rtb.backends.Connector = None
-
-    if rospy.get_param('~robot', None):
-        module_name, model_name = rospy.get_param('~robot', []).rsplit('.', maxsplit=1)
-        robot_cls = getattr(importlib.import_module(module_name), model_name)
-        
-        robot = ROSRobot(robot_cls())
-
-    if rospy.get_param('~backend', None):
-        module_name, backend_name = rospy.get_param('~backend', None).rsplit('.', maxsplit=1)
-        backend_cls = getattr(importlib.import_module(module_name), backend_name)
-        
-        backend = backend_cls()
-
-    manipulator = Armer(robots=robots, backend=backend, publish_transforms=False)
-    manipulator.run()
+    armer = Armer.load(os.path.join(__path__, 'cfg/panda.yaml'))
+    armer.run()

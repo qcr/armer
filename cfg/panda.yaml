@@ -1,0 +1,8 @@
+robots:
+  - model: roboticstoolbox.models.Panda
+    joint_state_topic: /joint_states # default
+    joint_velocity_topic:  /joint_velocity_node_controller/joint_velocity # default
+backend:
+  - type: roboticstoolbox.backends.Swift.Swift
+readonly_backends:
+  - type: roboticstoolbox.backends.PyPlot.PyPlot2

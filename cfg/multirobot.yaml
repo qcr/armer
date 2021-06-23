@@ -1,0 +1,10 @@
+robots:
+  - model: roboticstoolbox.models.Panda
+    joint_state_topic: /joint_states # default
+    joint_velocity_topic:  /joint_velocity_node_controller/joint_velocity # default
+  - name: ur5
+    model: roboticstoolbox.models.UR5
+    origin: [-1, 0, 0, 0, 0, 0] #default (xyzrpy)
+    # readonly: true
+backend:
+  - type: roboticstoolbox.backends.Swift.Swift
