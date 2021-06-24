@@ -105,14 +105,14 @@ class ROSRobot(rtb.ERobot):
         # Arm state property
         self.state: ManipulatorState = ManipulatorState()
 
-        self.e_v_frame: str = None
+        self.e_v_frame: str = None # Expected cartesian velocity
 
         self.e_v: np.array = np.zeros(shape=(6,))  # cartesian motion
         self.j_v: np.array = np.zeros(
             shape=(len(self.q),)
-        )  # joint motion
+        )  # expected joint velocity
 
-        self.e_p = self.fkine(self.q, start=self.base_link)
+        self.e_p = self.fkine(self.q, start=self.base_link) # measured end-effector position
 
         self.last_update: float = 0
         self.last_tick: float = 0
