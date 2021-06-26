@@ -5,8 +5,9 @@ Armer Class
 .. codeauthor:: Gavin Suddreys
 """
 from __future__ import annotations
+from os import read
 
-from typing import List
+from typing import List, Dict
 import timeit
 import importlib
 
@@ -44,15 +45,18 @@ class Armer:
             self,
             robots: List[rtb.robot.Robot] = None,
             backend: rtb.backends.Connector = None,
-            publish_transforms: bool = False) -> None:
+            readonly_backends: List[rtb.backends.Connector] = None,
+            publish_transforms: bool = False,
+            logging: dict[str, bool] = None) -> None:
 
         self.robots: List[ROSRobot] = robots
         self.backend: rtb.backends.Connector = backend
-        self.read_only_backends : List[rtb.backends.Connector] = []
+        self.readonly_backends : List[rtb.backends.Connector] = readonly_backends \
+            if readonly_backends else []
 
         if not self.robots:
             self.robots = [ROSRobot(self, rtb.models.URDF.UR5())]
-
+        
         if not self.backend:
             self.backend = Swift()
 
@@ -72,11 +76,14 @@ class Armer:
         for robot in self.robots:
             self.backend.add(robot)
 
-        for readonly in self.read_only_backends:
+        for readonly in self.readonly_backends:
             readonly.launch()
 
             for robot in self.robots:
                 readonly.add(robot, readonly=True)
+
+        # Logging
+        self.log_frequency = 'frequency' in logging and logging['frequency']
 
 
     def close(self):
@@ -158,8 +165,32 @@ class Armer:
                 del spec['type']
 
             robots.append(wrapper(robot_cls(), **spec))
+        
+        backend = None
 
-        return Armer(robots=robots)
+        if 'backend' in config:
+            module_name, model_name = config['backend']['type'].rsplit('.', maxsplit=1)
+            backend_cls = getattr(importlib.import_module(module_name), model_name)
+
+            backend = backend_cls(**config['args'] if 'args' in config else dict())
+
+        readonly_backends = []
+
+        if 'readonly_backends' in config:
+            for spec in config['readonly_backends']:
+                module_name, model_name = spec['type'].rsplit('.', maxsplit=1)
+                backend_cls = getattr(importlib.import_module(module_name), model_name)
+
+                readonly_backends.append(backend_cls(**spec['args'] if 'args' in spec else dict()))
+                
+        logging = config['logging'] if 'logging' in config else {}
+        
+        return Armer(
+            robots=robots,
+            backend=backend,
+            readonly_backends=readonly_backends,
+            logging=logging
+        )
 
     def run(self) -> None:
         """
@@ -168,7 +199,7 @@ class Armer:
         self.last_tick = timeit.default_timer()
 
         while not rospy.is_shutdown():
-            with Timer('ROS', True):
+            with Timer('ROS', self.log_frequency):
                 current_time = timeit.default_timer()
                 dt = current_time - self.last_tick
 
@@ -177,7 +208,7 @@ class Armer:
 
                 self.backend.step(dt=dt)
 
-                for backend in self.read_only_backends:
+                for backend in self.readonly_backends:
                     backend.step(dt=dt)
 
                 self.publish_transforms()

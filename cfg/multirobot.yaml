@@ -4,7 +4,9 @@ robots:
     joint_velocity_topic:  /joint_velocity_node_controller/joint_velocity # default
   - name: ur5
     model: roboticstoolbox.models.UR5
-    origin: [-1, 0, 0, 0, 0, 0] #default (xyzrpy)
+    origin: [-1, 0, 0, 0, 0, 0] # (xyzrpy)
+    logging: 
+      frequency: true
     # readonly: true
 backend:
   - type: roboticstoolbox.backends.Swift.Swift
