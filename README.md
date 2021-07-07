@@ -11,7 +11,10 @@ Requires ROS noetic preinstalled
 
 1. Create catkin workspace
 2. Clone this repository and https://github.com/qcr/armer_msgs into the catkin workspace src folder
-3. In the main workspace folder run rosdep install --from-paths src --ignore-src -r -y 
+3. In the main workspace folder run 
+```sh
+rosdep install --from-paths src --ignore-src -r -y 
+```
 4. catkin_make in the main workspace folder 
 5. Don't forget to source this workspace and run roslaunch armer armer.launch to start the simulation. By default the simulation will launch the Panda model
 
