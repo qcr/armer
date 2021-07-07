@@ -22,12 +22,12 @@ rosdep install --from-paths src --ignore-src -r -y
 
 ### Panda in Swift
 ```sh
-roslaunch armer armer.launch config:={path to}/cfg/panda.yaml
+roslaunch armer armer.launch config:=panda
 ```
 
 ### UR5 in Swift
 ```sh
-roslaunch armer armer.launch config:={path to}/cfg/ur5.yaml
+roslaunch armer armer.launch config:=ur5
 ```
 An example for Panda can be run from the workspace main directory via the following command after roslaunching the Panda model sim
 

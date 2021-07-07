@@ -2,6 +2,6 @@
     <arg name="config" default="$(find armer)/cfg/panda.yaml" />
 
     <node pkg="armer" type="armer" name="armer" output="screen">
-        <param name="config" value="$(arg config)" />
+        <param name="config" value="$(find armer)/cfg/$(arg config).yaml" />
     </node>
 </launch>
