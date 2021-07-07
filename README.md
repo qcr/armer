@@ -6,19 +6,34 @@
 [![Coverage](https://codecov.io/gh/suddrey-qut/armer/branch/master/graph/badge.svg)](https://codecov.io/gh/suddrey-qut/armer)
 
 
+## Installation
+Requires ROS noetic preinstalled
+
+1. Create catkin workspace
+2. Clone this repository and https://github.com/qcr/armer_msgs into the catkin workspace src folder
+3. In the main workspace folder run rosdep install --from-paths src --ignore-src -r -y 
+4. catkin_make in the main workspace folder 
+5. Don't forget to source this workspace and run roslaunch armer armer.launch to start the simulation. By default the simulation will launch the Panda model
+
 ## Usage
 
 ### Panda in Swift
 ```sh
-rosrun armer armer _robot:=roboticstoolbox.models.URDF.Panda _backend:=roboticstoolbox.backends.Swift
+roslaunch armer armer.launch config:={path to}/cfg/panda.yaml
 ```
 
 ### UR5 in Swift
 ```sh
-rosrun armer armer _robot:=roboticstoolbox.models.URDF.UR5 _backend:=roboticstoolbox.backends.Swift
+roslaunch armer armer.launch config:={path to}/cfg/ur5.yaml
+```
+An example for Panda can be run from the workspace main directory via the following command after roslaunching the Panda model sim
+
+```sh
+python3 armer/examples/panda_example.py
 ```
 
-### Panda in PyPlot
+An example for UR5 can be run from the workspace main directory via the following command after roslaunching the UR5 model sim
+
 ```sh
-rosrun armer armer _robot:=roboticstoolbox.models.URDF.Panda _backend:=roboticstoolbox.backends.Swift
+python3 armer/examples/ur5_example.py
 ```
