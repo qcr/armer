@@ -54,31 +54,31 @@ goal.pose_stamped=target
 pose_cli.send_goal(goal)
 pose_cli.wait_for_result()
 
-# print('Moving {}'.format('Home'))
-# home_srv()
+print('Moving {}'.format('Home'))
+home_srv()
 
-# DESIRED_TIME=2
-# print('Moving {} for {} seconds'.format('up', DESIRED_TIME))
-# ts = TwistStamped()
-# ts.twist.linear.z = 0.1
+DESIRED_TIME=2
+print('Moving {} for {} seconds'.format('up', DESIRED_TIME))
+ts = TwistStamped()
+ts.twist.linear.z = 0.1
 
-# start_time = timeit.default_timer()
+start_time = timeit.default_timer()
 
-# while timeit.default_timer() - start_time < DESIRED_TIME:
-#     vel_pub.publish(ts)
+while timeit.default_timer() - start_time < DESIRED_TIME:
+    vel_pub.publish(ts)
 
-# vel_pub.publish(TwistStamped())
+vel_pub.publish(TwistStamped())
 
-# print('Moving {} for {} seconds'.format('down', DESIRED_TIME))
-# ts = TwistStamped()
-# ts.twist.linear.z = -0.1
+print('Moving {} for {} seconds'.format('down', DESIRED_TIME))
+ts = TwistStamped()
+ts.twist.linear.z = -0.1
 
-# start_time = timeit.default_timer()
+start_time = timeit.default_timer()
 
-# while timeit.default_timer() - start_time < DESIRED_TIME:
-#     vel_pub.publish(ts)
+while timeit.default_timer() - start_time < DESIRED_TIME:
+    vel_pub.publish(ts)
 
-# vel_pub.publish(TwistStamped())
+vel_pub.publish(TwistStamped())
 
 
 # Create a target pose

@@ -74,11 +74,13 @@ class ROSRobot(rtb.ERobot):
                  origin=None,
                  config_path=None,
                  readonly=False,
+                 gripper=None,
                  * args,
                  **kwargs):  # pylint: disable=unused-argument
 
         super().__init__(robot)
         self.__dict__.update(robot.__dict__)
+        self.gripper=gripper
 
         self.name = name if name else self.name
 
@@ -112,7 +114,7 @@ class ROSRobot(rtb.ERobot):
             shape=(len(self.q),)
         )  # expected joint velocity
 
-        self.e_p = self.fkine(self.q, start=self.base_link) # measured end-effector position
+        self.e_p = self.fkine(self.q, start=self.base_link, end=self.gripper) # measured end-effector position
 
         self.last_update: float = 0
         self.last_tick: float = 0
@@ -283,7 +285,7 @@ class ROSRobot(rtb.ERobot):
             ])
 
             if np.any(e_v - self.e_v):
-                self.e_p = self.fkine(self.q, start=self.base_link, fast=True)
+                self.e_p = self.fkine(self.q, start=self.base_link, fast=True, end=self.gripper)
 
             self.e_v = e_v
 
@@ -335,7 +337,7 @@ class ROSRobot(rtb.ERobot):
                 pose.orientation.z
             ]).SE3()
 
-            dq = self.ikine_LMS(target, q0=self.q)
+            dq = self.ikine_LMS(target, q0=self.q, end=self.gripper)
             traj = rtb.tools.trajectory.jtraj(self.q, dq.q, 100)
 
             if self.__traj_move(traj, goal.speed if goal.speed else 0.4):
@@ -382,7 +384,7 @@ class ROSRobot(rtb.ERobot):
 
             while not arrived and not self.preempted:
                 velocities, arrived = rtb.p_servo(
-                    self.fkine(self.q, start=self.base_link),
+                    self.fkine(self.q, start=self.base_link, end=self.gripper),
                     target,
                     min(3, goal.gain) if goal.gain else 2,
                     threshold=goal.threshold if goal.threshold else 0.005
@@ -551,7 +553,7 @@ class ROSRobot(rtb.ERobot):
 
                 jV = Kp * error
 
-                jacob0 = self.jacob0(self.q, fast=True)
+                jacob0 = self.jacob0(self.q, fast=True, end=self.gripper)
 
                 T = jacob0 @ jV
                 V = np.linalg.norm(T[:3])
@@ -577,7 +579,7 @@ class ROSRobot(rtb.ERobot):
         :return: ManipulatorState message describing the current state of the robot
         :rtype: ManipulatorState
         """
-        ee_pose = self.fkine(self.q, start=self.base_link, fast=True)
+        ee_pose = self.fkine(self.q, start=self.base_link, fast=True, end=self.gripper)
 
         pose_stamped = PoseStamped()
         pose_stamped.header.frame_id = self.base_link.name
@@ -714,7 +716,7 @@ class ROSRobot(rtb.ERobot):
                 self.e_v *= 0.9 if np.sum(np.absolute(self.e_v)
                                           ) >= 0.0001 else 0
 
-            wTe = self.fkine(self.q, start=self.base_link, fast=True)
+            wTe = self.fkine(self.q, start=self.base_link, fast=True, end=self.gripper)
             error = self.e_p @ np.linalg.inv(wTe)
             # print(e)
             trans = self.e_p[:3, 3]  # .astype('float64')
@@ -734,7 +736,7 @@ class ROSRobot(rtb.ERobot):
             e_v = np.concatenate([v_t, v_r])
 
             self.j_v = np.linalg.pinv(
-                self.jacob0(self.q, fast=True)) @ e_v
+                self.jacob0(self.q, fast=True, end=self.gripper)) @ e_v
 
         # apply desired joint velocity to robot
         if any(self.j_v):

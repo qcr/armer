@@ -9,25 +9,41 @@
 ## Installation
 Requires ROS noetic preinstalled
 
-1. Create catkin workspace
-2. Clone this repository and https://github.com/qcr/armer_msgs into the catkin workspace src folder
-3. In the main workspace folder run 
+1. Create a catkin workspace (this example will assume the workspace location ~/armer_ws)
+2. Clone this repository and https://github.com/qcr/armer_msgs into the armer_ws/src folder
+3. In the main workspace folder (armer_ws) run 
 ```sh
 rosdep install --from-paths src --ignore-src -r -y 
 ```
-4. catkin_make in the main workspace folder 
-5. Don't forget to source this workspace and run roslaunch armer armer.launch to start the simulation. By default the simulation will launch the Panda model
+4. Build the packages by running 
+```sh
+catkin_make 
+```
+also in the main workspace folder (armer_ws)
+5. Source the workspace
+```sh
+source devel/setup.sh
+```
+To make this automatically occur in any terminal that is launched, run 
+```sh
+source ~/armer_ws/devel/setup.bash
+```
+6. Run 
+```sh
+roslaunch armer armer.launch
+```
+ to start the simulation. By default the Panda model sim will be launched
 
 ## Usage
 
 ### Panda in Swift
 ```sh
-roslaunch armer armer.launch config:=panda
+roslaunch armer armer.launch config:=panda_sim
 ```
 
 ### UR5 in Swift
 ```sh
-roslaunch armer armer.launch config:=ur5
+roslaunch armer armer.launch config:=ur5_sim
 ```
 An example for Panda can be run from the workspace main directory via the following command after roslaunching the Panda model sim
 

@@ -1,0 +1,12 @@
+robots:
+  - name: arm # default is panda model roboticstoolbox.models.Panda
+    model: roboticstoolbox.models.Panda
+    joint_state_topic: /joint_states # default
+    joint_velocity_topic:  /joint_velocity_node_controller/joint_velocity # default
+    origin: [0, 0, 0, 0, 0, 0] #default (xyzrpy)
+backend: 
+  type: armer.backends.ROS.ROS
+#readonly_backends:
+#  - type: roboticstoolbox.backends.PyPlot.PyPlot
+logging: 
+  frequency: false
