@@ -221,9 +221,3 @@ Moves the end-effector to a pre-defined joint configuration.
 
 - **/arm/joint/pose** ([armer_msgs/MoveToJointPoseAction](https://github.com/qcr/armer_msgs/blob/main/action/MoveToJointPose.action))
 Moves the joints of the robot to the indicated positions (radians).
-
-## Supporters
-
-Development of the Armer Driver software stack was directly supported by:
-
-[![Australian Centre for Robotic Vision](./docs/acrv_logo_small.png)](https://www.roboticvision.org/)&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;[![QUT Centre for Robotics](./docs/qcr_logo_small.png)](https://research.qut.edu.au/qcr/)
