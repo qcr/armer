@@ -87,15 +87,15 @@ roslaunch armer armer.launch config:=panda_sim
 
 ## Examples
 
-Examples of interfacing with the driver can be found in the examples folder. 
+Examples of interfacing with the driver can be found in the [examples folder](https://github.com/qcr/armer/tree/devel-faith/examples). 
 
-An example for launching a Panda sim can be run from the workspace main directory via the following command after roslaunching the Panda model sim.
+An example[(panda_example.py)](https://github.com/qcr/armer/blob/devel-faith/examples/panda_example.py) for interacting with a Panda sim can be run from the workspace main directory via the following command after roslaunching the Panda model sim config.
 
 ```sh
 python3 armer/examples/panda_example.py
 ```
 
-Alternatively, an example for launching a UR5 sim can be run from the workspace main directory via the following command after roslaunching the UR5 model sim.
+Alternatively, an example[(ur5_example.py)](https://github.com/qcr/armer/blob/devel-faith/examples/ur5_example.py) for interacting with a UR5 sim can be run from the workspace main directory via the following command after roslaunching the UR5 model sim config.
 
 ```sh
 python3 armer/examples/ur5_example.py
@@ -221,3 +221,9 @@ Moves the end-effector to a pre-defined joint configuration.
 
 - **/arm/joint/pose** ([armer_msgs/MoveToJointPoseAction](https://github.com/qcr/armer_msgs/blob/main/action/MoveToJointPose.action))
 Moves the joints of the robot to the indicated positions (radians).
+
+## Supporters
+
+Development of the Armer Driver software stack was directly supported by:
+
+[![Australian Centre for Robotic Vision](./docs/acrv_logo_small.png)](https://www.roboticvision.org/)&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;[![QUT Centre for Robotics](./docs/qcr_logo_small.png)](https://research.qut.edu.au/qcr/)
