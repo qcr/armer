@@ -17,6 +17,8 @@ Requires ROS noetic preinstalled
 1. Create a catkin workspace 
 ```sh
 mkdir ~/armer_ws && cd ~/armer_ws
+```
+```sh
 catkin_make
 ```
 2. Clone this repository and https://github.com/qcr/armer_msgs into the armer_ws/src folder
@@ -50,7 +52,7 @@ roslaunch armer armer.launch
 
 Configurations are specified using the YAML file format and should be placed in the cfg folder. 
 
-An example configuration for the Franka-Emika Panda simulation can be seen below:
+A simple example configuration for the Franka-Emika Panda simulation can be seen below:
 ```
 robots:
   - name: arm 
@@ -97,6 +99,54 @@ An example for UR5 can be run from the workspace main directory via the followin
 ```sh
 python3 armer/examples/ur5_example.py
 ```
+
+To request a pose, a ros action client must be created to communicate with the driver.
+```
+# Create a ros action client to communicate with the driver
+pose_cli = actionlib.SimpleActionClient('/arm/cartesian/pose', MoveToPoseAction)
+pose_cli.wait_for_server()
+```
+The pose action server uses the PoseStamped message type from the geometry messages package. To request a pose the frame_id of the header field should be filled out with the target robot's base link. The desired pose's position and orientation should be filled out in the corresponding fields. An example pose request can be seen below.
+
+```
+# Create a target pose
+target = PoseStamped()
+target.header.frame_id = 'panda_link0'
+
+# Populate with target position/orientation 
+target.pose.position.x = 0.307
+target.pose.position.y = 0.400
+target.pose.position.z = 0.490
+
+target.pose.orientation.x = -1.00
+target.pose.orientation.y =  0.00
+target.pose.orientation.z =  0.00
+target.pose.orientation.w =  0.00
+```
+
+The desired pose is then sent to the action server as a goal
+```
+# Create goal from target pose
+goal = MoveToPoseGoal()
+goal.pose_stamped=target
+
+# Send goal and wait for it to finish
+pose_cli.send_goal(goal)
+pose_cli.wait_for_result()
+```
+A target robot can also be manipulated by publishing directly to the cartesian velocity topic. This topic uses the message type TwistStamped.
+
+```
+# Set up the publisher pointed to the velocity topic
+vel_pub = rospy.Publisher('/arm/cartesian/velocity', TwistStamped, queue_size=1)
+#Create the empty message
+ts = TwistStamped()
+#Populate the message with desired variables
+ts.twist.linear.z = 0.1
+#Publish message
+vel_pub.publish(ts)
+```
+
 ## Driver Component Summary
 
 ### Subscribed Topics
