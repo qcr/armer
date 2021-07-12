@@ -1,4 +1,4 @@
-# Armer
+# Armer Driver
 [![QUT Centre for Robotics Open Source](https://github.com/qcr/qcr.github.io/raw/master/misc/badge.svg)](https://qcr.github.io)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Build Status](https://github.com/suddrey-qut/armer/workflows/Build/badge.svg?branch=master)](https://github.com/suddrey-qut/armer/actions?query=workflow%3ABuild)
@@ -6,38 +6,39 @@
 [![Coverage](https://codecov.io/gh/suddrey-qut/armer/branch/master/graph/badge.svg)](https://codecov.io/gh/suddrey-qut/armer)
 
 ## Overview
-This project provides a simple unified mechanism for building high-level interface configurations for seamlessly controlling a broad range of manipulators under different actuation modes.
+The Armer driver provides a simple mechanism for building high-level configurations to seamlessly control a broad range of manipulators under different actuation modes (simulation or physical).
 
-More concretly, the Armer driver provides a mechanism for advertising high-level topics, services and action_servers for controlling a manipulator, which when called, not only actuate the manipulator based on the provided command, but also hot-swaps in the relevant low-level controllers for that actuation mode. 
+Several ROS action servers, topics and services are set up by this package to enable this functionality. A summary of these can be found [here](#driver-component-summary). 
 
+Additionally, the driver is built off the [Python Robotics Toolbox](https://qcr.github.io/code/robotics-toolbox-python/) and uses [Swift](https://qcr.github.io/code/swift/) as a backend to simulate supported manipulators.
 
 ## Installation
-Requires ROS noetic preinstalled
+*Requires ROS noetic preinstalled*
 
-1. Create a catkin workspace 
+1. Create a catkin workspace.
 ```sh
 mkdir ~/armer_ws && cd ~/armer_ws
 ```
 ```sh
 catkin_make
 ```
-2. Clone this repository and https://github.com/qcr/armer_msgs into the armer_ws/src folder
+2. Clone this repository and https://github.com/qcr/armer_msgs into the armer_ws/src folder.
 ```sh
 cd src && git clone https://github.com/qcr/armer.git && git clone https://github.com/qcr/armer_msgs 
 ```
-3. Install the required dependencies
+3. Install the required dependencies.
 ```sh
 cd .. && rosdep install --from-paths src --ignore-src -r -y 
 ```
-4. Build the packages by running 
+4. Build the packages.
 ```sh
 catkin_make 
 ```
-5. Source the workspace
+5. Source the workspace.
 ```sh
 source devel/setup.sh
 ```
-To make this automatically occur in any terminal that is launched, run 
+To make this automatically occur in any terminal that is launched, run the follwing line.
 ```sh
 echo "source ~/armer_ws/devel/setup.bash" >> ~/.bashrc
 
@@ -46,11 +47,11 @@ echo "source ~/armer_ws/devel/setup.bash" >> ~/.bashrc
 ```sh
 roslaunch armer armer.launch
 ```
- to start the simulation. By default the Panda model sim will be launched
+ to start the simulation. By default the configuration for the Panda model sim will be launched.
 
 ## Usage
 
-Configurations are specified using the YAML file format and should be placed in the cfg folder. 
+The driver can be configured use with different arms, a simulation or a physical enviroment. To define these settings and allow for easy reuse, settings can be saved and loaded from a YAML file in the cfg folder. 
 
 A simple example configuration for the Franka-Emika Panda simulation can be seen below:
 ```
@@ -63,7 +64,7 @@ backend:
 The key parameters to define here are:
 * name: namespace to be used
 * model: robotics toolbox robot model to use
-* backend type: roboticstoolbox.backends.Swift.Swift will launch the Swift simulator. Use armer.backends.ROS.ROS to use a physical model
+* backend type: roboticstoolbox.backends.Swift.Swift will launch the Swift simulator. Use armer.backends.ROS.ROS to use a physical system
 
 Other parameters can also be set:
 | Field Name | Description | Example |
@@ -75,45 +76,50 @@ Other parameters can also be set:
 | logging: frequency | Sets the frequency of logging | false |
 
 
-Certain arms (such as the UR3) have multiple end effectors so specifying the link should be done by adding a "gripper" field to the robots section with the link name as a string.
+Certain arms (such as the UR3) have multiple end effectors so specifying the link must be done by adding a "gripper" field to the robots section with the link name as a string.
 
-### Panda in Swift
+To launch a driver instance with a preset config, the config parameter is added to the roslaunch command with the name of the desired YAML config.
+
+The following example shows how driver instance can be launched with a [saved Panda sim config](https://github.com/qcr/armer/blob/devel-faith/cfg/panda_sim.yaml):
 ```sh
 roslaunch armer armer.launch config:=panda_sim
 ```
 
-### UR5 in Swift
-```sh
-roslaunch armer armer.launch config:=ur5_sim
-```
-
 ## Examples
-An example for Panda can be run from the workspace main directory via the following command after roslaunching the Panda model sim
+
+Examples of interfacing with the driver can be found in the examples folder. 
+
+An example for launching a Panda sim can be run from the workspace main directory via the following command after roslaunching the Panda model sim.
 
 ```sh
 python3 armer/examples/panda_example.py
 ```
 
-An example for UR5 can be run from the workspace main directory via the following command after roslaunching the UR5 model sim
+Alternatively, an example for launching a UR5 sim can be run from the workspace main directory via the following command after roslaunching the UR5 model sim.
 
 ```sh
 python3 armer/examples/ur5_example.py
 ```
 
-To request a pose, a ros action client must be created to communicate with the driver.
+## Code Examples
+
+To communicate with the driver, a ROS action client must be created to communicate with the driver.
 ```
-# Create a ros action client to communicate with the driver
 pose_cli = actionlib.SimpleActionClient('/arm/cartesian/pose', MoveToPoseAction)
 pose_cli.wait_for_server()
 ```
-The pose action server uses the PoseStamped message type from the geometry messages package. To request a pose the frame_id of the header field should be filled out with the target robot's base link. The desired pose's position and orientation should be filled out in the corresponding fields. An example pose request can be seen below.
+In this example we will set the pose of a simulated Panda arm. The pose action server uses the PoseStamped message type from the geometry messages package. 
 
 ```
-# Create a target pose
+# Create an empty PoseStamped message
 target = PoseStamped()
+```
+To request a pose the frame_id of the header field should be filled out with the target robot's base link.
+```
 target.header.frame_id = 'panda_link0'
-
-# Populate with target position/orientation 
+```
+ The desired pose's position and orientation should be filled out in the corresponding fields.
+```
 target.pose.position.x = 0.307
 target.pose.position.y = 0.400
 target.pose.position.z = 0.490
@@ -124,26 +130,33 @@ target.pose.orientation.z =  0.00
 target.pose.orientation.w =  0.00
 ```
 
-The desired pose is then sent to the action server as a goal
+Create a goal from the target pose.
 ```
-# Create goal from target pose
 goal = MoveToPoseGoal()
 goal.pose_stamped=target
+```
 
-# Send goal and wait for it to finish
+The desired pose is then sent to the action server as a goal and waits for it to finish.
+```
 pose_cli.send_goal(goal)
 pose_cli.wait_for_result()
 ```
 A target robot can also be manipulated by publishing directly to the cartesian velocity topic. This topic uses the message type TwistStamped.
 
+Set up the publisher pointed to the velocity topic.
 ```
-# Set up the publisher pointed to the velocity topic
 vel_pub = rospy.Publisher('/arm/cartesian/velocity', TwistStamped, queue_size=1)
-#Create the empty message
+```
+Create an empty message.
+```
 ts = TwistStamped()
-#Populate the message with desired variables
+```
+Populate the message with desired variables.
+```
 ts.twist.linear.z = 0.1
-#Publish message
+```
+Publish the message to the velocity topic.
+```
 vel_pub.publish(ts)
 ```
 
