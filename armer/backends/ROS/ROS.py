@@ -107,16 +107,6 @@ class ROS(Connector):  # pragma nocover
     #  Methods to interface with the robots created in other environemnts
     #
 
-    def add(self):
-        '''
-        id = add(object) adds the object to the external environment. object must
-        be of an appropriate class. This adds a object object to a list of
-        objects which will act upon the step() method being called.
-
-        '''
-
-        pass
-
     def remove(self):
         '''
         remove(id) removes the object from the external environment.
