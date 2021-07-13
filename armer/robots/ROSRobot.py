@@ -24,7 +24,7 @@ from geometry_msgs.msg import PoseStamped
 from geometry_msgs.msg import TwistStamped, Twist
 from std_srvs.srv import Empty, EmptyRequest, EmptyResponse
 
-from std_msgs.msg import Float32MultiArray
+from std_msgs.msg import Float64MultiArray
 
 from armer_msgs.msg import ManipulatorState, JointVelocity
 from armer_msgs.msg import MoveToJointPoseAction, MoveToJointPoseGoal, MoveToJointPoseResult
@@ -139,7 +139,7 @@ class ROSRobot(rtb.ERobot):
                 joint_velocity_topic
                 if joint_velocity_topic
                 else '/joint__group_velocity_controller/joint_velocity',
-                Float32MultiArray,
+                Float64MultiArray,
                 queue_size=1
             )
 
@@ -752,7 +752,7 @@ class ROSRobot(rtb.ERobot):
 
             self.qd = self.j_v
 
-        self.joint_publisher.publish(Float32MultiArray(data=self.qd))
+        self.joint_publisher.publish(Float64MultiArray(data=self.qd))
         self.last_tick = current_time
 
         self.event.set()
