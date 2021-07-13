@@ -60,7 +60,7 @@ class ROS(Connector):  # pragma nocover
 
         super().add()
 
-    def step(self):
+    def step(self, dt=0.01):
         '''
         step(dt) triggers the external program to make a time step
         of defined time updating the state of the environment as defined by
