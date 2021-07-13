@@ -70,7 +70,7 @@ Other parameters can also be set:
 | Field Name | Description | Example |
 | --------| --------| --------|
 | robots: joint_state_topic | topic to listen to joint states on | `"/joint_states"` |
-| robots: joint_velocity_topic | topic to listen to velocity on | `"/joint_velocity_node_controller/joint_velocity"` |
+| robots: joint_velocity_topic | topic to listen to velocity on | `"/joint_group_velocity_controller/joint_velocity"` |
 | robots: origin | Set a different origin for the robot | [-1, 0, 0, 0, 0, 0] |
 | robots: gripper | Specify the end effector link | `"tool0"` | 
 | logging: frequency | Sets the frequency of logging | false |

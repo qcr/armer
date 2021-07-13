@@ -10,6 +10,9 @@ import time
 import rospy
 
 from roboticstoolbox.backends.Swift import Swift
+from roboticstoolbox.models.URDF.Panda import Panda
+
+from armer.robots.ROSRobot import ROSRobot
 
 class TestDriver(unittest.TestCase):
     """
@@ -47,7 +50,7 @@ class TestDriver(unittest.TestCase):
         Test initialising driver
         """
         from armer import Armer #pylint: disable=import-outside-toplevel
-        driver = Armer(backend=Swift())
+        driver = Armer(robots=[ROSRobot(Panda())], backend=Swift(), backend_args={'headless': True})
         self.assertIsInstance(driver, Armer)
         driver.close()
 

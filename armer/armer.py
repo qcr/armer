@@ -5,9 +5,8 @@ Armer Class
 .. codeauthor:: Gavin Suddreys
 """
 from __future__ import annotations
-from os import read
+from typing import List, Dict, Any, Tuple
 
-from typing import List, Dict
 import timeit
 import importlib
 
@@ -45,7 +44,8 @@ class Armer:
             self,
             robots: List[rtb.robot.Robot] = None,
             backend: rtb.backends.Connector = None,
-            readonly_backends: List[rtb.backends.Connector] = None,
+            backend_args: Dict[str, Any] = None,
+            readonly_backends: List[Tuple[rtb.backends.Connector, Dict[str, Any]]] = None,
             publish_transforms: bool = False,
             logging: dict[str, bool] = None) -> None:
 
@@ -56,7 +56,7 @@ class Armer:
 
         if not self.robots:
             self.robots = [ROSRobot(self, rtb.models.URDF.UR5())]
-        
+
         if not self.backend:
             self.backend = Swift()
 
@@ -71,19 +71,19 @@ class Armer:
         self.last_tick = timeit.default_timer()
 
         # Launch backend
-        self.backend.launch()
+        self.backend.launch(**(backend_args if backend_args else dict()))
 
         for robot in self.robots:
             self.backend.add(robot)
 
-        for readonly in self.readonly_backends:
-            readonly.launch()
+        for readonly, args in self.readonly_backends:
+            readonly.launch(**args)
 
             for robot in self.robots:
                 readonly.add(robot, readonly=True)
 
         # Logging
-        self.log_frequency = 'frequency' in logging and logging['frequency']
+        self.log_frequency = logging and 'frequency' in logging and logging['frequency']
 
 
     def close(self):
@@ -165,14 +165,16 @@ class Armer:
                 del spec['type']
 
             robots.append(wrapper(robot_cls(), **spec))
-        
+
         backend = None
+        backend_args = dict()
 
         if 'backend' in config:
             module_name, model_name = config['backend']['type'].rsplit('.', maxsplit=1)
             backend_cls = getattr(importlib.import_module(module_name), model_name)
 
-            backend = backend_cls(**config['args'] if 'args' in config else dict())
+            backend = backend_cls()
+            backend_args = config['args'] if 'args' in config else dict()
 
         readonly_backends = []
 
@@ -181,13 +183,14 @@ class Armer:
                 module_name, model_name = spec['type'].rsplit('.', maxsplit=1)
                 backend_cls = getattr(importlib.import_module(module_name), model_name)
 
-                readonly_backends.append(backend_cls(**spec['args'] if 'args' in spec else dict()))
-                
+                readonly_backends.append((backend_cls(), spec['args'] if 'args' in spec else dict()))
+
         logging = config['logging'] if 'logging' in config else {}
-        
+
         return Armer(
             robots=robots,
             backend=backend,
+            backend_args=backend_args,
             readonly_backends=readonly_backends,
             logging=logging
         )

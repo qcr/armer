@@ -24,6 +24,8 @@ from geometry_msgs.msg import PoseStamped
 from geometry_msgs.msg import TwistStamped, Twist
 from std_srvs.srv import Empty, EmptyRequest, EmptyResponse
 
+from std_msgs.msg import Float32MultiArray
+
 from armer_msgs.msg import ManipulatorState, JointVelocity
 from armer_msgs.msg import MoveToJointPoseAction, MoveToJointPoseGoal, MoveToJointPoseResult
 from armer_msgs.msg import MoveToNamedPoseAction, MoveToNamedPoseGoal, MoveToNamedPoseResult
@@ -114,7 +116,11 @@ class ROSRobot(rtb.ERobot):
             shape=(len(self.q),)
         )  # expected joint velocity
 
-        self.e_p = self.fkine(self.q, start=self.base_link, end=self.gripper) # measured end-effector position
+        self.e_p = self.fkine(
+            self.q, 
+            start=self.base_link, 
+            end=self.gripper
+        ) # measured end-effector position
 
         self.last_update: float = 0
         self.last_tick: float = 0
@@ -132,8 +138,8 @@ class ROSRobot(rtb.ERobot):
             self.joint_publisher = rospy.Publisher(
                 joint_velocity_topic
                 if joint_velocity_topic
-                else '/joint_velocity_node_controller/joint_velocity',
-                JointVelocity,
+                else '/joint__group_velocity_controller/joint_velocity',
+                Float32MultiArray,
                 queue_size=1
             )
 
@@ -746,7 +752,7 @@ class ROSRobot(rtb.ERobot):
 
             self.qd = self.j_v
 
-        self.joint_publisher.publish(JointVelocity(joints=self.qd))
+        self.joint_publisher.publish(Float32MultiArray(data=self.qd))
         self.last_tick = current_time
 
         self.event.set()
