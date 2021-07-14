@@ -5,6 +5,9 @@
 [![Language grade: Python](https://img.shields.io/lgtm/grade/python/g/suddrey-qut/armer.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/suddrey-qut/armer/context:python)
 [![Coverage](https://codecov.io/gh/suddrey-qut/armer/branch/master/graph/badge.svg)](https://codecov.io/gh/suddrey-qut/armer)
 
+
+![armer_example](./docs/armer_example.gif)
+
 ## Overview
 The Armer driver provides a simple mechanism for building high-level configurations to seamlessly control a broad range of manipulators under different actuation modes (simulation or physical).
 
@@ -13,18 +16,16 @@ Several ROS action servers, topics and services are set up by this package to en
 Additionally, the driver is built off the [Python Robotics Toolbox](https://qcr.github.io/code/robotics-toolbox-python/) and uses [Swift](https://qcr.github.io/code/swift/) as a backend to simulate supported manipulators.
 
 ## Installation
-*Requires ROS noetic preinstalled*
+*Requires ROS Noetic preinstalled*
 
 1. Create a catkin workspace.
 ```sh
-mkdir ~/armer_ws && cd ~/armer_ws
+mkdir -p ~/armer_ws/src && cd ~/armer_ws/src
 ```
-```sh
-catkin_make
-```
+
 2. Clone this repository and https://github.com/qcr/armer_msgs into the armer_ws/src folder.
 ```sh
-cd src && git clone https://github.com/qcr/armer.git && git clone https://github.com/qcr/armer_msgs 
+git clone https://github.com/qcr/armer.git && git clone https://github.com/qcr/armer_msgs 
 ```
 3. Install the required dependencies.
 ```sh
@@ -82,7 +83,7 @@ To launch a driver instance with a preset config, the config parameter is added 
 
 The following example shows how driver instance can be launched with a [saved Panda sim config](https://github.com/qcr/armer/blob/devel-faith/cfg/panda_sim.yaml):
 ```sh
-roslaunch armer armer.launch config:=panda_sim
+roslaunch armer armer.launch config:=/path/to/cfg/panda_sim.yaml
 ```
 
 ## Examples
@@ -102,6 +103,8 @@ python3 armer/examples/ur5_example.py
 ```
 
 ## Code Examples
+
+### Move a manipulator to a specified pose
 
 To communicate with the driver, a ROS action client must be created to communicate with the driver.
 ```
@@ -141,6 +144,8 @@ The desired pose is then sent to the action server as a goal and waits for it to
 pose_cli.send_goal(goal)
 pose_cli.wait_for_result()
 ```
+
+### Move a manipulator's end effector w.r.t the target frame's ID
 A target robot can also be manipulated by publishing directly to the cartesian velocity topic. This topic uses the message type TwistStamped.
 
 Set up the publisher pointed to the velocity topic.
@@ -177,13 +182,13 @@ Provides information on the current state of the manipulator including the pose 
 
 ### Services
 
-- **/arm/home** ([std_srvs/Empty](http://docs.ros.org/jade/api/std_srvs/html/srv/Empty.html))
+- **/arm/home** ([std_srvs/Empty](http://docs.ros.org/noetic/api/std_srvs/html/srv/Empty.html))
 Moves the robot back to its initial ready pose.
 
-- **/arm/recover** ([std_srvs/Empty](http://docs.ros.org/jade/api/std_srvs/html/srv/Empty.html))
+- **/arm/recover** ([std_srvs/Empty](http://docs.ros.org/noetic/api/std_srvs/html/srv/Empty.html))
 Recovers from collision or limit violation error states that will put the robot into a non-operable state.
 
-- **/arm/stop** ([std_srvs/Empty](http://docs.ros.org/jade/api/std_srvs/html/srv/Empty.html))
+- **/arm/stop** ([std_srvs/Empty](http://docs.ros.org/noetic/api/std_srvs/html/srv/Empty.html))
 Stops the current motion of the current.
 
 - **/arm/get_named_poses** ([armer_msgs/GetNamesList](https://github.com/qcr/armer_msgs/blob/main/srv/GetNamesList.srv))
