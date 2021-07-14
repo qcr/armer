@@ -20,14 +20,12 @@ Additionally, the driver is built off the [Python Robotics Toolbox](https://qcr.
 
 1. Create a catkin workspace.
 ```sh
-mkdir ~/armer_ws && cd ~/armer_ws
+mkdir -p ~/armer_ws/src && cd ~/armer_ws/src
 ```
-```sh
-catkin_make
-```
+
 2. Clone this repository and https://github.com/qcr/armer_msgs into the armer_ws/src folder.
 ```sh
-cd src && git clone https://github.com/qcr/armer.git && git clone https://github.com/qcr/armer_msgs 
+git clone https://github.com/qcr/armer.git && git clone https://github.com/qcr/armer_msgs 
 ```
 3. Install the required dependencies.
 ```sh
@@ -85,7 +83,7 @@ To launch a driver instance with a preset config, the config parameter is added 
 
 The following example shows how driver instance can be launched with a [saved Panda sim config](https://github.com/qcr/armer/blob/devel-faith/cfg/panda_sim.yaml):
 ```sh
-roslaunch armer armer.launch config:=panda_sim
+roslaunch armer armer.launch config:=/path/to/cfg/panda_sim.yaml
 ```
 
 ## Examples
@@ -228,10 +226,3 @@ Moves the end-effector to a pre-defined joint configuration.
 
 - **/arm/joint/pose** ([armer_msgs/MoveToJointPoseAction](https://github.com/qcr/armer_msgs/blob/main/action/MoveToJointPose.action))
 Moves the joints of the robot to the indicated positions (radians).
-
-
-## Supporters
-
-Development of the Armer Driver software stack was directly supported by:
-
-[![Australian Centre for Robotic Vision](./docs/acrv_logo_small.png)](https://www.roboticvision.org/)&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;[![QUT Centre for Robotics](./docs/qcr_logo_small.png)](https://research.qut.edu.au/qcr/)
