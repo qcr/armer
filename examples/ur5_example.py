@@ -16,7 +16,7 @@ from geometry_msgs.msg import PoseStamped, TwistStamped
 from std_srvs.srv import Empty
 
 # initialise ros node
-rospy.init_node('move_to_points_example', anonymous=True)
+rospy.init_node('move_to_points_example', disable_signals=True)
 
 
 home_srv = rospy.ServiceProxy('/arm/home', Empty)
