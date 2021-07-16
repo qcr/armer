@@ -81,22 +81,22 @@ Certain arms (such as the UR3) have multiple end effectors so specifying the lin
 
 To launch a driver instance with a preset config, the config parameter is added to the roslaunch command with the name of the desired YAML config.
 
-The following example shows how driver instance can be launched with a [saved Panda sim config](https://github.com/qcr/armer/blob/devel-faith/cfg/panda_sim.yaml):
+The following example shows how driver instance can be launched with a [saved Panda sim config](https://github.com/qcr/armer/blob/master/cfg/panda_sim.yaml):
 ```sh
 roslaunch armer armer.launch config:=/path/to/cfg/panda_sim.yaml
 ```
 
 ## Examples
 
-Examples of interfacing with the driver can be found in the [examples folder](https://github.com/qcr/armer/tree/devel-faith/examples). 
+Examples of interfacing with the driver can be found in the [examples folder](https://github.com/qcr/armer/tree/master/examples). 
 
-An example[(panda_example.py)](https://github.com/qcr/armer/blob/devel-faith/examples/panda_example.py) for interacting with a Panda sim can be run from the workspace main directory via the following command after roslaunching the Panda model sim config.
+An example[(panda_example.py)](https://github.com/qcr/armer/blob/master/examples/panda_example.py) for interacting with a Panda sim can be run from the workspace main directory via the following command after roslaunching the Panda model sim config.
 
 ```sh
 python3 armer/examples/panda_example.py
 ```
 
-Alternatively, an example[(ur5_example.py)](https://github.com/qcr/armer/blob/devel-faith/examples/ur5_example.py) for interacting with a UR5 sim can be run from the workspace main directory via the following command after roslaunching the UR5 model sim config.
+Alternatively, an example[(ur5_example.py)](https://github.com/qcr/armer/blob/master/examples/ur5_example.py) for interacting with a UR5 sim can be run from the workspace main directory via the following command after roslaunching the UR5 model sim config.
 
 ```sh
 python3 armer/examples/ur5_example.py
