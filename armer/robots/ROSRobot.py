@@ -344,7 +344,7 @@ class ROSRobot(rtb.ERobot):
                 pose.orientation.z
             ]).SE3()
 
-            dq = self.ikine_LMS(target, q0=self.q, end=self.gripper)
+            dq = self.ikine_LMS(target, q0=self.q) #), end=self.gripper)
             traj = rtb.tools.trajectory.jtraj(self.q, dq.q, 100)
 
             if self.__traj_move(traj, goal.speed if goal.speed else 0.4):
@@ -495,7 +495,7 @@ class ROSRobot(rtb.ERobot):
                 self.qr if hasattr(self, 'qr') else self.q, # pylint: disable=no-member
                 200
             )
-            self.__traj_move(traj)
+            self.__traj_move(traj, max_speed=0.1)
             return EmptyResponse()
 
     def recover_cb(self, req: EmptyRequest) -> EmptyResponse: # pylint: disable=no-self-use
@@ -547,37 +547,60 @@ class ROSRobot(rtb.ERobot):
         :return: [description]
         :rtype: bool
         """
-        Kp = 15
+        Kp = 10
+        idx = 1
         self.moving = True
+        
+        last_jV = np.array([0] * self.n)
+        
+        print('current', self.q)
+        print('idx: ', idx)
+        while idx < traj.q.shape[0] and not self.preempted:
 
-        for dq in traj.q[1:]:
-            if self.preempted:
+            dq = traj.q[idx]
+            error = dq - self.q
+
+            if idx == traj.q.shape[0] and np.max(np.fabs(error)) < 0.5:
+                 idx += 1
+                 continue
+
+            jV = Kp * error
+
+
+            if np.all(np.fabs(jV) < 0.00001):
                 break
 
-            error = [-1] * self.n
-            while np.max(np.fabs(error)) > 0.05 and not self.preempted:
-                error = dq - self.q
+            if np.any(np.fabs(jV) > 0.3):
+                jV = jV / np.max(np.fabs(jV)) * 0.3
 
-                jV = Kp * error
 
-                jacob0 = self.jacob0(self.q, fast=True, end=self.gripper)
+            jacob0 = self.jacob0(self.q, fast=True, end=self.gripper)
 
-                T = jacob0 @ jV
-                V = np.linalg.norm(T[:3])
+            T = jacob0 @ jV
+            V = np.linalg.norm(T[:3])
 
-                if V > max_speed:
-                    T = T / V * max_speed
-                    jV = (np.linalg.pinv(jacob0) @ T)
+            # if V > max_speed:
+            #     T = T / V * max_speed
+            #     jV = (np.linalg.pinv(jacob0) @ T)
 
-                self.event.clear()
-                self.j_v = jV
-                self.last_update = timeit.default_timer()
-                self.event.wait()
+            self.event.clear()
+            self.j_v = jV
+            self.last_update = timeit.default_timer()
+            self.event.wait()
+            
+            Q = (traj.q[idx:] - self.q) * np.sign(traj.qd[idx:])
+            #print(np.where(Q > 0, Q, np.inf).argmin())
+            Q = np.sum(Q, axis=1)
+            increment = np.where(Q > 0.5, Q, np.inf).argmin()
+            
+            idx = idx + increment
+
+            last_jV = jV
 
         self.moving = False
         result = not self.preempted
         self.preempted = False
-        return result
+        return result 
 
     def get_state(self) -> ManipulatorState:
         """
