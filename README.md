@@ -5,8 +5,7 @@
 [![Language grade: Python](https://img.shields.io/lgtm/grade/python/g/suddrey-qut/armer.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/suddrey-qut/armer/context:python)
 [![Coverage](https://codecov.io/gh/suddrey-qut/armer/branch/master/graph/badge.svg)](https://codecov.io/gh/suddrey-qut/armer)
 
-
-![armer_example](./docs/armer_example.gif)
+![armer_example](https://github.com/qcr/armer/raw/master/docs/armer_example.gif)
 
 ## Overview
 The Armer driver provides a simple mechanism for building high-level configurations to seamlessly control a broad range of manipulators under different actuation modes (simulation or physical).
@@ -25,16 +24,18 @@ mkdir -p ~/armer_ws/src && cd ~/armer_ws/src
 
 2. Clone this repository and https://github.com/qcr/armer_msgs into the armer_ws/src folder.
 ```sh
-git clone https://github.com/qcr/armer.git && git clone https://github.com/qcr/armer_msgs 
+git clone https://github.com/qcr/armer.git && git clone https://github.com/qcr/armer_msgs
 ```
 3. Install the required dependencies.
 ```sh
-cd .. && rosdep install --from-paths src --ignore-src -r -y 
+cd .. && rosdep install --from-paths src --ignore-src -r -y
 ```
+
 4. Build the packages.
 ```sh
 catkin_make 
 ```
+
 5. Source the workspace.
 ```sh
 source devel/setup.sh
@@ -42,13 +43,13 @@ source devel/setup.sh
 To make this automatically occur in any terminal that is launched, run the follwing line.
 ```sh
 echo "source ~/armer_ws/devel/setup.bash" >> ~/.bashrc
-
 ```
-6. Run 
+
+6. Run the following code block to start the simulation. By default the configuration for the Panda model sim will be launched.
 ```sh
 roslaunch armer armer.launch
 ```
- to start the simulation. By default the configuration for the Panda model sim will be launched.
+
 
 ## Usage
 
@@ -68,8 +69,9 @@ The key parameters to define here are:
 * backend type: roboticstoolbox.backends.Swift.Swift will launch the Swift simulator. Use armer.backends.ROS.ROS to use a physical system
 
 Other parameters can also be set:
+
 | Field Name | Description | Example |
-| --------| --------| --------|
+| :--------| :--------| :--------|
 | robots: joint_state_topic | topic to listen to joint states on | `"/joint_states"` |
 | robots: joint_velocity_topic | topic to listen to velocity on | `"/joint_group_velocity_controller/joint_velocity"` |
 | robots: origin | Set a different origin for the robot | [-1, 0, 0, 0, 0, 0] |
@@ -82,7 +84,7 @@ Certain arms (such as the UR3) have multiple end effectors so specifying the lin
 To launch a driver instance with a preset config, the config parameter is added to the roslaunch command with the name of the desired YAML config.
 
 The following example shows how driver instance can be launched with a [saved Panda sim config](https://github.com/qcr/armer/blob/master/cfg/panda_sim.yaml):
-```sh
+```
 roslaunch armer armer.launch config:=/path/to/cfg/panda_sim.yaml
 ```
 
@@ -92,13 +94,13 @@ Examples of interfacing with the driver can be found in the [examples folder](ht
 
 An example[(panda_example.py)](https://github.com/qcr/armer/blob/master/examples/panda_example.py) for interacting with a Panda sim can be run from the workspace main directory via the following command after roslaunching the Panda model sim config.
 
-```sh
+```
 python3 armer/examples/panda_example.py
 ```
 
 Alternatively, an example[(ur5_example.py)](https://github.com/qcr/armer/blob/master/examples/ur5_example.py) for interacting with a UR5 sim can be run from the workspace main directory via the following command after roslaunching the UR5 model sim config.
 
-```sh
+```
 python3 armer/examples/ur5_example.py
 ```
 
