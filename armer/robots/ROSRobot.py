@@ -550,25 +550,23 @@ class ROSRobot(rtb.ERobot):
         Kp = 10
         idx = 1
         self.moving = True
-        
-        last_jV = np.array([0] * self.n)
-        
-        print('current', self.q)
-        print('idx: ', idx)
+
         while idx < traj.q.shape[0] and not self.preempted:
 
             dq = traj.q[idx]
             error = dq - self.q
+            goal_error = traj.q[-1] - self.q
 
-            if idx == traj.q.shape[0] and np.max(np.fabs(error)) < 0.5:
-                 idx += 1
-                 continue
+            if np.all(np.fabs(goal_error) < 0.05):
+                 print('Too close to goal state')
+                 break
 
             jV = Kp * error
 
-
-            if np.all(np.fabs(jV) < 0.00001):
-                break
+            if np.all(np.fabs(jV) < 0.0001):
+                print('Low velocity detected')
+                idx += 1
+                continue
 
             if np.any(np.fabs(jV) > 0.3):
                 jV = jV / np.max(np.fabs(jV)) * 0.3
@@ -592,10 +590,8 @@ class ROSRobot(rtb.ERobot):
             #print(np.where(Q > 0, Q, np.inf).argmin())
             Q = np.sum(Q, axis=1)
             increment = np.where(Q > 0.5, Q, np.inf).argmin()
-            
-            idx = idx + increment
 
-            last_jV = jV
+            idx = idx + increment
 
         self.moving = False
         result = not self.preempted
