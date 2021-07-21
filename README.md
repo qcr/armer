@@ -7,7 +7,7 @@
 
 ![armer_example](https://github.com/qcr/armer/raw/master/docs/armer_example.gif)
 
-## Overview
+## Introduction
 The Armer driver provides a simple mechanism for building high-level configurations to seamlessly control a broad range of manipulators under different actuation modes (simulation or physical).
 
 Several ROS action servers, topics and services are set up by this package to enable this functionality. A summary of these can be found [here](#driver-component-summary). 
@@ -108,12 +108,17 @@ python3 armer/examples/ur5_example.py
 
 ### Move a manipulator to a specified pose
 
+Both the MoveToPose action server and the ServoToPose action server will move a manipulator to a specific pose. 
+
 To communicate with the driver, a ROS action client must be created to communicate with the driver.
+
+To connect to the MoveToPose action server, initialize an action client with the following code.
 ```
 pose_cli = actionlib.SimpleActionClient('/arm/cartesian/pose', MoveToPoseAction)
 pose_cli.wait_for_server()
 ```
-In this example we will set the pose of a simulated Panda arm. The pose action server uses the PoseStamped message type from the geometry messages package. 
+
+In this example the pose of a simulated Panda arm will be set. The MoveToPose action server uses the PoseStamped message type from the geometry messages package. 
 
 ```
 # Create an empty PoseStamped message
@@ -141,14 +146,86 @@ goal = MoveToPoseGoal()
 goal.pose_stamped=target
 ```
 
-The desired pose is then sent to the action server as a goal and waits for it to finish.
+Set the movement speed if desired. The field types can be seen in the action message declaration ([armer_msgs/MoveToPose.action](https://github.com/qcr/armer_msgs/blob/main/action/MoveToPose.action)).
+```
+goal.speed=1
+```
+
+The desired pose is then sent to the action server as a goal and waits for it to finish. The server will return true if it has been successful and false if not.
 ```
 pose_cli.send_goal(goal)
 pose_cli.wait_for_result()
 ```
+### Move a manipulator to a specified pose with obstacle avoidance
+
+The key difference between the two pose action servers is ServoToPose will move to the specified pose with real time object avoidance.
+
+To connect to the ServoToPose action server, initialize an action client with the following code.
+```
+servo_cli = actionlib.SimpleActionClient('/arm/cartesian/servo_pose', ServoToPoseAction)
+servo_cli.wait_for_server()
+```
+Again, the pose of a simulated Panda arm will be set. The ServoToPose action server also uses the PoseStamped message type from the geometry messages package. 
+
+```
+# # Create a target pose
+target = PoseStamped()
+target.header.frame_id = 'panda_link0'
+
+# Populate with target position/orientation 
+target.pose.position.x = 0.307
+target.pose.position.y = 0.400
+target.pose.position.z = 0.490
+
+target.pose.orientation.x = -1.00
+target.pose.orientation.y =  0.00
+target.pose.orientation.z =  0.00
+target.pose.orientation.w =  0.00
+
+# Create goal from target pose
+goal = ServoToPoseGoal()
+goal.pose_stamped=target
+```
+As with MoveToPose, parameters can be specified, here the threshold and gain can be set as follows. Additionally, the expected types can be seen in the action message declaration ([armer_msgs/ServoToPose.action](https://github.com/qcr/armer_msgs/blob/main/action/ServoToPose.action)).
+```
+goal.threshold=0.5
+goal.gain=0.5
+```
+ServoToPose will also return a success boolean.
+```
+# Send goal and wait for it to finish
+servo_cli.send_goal(goal)
+servo_cli.wait_for_result()
+servo_cli.get_result()
+
+```
+As can be seen, the ServoToPose process to have the driver move a manipulator to a specific pose is very similar between MoveToPose.
+
+### Move a manipulator via specific joint settings
+If the user has a desired joint configuration, the joints of a manipulator can manually be set with the the MoveToJointPoseAction server.
+
+As always, a connection with the server must be created via an action client.
+
+```
+servo_cli = actionlib.SimpleActionClient('/arm/joint/pose', MoveToJointPoseAction)
+servo_cli.wait_for_server()
+```
+The desired joint positions should be sent through as an array. Other field types can be seen in the action message declaration ([armer_msgs/MoveToJointPose.action](https://github.com/qcr/armer_msgs/blob/main/action/MoveToJointPose.action)). 
+```
+# Desired joint settings in radians
+desired_joints=[0, -pi/2, pi/4, 0, 0, 0 0]
+# Create goal from target pose
+goal = MoveToJointPoseGoal()
+goal.joints=desired_joints
+
+# Send goal and wait for it to finish
+servo_cli.send_goal(goal)
+servo_cli.wait_for_result()
+servo_cli.get_result()
+```
 
 ### Move a manipulator's end effector w.r.t the target frame's ID
-A target robot can also be manipulated by publishing directly to the cartesian velocity topic. This topic uses the message type TwistStamped.
+A target robot can also be manipulated by publishing directly to the cartesian velocity topic. This topic uses the message type [TwistStamped](https://docs.ros.org/api/geometry_msgs/html/msg/Twist.html).
 
 Set up the publisher pointed to the velocity topic.
 ```
