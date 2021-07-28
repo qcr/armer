@@ -781,7 +781,7 @@ class ROSRobot(rtb.ERobot):
                 self.j_v *= 0.9 if np.sum(np.absolute(self.j_v)
                                           ) >= 0.0001 else 0
 
-            self.qd = self.j_v
+        self.qd = self.j_v
 
         self.joint_publisher.publish(Float64MultiArray(data=self.qd))
         self.last_tick = current_time
