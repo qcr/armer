@@ -54,9 +54,9 @@ target.pose.orientation.w =  0.00
 
 
 # Create goal from target pose
-print('Moving to {}'.format(str(target.pose)))
-goal = MoveToPoseGoal()
-goal.pose_stamped=target
+# print('Moving to {}'.format(str(target.pose)))
+# goal = MoveToPoseGoal()
+# goal.pose_stamped=target
 
 # Send goal and wait for it to finish
 # pose_cli.send_goal(goal)

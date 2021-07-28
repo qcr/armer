@@ -87,8 +87,11 @@ class ROSRobot(rtb.ERobot):
         self.name = name if name else self.name
 
         # Arm State information
-        self.joint_names = list(map(lambda link: link.name.replace(
-            'link', 'joint'), filter(lambda link: link.isjoint, self.elinks)))
+        # self.joint_names = list(map(lambda link: link.name.replace(
+        #     'link', 'joint'), filter(lambda link: link.isjoint, self.elinks)))
+        self.joint_names = list(map(lambda link: link._joint_name, filter(lambda link: link.isjoint, self.elinks)))
+        # self.joint_names =['elbow_joint', 'shoulder_lift_joint', 'shoulder_pan_joint', 'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint']
+
         self.joint_indexes = []
 
         if origin:
