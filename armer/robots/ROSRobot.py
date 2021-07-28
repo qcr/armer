@@ -588,7 +588,7 @@ class ROSRobot(rtb.ERobot):
             self.j_v = jV
             self.last_update = timeit.default_timer()
             self.event.wait()
-            
+
             Q = (traj.q[idx:] - self.q) * np.sign(traj.qd[idx:])
             #print(np.where(Q > 0, Q, np.inf).argmin())
             Q = np.sum(Q, axis=1)
@@ -596,10 +596,12 @@ class ROSRobot(rtb.ERobot):
 
             idx = idx + increment
 
+        self.j_v = [0] * self.n
+
         self.moving = False
         result = not self.preempted
         self.preempted = False
-        return result 
+        return result
 
     def get_state(self) -> ManipulatorState:
         """
