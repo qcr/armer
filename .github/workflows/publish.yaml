@@ -1,0 +1,38 @@
+name: 'Publish Armer release'
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout site code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Install dependencies
+        run: |
+          echo "TODO"
+      - name: Build
+        run: |
+          echo "TODO"
+      - name: Push result to gh_pages branch
+        run: |
+          pushd docs
+          make html
+          popd
+          cp -r docs/build/ ../
+          git fetch --all
+          git checkout -f gh_pages
+          git reset --hard build_root
+          git clean -d -x -f
+          cp -r ../build/* .
+          git config --local user.email "actions@github.com"
+          git config --local user.name "GitHub Action"
+          git add .
+          git commit -m "Generated from contents of master commit: $(git rev-parse --short "$GITHUB_SHA")"
+          git push -f
