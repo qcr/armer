@@ -17,20 +17,26 @@ jobs:
       - name: Install dependencies
         run: |
           echo "TODO"
+          sudo apt install python3-sphinx
+          python3 -m pip install sphinx-markdown-tables
+          python3 -m pip install sphinx-rtd-theme
+          python3 -m pip install recommonmark
+          python3 -m pip install sphinxcontrib-openapi
       - name: Build
         run: |
           echo "TODO"
       - name: Push result to gh_pages branch
         run: |
+          cp README.md docs/README.md
           pushd docs
           make html
-          popd
+          popd 
           cp -r docs/build/ ../
           git fetch --all
           git checkout -f gh_pages
           git reset --hard build_root
           git clean -d -x -f
-          cp -r ../build/* .
+          cp -r ../build/html/* .
           git config --local user.email "actions@github.com"
           git config --local user.name "GitHub Action"
           git add .
