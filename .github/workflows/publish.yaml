@@ -18,6 +18,10 @@ jobs:
         run: |
           echo "TODO"
           sudo apt install python3-sphinx
+          python3 -m pip install sphinx-markdown-tables
+          python3 -m pip install sphinx-rtd-theme
+          python3 -m pip install recommonmark
+          python3 -m pip install sphinxcontrib-openapi
       - name: Build
         run: |
           echo "TODO"
