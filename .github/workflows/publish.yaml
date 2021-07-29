@@ -27,9 +27,10 @@ jobs:
           echo "TODO"
       - name: Push result to gh_pages branch
         run: |
+          cp README.md docs/README.md
           pushd docs
           make html
-          popd
+          popd 
           cp -r docs/build/ ../
           git fetch --all
           git checkout -f gh_pages
