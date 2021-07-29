@@ -35,7 +35,7 @@ jobs:
           git checkout -f gh_pages
           git reset --hard build_root
           git clean -d -x -f
-          cp -r ../build/* .
+          cp -r ../build/html/* .
           git config --local user.email "actions@github.com"
           git config --local user.name "GitHub Action"
           git add .
