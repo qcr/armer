@@ -1,16 +1,16 @@
-#!/usr/bin/env python3
 """
 Test script
 
 .. codeauthor:: Gavin Suddreys
 """
 import timeit
-
+from math import pi
 import rospy
 import actionlib
 
 from armer_msgs.msg import MoveToPoseAction, MoveToPoseGoal
 from armer_msgs.msg import ServoToPoseAction, ServoToPoseGoal
+from armer_msgs.msg import MoveToJointPoseAction, MoveToJointPoseGoal 
 from geometry_msgs.msg import PoseStamped, TwistStamped
 
 from std_srvs.srv import Empty
@@ -28,6 +28,9 @@ pose_cli = actionlib.SimpleActionClient('/arm/cartesian/pose', MoveToPoseAction)
 pose_cli.wait_for_server()
 
 servo_cli = actionlib.SimpleActionClient('/arm/cartesian/servo_pose', ServoToPoseAction)
+servo_cli.wait_for_server()
+
+servo_cli = actionlib.SimpleActionClient('/arm/joint/pose', MoveToJointPoseAction)
 servo_cli.wait_for_server()
 
 # Create a target pose
@@ -105,3 +108,19 @@ vel_pub.publish(TwistStamped())
 # servo_cli.wait_for_result()
 
 # servo_cli.get_result()
+
+#Joint velocity example
+# Desired joint settings in radians
+desired_joints=[0, 0, -pi/2, pi/4, 0, 0, 0]
+
+print('Moving joints to {}'.format(str(desired_joints)))
+
+# Create goal from target pose
+goal = MoveToJointPoseGoal()
+goal.joints=desired_joints
+
+
+# Send goal and wait for it to finish
+servo_cli.send_goal(goal)
+servo_cli.wait_for_result()
+servo_cli.get_result()
