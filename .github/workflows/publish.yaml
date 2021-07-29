@@ -17,6 +17,7 @@ jobs:
       - name: Install dependencies
         run: |
           echo "TODO"
+          sudo apt install python3-sphinx
       - name: Build
         run: |
           echo "TODO"
