@@ -11,9 +11,18 @@ Welcome to Armer Driver's documentation!
    :caption: Overview:
 
    README.md
+   
+.. toctree::
+   :maxdepth: 3
+   :caption: Tutorials:
+
+   creating_a_launch_package
+   set_joint_velocity
+   set_cartesian_velocity
 
 .. toctree::
    :maxdepth: 3
    :caption: Code:
 
    modules
+ 
