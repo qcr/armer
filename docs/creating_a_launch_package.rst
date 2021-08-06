@@ -63,9 +63,11 @@ Create a config for launching the physical robot backend using the following as 
     The key parameters to define here are:
         * name: namespace to be used
         * model: robotics toolbox robot model to use
-        * backend type: roboticstoolbox.backends.Swift.Swift will launch the Swift simulator. Use armer.backends.ROS.ROS to use a physical system
+        * backend type: 
+            * roboticstoolbox.backends.Swift.Swift will launch the Swift simulator
+            * armer.backends.ROS.ROS to use a physical system
 
-    Other parameters can also be set:
+    Optional parameters can also be set:
 
     .. list-table:: Configuration parameters
         :widths: 25 25 50
@@ -104,6 +106,8 @@ For ease of deployment and use, the launch and config file should be packaged in
 #. Relevant config files should be placed in ``armer_{ROBOT_MODEL}/cfg``. 
 
 #. The package can be created by running ``catkin_create_pkg armer_{ROBOT_MODEL}/`` in the directory above ``armer_{ROBOT_MODEL}``.
+
+#. The package can be built by running ``catkin_make`` in the main workspace directory
 
 #. If all has gone well, the ROS drivers and the Armer drivers should be started after running:
 
