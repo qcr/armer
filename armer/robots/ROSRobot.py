@@ -351,7 +351,7 @@ class ROSRobot(rtb.ERobot):
             ]).SE3()
 
             dq = self.ikine_LMS(target, q0=self.q) #), end=self.gripper)
-            traj = rtb.tools.trajectory.jtraj(self.q, dq.q, 100)
+            traj = rtb.tools.trajectory.jtraj(self.q, dq.q, 500)
 
             if self.__traj_move(traj, goal.speed if goal.speed else 0.4):
                 self.pose_server.set_succeeded(MoveToPoseResult(success=True))
@@ -438,7 +438,7 @@ class ROSRobot(rtb.ERobot):
             traj = rtb.tools.trajectory.jtraj(
                 self.q,
                 np.array(goal.joints),
-                100,
+                500,
             )
 
             if self.__traj_move(traj, goal.speed if goal.speed else 0.4):
@@ -499,7 +499,7 @@ class ROSRobot(rtb.ERobot):
             traj = rtb.tools.trajectory.jtraj(
                 self.q,
                 self.qr if hasattr(self, 'qr') else self.q, # pylint: disable=no-member
-                200
+                500
             )
             self.__traj_move(traj, max_speed=0.1)
             return EmptyResponse()
