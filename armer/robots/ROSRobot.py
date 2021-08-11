@@ -18,6 +18,9 @@ from spatialmath import SE3, SO3, UnitQuaternion
 import numpy as np
 import yaml
 
+from scipy.interpolate import interp1d
+
+from std_msgs.msg import Header
 from sensor_msgs.msg import JointState
 from geometry_msgs.msg import PoseStamped
 
@@ -550,51 +553,35 @@ class ROSRobot(rtb.ERobot):
         :return: [description]
         :rtype: bool
         """
-        Kp = 10
-        idx = 1
         self.moving = True
 
-        while idx < traj.q.shape[0] and not self.preempted:
+        t = 0
+        delta = 1/500
+        
+        qfunc = interp1d(np.linspace(0, 1, traj.q.shape[0]), traj.q, axis=0)
 
-            dq = traj.q[idx]
-            error = dq - self.q
-            goal_error = traj.q[-1] - self.q
-
-            if np.all(np.fabs(goal_error) < 0.05):
-                 print('Too close to goal state')
-                 break
-
-            jV = Kp * error
-
-            if np.all(np.fabs(jV) < 0.0001):
-                print('Low velocity detected')
-                idx += 1
-                continue
-
-            if np.any(np.fabs(jV) > 0.3):
-                jV = jV / np.max(np.fabs(jV)) * 0.3
-
+        while t + delta < 1 and not self.preempted:
+            jV = (qfunc(t + delta) - qfunc(t)) / delta
 
             jacob0 = self.jacob0(self.q, fast=True, end=self.gripper)
 
             T = jacob0 @ jV
             V = np.linalg.norm(T[:3])
+            
+            time_scaling = 1
 
-            # if V > max_speed:
-            #     T = T / V * max_speed
-            #     jV = (np.linalg.pinv(jacob0) @ T)
+            if V > max_speed:
+                T = T / V * max_speed
+                jV = (np.linalg.pinv(jacob0) @ T)
+
+                time_scaling = np.linalg.norm((jacob0 @ jV)[:3]) / V
+
+            t += delta * time_scaling
 
             self.event.clear()
             self.j_v = jV
             self.last_update = timeit.default_timer()
             self.event.wait()
-
-            Q = (traj.q[idx:] - self.q) * np.sign(traj.qd[idx:])
-            #print(np.where(Q > 0, Q, np.inf).argmin())
-            Q = np.sum(Q, axis=1)
-            increment = np.where(Q > 0.5, Q, np.inf).argmin()
-
-            idx = idx + increment
 
         self.j_v = [0] * self.n
 
@@ -610,10 +597,17 @@ class ROSRobot(rtb.ERobot):
         :return: ManipulatorState message describing the current state of the robot
         :rtype: ManipulatorState
         """
+        jacob0 = self.jacob0(self.q, fast=True, end=self.gripper)
+        
+        ## end-effector position
         ee_pose = self.fkine(self.q, start=self.base_link, fast=True, end=self.gripper)
 
+        header = Header()
+        header.frame_id = self.base_link.name
+        header.stamp = rospy.Time.now()
+
         pose_stamped = PoseStamped()
-        pose_stamped.header.frame_id = self.base_link.name
+        pose_stamped.header = header
 
         translation = ee_pose[:3, 3]
         pose_stamped.pose.position.x = translation[0]
@@ -630,7 +624,24 @@ class ROSRobot(rtb.ERobot):
 
         state = ManipulatorState()
         state.ee_pose = pose_stamped
+
+        # end-effector velocity
+        T = jacob0 @ self.qd
+
+        twist_stamped = TwistStamped()
+        twist_stamped.header = header
+        twist_stamped.twist.linear.x = T[0]
+        twist_stamped.twist.linear.y = T[1]
+        twist_stamped.twist.linear.z = T[2]
+        twist_stamped.twist.angular.x = T[3]
+        twist_stamped.twist.angular.x = T[4]
+        twist_stamped.twist.angular.x = T[5]
+
+        state.ee_velocity = twist_stamped
+
+        # joints
         state.joint_poses = list(self.q)
+        state.joint_velocities = list(self.qd)
         state.joint_torques = list(self.tau)
 
         return state
