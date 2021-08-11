@@ -1,20 +1,23 @@
 Working With A New Arm
 ====================================
 
-First install the manipulator's drivers.
+First, install the manipulator's drivers.
 
-If there is no existing `armer_{ROBOT_MODEL}` package in the QCR repos see:
-    * `Creating a launch file <https://github.com/qcr/armer_panda/>`_
-    * `Creating a yaml config <https://github.com/qcr/armer_panda/>`_
-    * `Creating an Armer package <https://github.com/qcr/armer_panda/>`_
+If a ``armer_{YOUR_ROBOT_MODEL}`` package is in the QCR repos, you're in luck! Simply install it and run 
+    ..code-block:: bash
+        
+        roslaunch armer_ur robot_bringup.launch 
 
+If your arm model doesn't have a hardware package in the QCR repos see:
+    *  `Creating a Hardware Package <creating_a_hardware_package.html#creating-a-hardware-package>`_.
+    
+If you want to set custom parameters:
+    * `Creating a launch file <creating_a_hardware_package.html#creating-a-launch-file>`_
+    * `Creating a config file <creating_a_hardware_package.html#creating-a-launch-file>`_
+    
 If there is no Robotic Toolbox model available see:
-    * `Creating a Robotics Toolbox model <https://github.com/qcr/armer_panda/>`_
+    * `Creating a Robotics Toolbox model <create_an_RTB_model.html#creating-a-robotics-toolbox-model/>`_
 
 
 
-The Armer drivers load a URDF model into the Python Robotic Toolbox framework to process the kinematics and other movement related calculations.
 
-If there is no existing `armer_{ROBOT_MODEL}` package in the QCR repos one can be  created by ` creating a launch file <https://github.com/qcr/armer_panda/>`_ that launches the manipulator drivers and the armer driver.
-
-To configure details such as if armer is interfacing with a simulation or a physical arm, a `yaml config file <https://github.com/qcr/armer_panda/>`_ should be created. 
