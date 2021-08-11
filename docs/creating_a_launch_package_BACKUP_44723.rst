@@ -2,7 +2,11 @@ Creating a Hardware Package
 ====================================
 Armer drivers provide a high level interface to command a manipulator. Armer relies on the manipulator's ROS driver implementation to communicate with the low level hardware.
 
+<<<<<<< HEAD
+For convenience a launch package can be created. This consists of:
+=======
 For convenience a hardware package should be created to launch the drivers for an arm or arm group. This consists of:
+>>>>>>> docs
 
 * A launch file which launches the manipulator drivers and then the Armer drivers
 * A yaml configuration file which sets run time parameters such as the model being launched and the type of backend 
