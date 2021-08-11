@@ -34,7 +34,7 @@ The following code block shows a Python3 script of setting the linear velocty in
 
 
 Testing from Command Line
------------------
+---------------------------
 
 Publishing to the velocity topic can be done from the command line. 
 
