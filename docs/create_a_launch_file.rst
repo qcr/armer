@@ -1,7 +1,14 @@
-Creating a Launch Package 
+Create A Combined Launch File
 ====================================
 While the Armer drivers provide a high level interface to command a manipulator, Armer relies on the manipulator's ROS driver implementation to communicate with the low level hardware.
 
+These drivers need to be installed and launched before the Armer driver can interface with the target manipulator.
+
+The instructions to launch them can be found on the arm's ROS driver Github page and usually involves ROSlaunching a launch file.
+
+..note::
+    The arm's drivers can also be launched manually before the Armer drivers
+    
 For convenience a launch package can be created. This consists of:
 
 * A launch file which launches the manipulator drivers and then the Armer drivers
