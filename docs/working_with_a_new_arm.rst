@@ -1,10 +1,11 @@
 Working With A New Arm
 ====================================
 
-First, install the manipulator's drivers.
+.. note::
+    Make sure the arm's ROS drivers are installed!
 
 If a ``armer_{YOUR_ROBOT_MODEL}`` package is in the QCR repos, you're in luck! Simply install it and run 
-    ..code-block:: bash
+    .. code-block:: bash
         
         roslaunch armer_ur robot_bringup.launch 
 
@@ -14,7 +15,7 @@ If your arm model doesn't have a hardware package in the QCR repos see:
 If you want to set custom parameters:
     * `Creating a launch file <creating_a_hardware_package.html#creating-a-launch-file>`_
     * `Creating a config file <creating_a_hardware_package.html#creating-a-launch-file>`_
-    
+
 If there is no Robotic Toolbox model available see:
     * `Creating a Robotics Toolbox model <create_an_RTB_model.html#creating-a-robotics-toolbox-model/>`_
 

@@ -2,10 +2,10 @@ Creating a Hardware Package
 ====================================
 Armer drivers provide a high level interface to command a manipulator. Armer relies on the manipulator's ROS driver implementation to communicate with the low level hardware.
 
-For convenience a hardware package should be created to launch the drivers for an arm or arm group. This consists of:
+For convenience, a hardware package should be created to launch the drivers for an arm or arm group. This consists of:
 
-* A launch file which launches the manipulator drivers and then the Armer drivers
-* A yaml configuration file which sets run time parameters such as the model being launched and the type of backend 
+* A `ROS launch file <http://wiki.ros.org/roslaunch/XML>`_ which launches the manipulator drivers and then the Armer drivers
+* A `yaml configuration file <http://wiki.ros.org/YAML%20Overview>`_ which sets run time parameters such as the model being launched and the type of backend 
 
 These files are packaged togther as a hardware package. To skip to folder structure and naming convention, see the `Putting it All Together <creating_a_hardware_package.html#putting-it-all-together>`_ section of this guide.
 
@@ -56,19 +56,19 @@ This is a ROS launch file which starts the manipulator's drivers as well as the 
 Creating a Configuration File
 ---------------------------------
 
-To configure details such as if armer is interfacing with a simulation or a physical arm, a `yaml config file <https://github.com/qcr/armer_panda/>`_ should be created. 
+To configure parameters such as if armer is interfacing with a simulation or a physical arm, a yaml config file should be created. 
 
-Armer uses the Robotics Toolbox to perform calculations and this config file will point to the Robotics toolbox ERobot object so movement can be processed. If the manipulator does not have an existing RTB model or if unsure, see `Creating a hardware package <https://github.com/qcr/armer_panda/>`_.
+Armer uses the Robotics Toolbox to perform calculations and this config file will point to the Robotics toolbox ERobot object so movement can be processed. If the manipulator does not have an existing RTB model or if unsure, see `Creating a Robotics Toolbox model <create_an_RTB_model.html#creating-a-robotics-toolbox-model/>`_.
 
-Create a config for launching the physical robot backend using the following as an example template:
+Create a config for launching the physical robot backend using the following as an example template and saved as ``{ROBOT_MODEL}_{BACKEND_MODE}.yaml`` where backend mode is `"real"` for a physical robot config and `"sim"` for a Swift sim robot:
 
     .. code-block:: yaml
 
         robots:
-        - name: arm 
+        - name: {DESIRED_ROBOT_NAMESPACE}
             model: roboticstoolbox.models.{ROBOTIC_TOOLBOX_MODEL_NAME}
         backend: 
-            type: roboticstoolbox.backends.ROS.ROS
+            type: {DESIRED_BACKEND_TYPE}
 
     Most parameters can be left as defaults, but these are the essential parameters that should be changed for basic functionality.
 
@@ -94,10 +94,8 @@ Create a config for launching the physical robot backend using the following as 
             - ``None``
 
     The two current options for backend are: 
-            * ``roboticstoolbox.backends.Swift.Swift``
-            * ``armer.backends.ROS.ROS``
-
-    ``roboticstoolbox.backends.Swift.Swift`` will launch the Swift simulator and ``armer.backends.ROS.ROS`` is to be used with a physical system
+            * ``roboticstoolbox.backends.Swift.Swift`` (Swift simulation robot)
+            * ``armer.backends.ROS.ROS`` (Physical robot)
 
     Multiple robots can be launched at a time and parameters for each individual instance can be set under the corresponding namespace. For example: 
 
@@ -119,7 +117,7 @@ Create a config for launching the physical robot backend using the following as 
 
             
     .. list-table:: Robot parameters
-        :widths: 25 25 25 25
+        :widths: 20 20 10 50
         :header-rows: 1
 
         *   - Field Name
@@ -132,7 +130,7 @@ Create a config for launching the physical robot backend using the following as 
             - `"/joint_states"`
         *   - joint_velocity_topic
             - topic to listen to velocity on
-            - `"/my_joint_group_velocity_controller/joint_velocity"` 
+            - `"/my_controller/joint_velocity"` 
             - `"/joint_group_velocity_controller/command"`
         *   - origin 
             - Set a different origin for the robot
@@ -153,7 +151,17 @@ Create a config for launching the physical robot backend using the following as 
 Putting it All Together
 ------------------------------
 
-For ease of deployment and use, the launch and config file should be packaged into a ROS package.
+For ease of deployment and use, the launch and config file should be packaged into a ROS package. The overall file structure is as follows:
+
+.. code-block::
+
+    armer_{ROBOT_MODEL}/
+        ├─ launch/
+        │   ├─ robot_bringup.launch
+        ├─ cfg/
+        │   ├─ {ROBOT_MODEL}_{BACKEND_MODE}.yaml
+
+
  
 #. The name of the package should be ``armer_{ROBOT_MODEL}``. 
 
