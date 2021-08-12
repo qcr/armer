@@ -2,7 +2,7 @@ Working With A New Arm
 ====================================
 
 .. note::
-    Make sure the arm's ROS drivers are installed!
+    Make sure the arm's ROS drivers and the main Armer driver package are installed!
 
 If a ``armer_{YOUR_ROBOT_MODEL}`` package is in the QCR repos, you're in luck! Simply install it and run 
     .. code-block:: bash

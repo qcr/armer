@@ -133,15 +133,15 @@ Create a config for launching the physical robot backend using the following as 
             - `"/my_controller/joint_velocity"` 
             - `"/joint_group_velocity_controller/command"`
         *   - origin 
-            - Set a different origin for the robot
+            - set a different origin for the robot
             - `[-1, 0, 0, 0, 0, 0]`
             - `[0, 0, 0, 0, 0, 0]`
         *   - gripper
-            - Specify the end effector link
+            - specify the end effector link
             - `"tool0"` 
             - ``None``
         *   - logging: frequency
-            - Sets the frequency of logging 
+            - sets the frequency of logging 
             - ``false`` 
             - ``None``
 
