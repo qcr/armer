@@ -84,7 +84,6 @@ class Armer:
         # Logging
         self.log_frequency = logging and 'frequency' in logging and logging['frequency']
 
-
     def close(self):
         """
         Close backend and stop action servers
