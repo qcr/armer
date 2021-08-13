@@ -16,6 +16,8 @@ Several ROS action servers, topics and services are set up by this package to en
 
 Additionally, the driver is built off the `Python Robotics Toolbox <https://qcr.github.io/code/robotics-toolbox-python>`_ and uses `Swift <https://qcr.github.io/code/swift/>`_ as a backend to simulate supported manipulators.
 
+To get started, check out the `Armer Installation <armer_installation>`_ page!
+
 .. toctree::
    :maxdepth: 2
    :caption: Getting Started:
@@ -38,7 +40,9 @@ Additionally, the driver is built off the `Python Robotics Toolbox <https://qcr.
    :maxdepth: 3
    :caption: Code:
 
+   API
    modules
+   
 
 
  

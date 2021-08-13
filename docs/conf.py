@@ -13,7 +13,7 @@ import sphinx_rtd_theme
 #
 import os
 import sys
-sys.path.insert(0, os.path.abspath('.'))
+sys.path.insert(0, os.path.abspath('../armer'))
 
 
 # -- Project information -----------------------------------------------------
@@ -35,6 +35,7 @@ extensions = [
     'sphinx_markdown_tables',
     'sphinx.ext.viewcode',
     'sphinx.ext.autosectionlabel',
+    'sphinx.ext.inheritance_diagram',
 ]
 autosectionlabel_prefix_document = True
 # Add any paths that contain templates here, relative to this directory.
@@ -44,7 +45,7 @@ templates_path = ['_templates']
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
-
+master_doc = 'index'
 
 # -- Options for HTML output -------------------------------------------------
 

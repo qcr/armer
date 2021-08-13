@@ -13,8 +13,8 @@ If your arm model doesn't have a hardware package in the QCR repos see:
     *  `Creating a Hardware Package <creating_a_hardware_package.html#creating-a-hardware-package>`_.
     
 If you want to set custom parameters:
-    * `Creating a launch file <creating_a_hardware_package.html#creating-a-launch-file>`_
-    * `Creating a config file <creating_a_hardware_package.html#creating-a-launch-file>`_
+    * `Creating a Launch File <creating_a_hardware_package.html#creating-a-launch-file>`_
+    * `Creating a Config File <creating_a_hardware_package.html#creating-a-launch-file>`_
 
 If there is no Robotic Toolbox model available see:
     * `Creating a Robotics Toolbox model <create_an_RTB_model.html#creating-a-robotics-toolbox-model/>`_

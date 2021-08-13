@@ -9,7 +9,7 @@ Quickstart Installation Script
 
 Copy and paste the following script into a terminal to create a new catkin workspace and install the Armer drivers to it. Note this script will also add the workspace to be sourced every time a bash terminal is opened.
 
-The installation script along with a breakdown of the process flick to 
+For a breakdown of the script flick to 
 `Installation Breakdown <armer_installation.html#installation_breakdown/>`_.
 
     .. code-block:: bash
@@ -21,11 +21,7 @@ The installation script along with a breakdown of the process flick to
         echo "source ~/armer_ws/devel/setup.bash" >> ~/.bashrc &&
 
 
-If the script has completed with no errors, Armer should be able to be started with:
-
-    .. code-block:: bash
-
-        roslaunch armer armer.launch
+If the script has completed with no errors, continue on to `Working With a New Arm <working_with_a_new_arm/>`_.
 
 Installation Breakdown
 --------------------------------
@@ -52,6 +48,7 @@ Installation Breakdown
 4. Builds the downloaded packages.
 
     .. code-block:: sh
+
         catkin_make 
 
 

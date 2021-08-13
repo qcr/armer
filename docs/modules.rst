@@ -15,9 +15,11 @@ Armer class
 ROSRobot module
 ---------------
 
-.. inheritance-diagram:: src.armer.robots.ROSRobot
+.. inheritance-diagram:: robots.ROSRobot
 
-.. automodule:: src.armer.robots.ROSRobot
+.. automodule:: robots.ROSRobot
    :members:
    :undoc-members:
    :show-inheritance:
+
+
