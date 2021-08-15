@@ -2,7 +2,7 @@
 Modules
 ====================================
 
-The main Armer class creates an instance of the ROSRobot class. The ROSRobot class takes a URDF model to create an ROS robot object.
+The main Armer class creates an instance of the ROSRobot class. The ROSRobot class takes a `Robotics Toolbox URDF model <https://petercorke.github.io/robotics-toolbox-python/arm_erobot.html?highlight=urdf#module-roboticstoolbox.models.URDF>`_ to create an ROS robot object.
 
 Armer class
 ---------------
@@ -14,7 +14,12 @@ Armer class
 
 ROSRobot module
 ---------------
-.. automodule:: armer.robots.ROSRobot
+
+.. inheritance-diagram:: robots.ROSRobot
+
+.. automodule:: robots.ROSRobot
    :members:
    :undoc-members:
    :show-inheritance:
+
+
