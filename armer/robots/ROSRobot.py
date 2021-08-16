@@ -80,6 +80,7 @@ class ROSRobot(rtb.ERobot):
                  config_path=None,
                  readonly=False,
                  gripper=None,
+                 frequency=None,
                  * args,
                  **kwargs):  # pylint: disable=unused-argument
 
@@ -100,6 +101,8 @@ class ROSRobot(rtb.ERobot):
         if origin:
             self.base = SE3(origin[:3]) @ SE3.RPY(origin[3:])
 
+        self.frequency = frequency if frequency else rospy.get_param(joint_state_topic + '/frequency', 500)
+        
         self.q = self.qr if hasattr(self, 'qr') else self.q # pylint: disable=no-member
         self.joint_states = None # Joint state message
 
@@ -351,7 +354,7 @@ class ROSRobot(rtb.ERobot):
             ]).SE3()
 
             dq = self.ikine_LMS(target, q0=self.q) #), end=self.gripper)
-            traj = rtb.tools.trajectory.jtraj(self.q, dq.q, 500)
+            traj = rtb.tools.trajectory.jtraj(self.q, dq.q, self.frequency)
 
             if self.__traj_move(traj, goal.speed if goal.speed else 0.2):
                 self.pose_server.set_succeeded(MoveToPoseResult(success=True))
@@ -438,7 +441,7 @@ class ROSRobot(rtb.ERobot):
             traj = rtb.tools.trajectory.jtraj(
                 self.q,
                 np.array(goal.joints),
-                500,
+                self.frequency,
             )
 
             if self.__traj_move(traj, goal.speed if goal.speed else 0.2):
@@ -499,7 +502,7 @@ class ROSRobot(rtb.ERobot):
             traj = rtb.tools.trajectory.jtraj(
                 self.q,
                 self.qr if hasattr(self, 'qr') else self.q, # pylint: disable=no-member
-                500
+                self.frequency
             )
             self.__traj_move(traj, max_speed=0.2)
             return EmptyResponse()
@@ -556,12 +559,12 @@ class ROSRobot(rtb.ERobot):
         self.moving = True
 
         t = 0
-        delta = 1/500
+        delta = 1/self.frequency
         
         qfunc = interp1d(np.linspace(0, 1, traj.q.shape[0]), traj.q, axis=0)
 
         while t + delta < 1 and not self.preempted:
-            jV = (qfunc(t + delta) - qfunc(t)) / delta
+            jV = (qfunc(t + delta) - self.q) / delta #self.q) / delta
 
             jacob0 = self.jacob0(self.q, fast=True, end=self.gripper)
 

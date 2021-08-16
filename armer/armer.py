@@ -66,7 +66,9 @@ class Armer:
         if self.is_publishing_transforms:
             self.broadcaster = tf2_ros.TransformBroadcaster()
 
-        self.rate = rospy.Rate(500)
+        self.frequency = min([r.frequency for r in self.robots])
+        self.rate = rospy.Rate(self.frequency)
+
         self.last_tick = timeit.default_timer()
 
         # Launch backend
