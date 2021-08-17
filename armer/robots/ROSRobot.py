@@ -89,14 +89,17 @@ class ROSRobot(rtb.ERobot):
         self.gripper=gripper
 
         self.name = name if name else self.name
-
-        # Arm State information
-        # self.joint_names = list(map(lambda link: link.name.replace(
-        #     'link', 'joint'), filter(lambda link: link.isjoint, self.elinks)))
-        self.joint_names = list(map(lambda link: link._joint_name, filter(lambda link: link.isjoint, self.elinks)))
-        # self.joint_names =['elbow_joint', 'shoulder_lift_joint', 'shoulder_pan_joint', 'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint']
+        
+        sorted_links=[]
+        #sort links by parents starting from gripper
+        link=self.link_dict[gripper]   
+        while link is not None:
+            sorted_links.append(link)
+            link=link.parent
+        sorted_links.reverse()
 
         self.joint_indexes = []
+        self.joint_names = list(map(lambda link: link._joint_name, filter(lambda link: link.isjoint, sorted_links)))
 
         if origin:
             self.base = SE3(origin[:3]) @ SE3.RPY(origin[3:])
