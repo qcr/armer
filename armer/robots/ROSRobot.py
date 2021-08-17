@@ -94,15 +94,13 @@ class ROSRobot(rtb.ERobot):
         # self.joint_names = list(map(lambda link: link.name.replace(
         #     'link', 'joint'), filter(lambda link: link.isjoint, self.elinks)))
         self.joint_names = list(map(lambda link: link._joint_name, filter(lambda link: link.isjoint, self.elinks)))
-        # self.joint_names =['elbow_joint', 'shoulder_lift_joint', 'shoulder_pan_joint', 'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint']
-
         self.joint_indexes = []
 
         if origin:
             self.base = SE3(origin[:3]) @ SE3.RPY(origin[3:])
 
         self.frequency = frequency if frequency else rospy.get_param(joint_state_topic + '/frequency', 500)
-        
+        print(self.frequency)
         self.q = self.qr if hasattr(self, 'qr') else self.q # pylint: disable=no-member
         self.joint_states = None # Joint state message
 
@@ -265,8 +263,8 @@ class ROSRobot(rtb.ERobot):
 
     def _state_cb(self, msg):
         if not self.joint_indexes:
-            self.joint_indexes = [idx for idx, joint_name in enumerate(
-                msg.name) if joint_name in self.joint_names]
+            for joint_name in self.joint_names:
+                self.joint_indexes.append(msg.name.index(joint_name))
         
         self.q = np.array(msg.position)[self.joint_indexes] if len(msg.position) == self.n else [0] * self.n
         self.joint_states = msg
@@ -562,9 +560,18 @@ class ROSRobot(rtb.ERobot):
         delta = 1/self.frequency
         
         qfunc = interp1d(np.linspace(0, 1, traj.q.shape[0]), traj.q, axis=0)
+ 
+        kP = 0.1
 
         while t + delta < 1 and not self.preempted:
+
+            # Too close to goal state
+            if np.all(np.fabs(qfunc(1) - self.q) < 0.005):
+                print('Too close to goal, quitting movement...')
+                break
+
             jV = (qfunc(t + delta) - self.q) / delta #self.q) / delta
+            jv = jV * kP
 
             jacob0 = self.jacob0(self.q, fast=True, end=self.gripper)
 
@@ -603,8 +610,7 @@ class ROSRobot(rtb.ERobot):
         jacob0 = self.jacob0(self.q, fast=True, end=self.gripper)
         
         ## end-effector position
-        ee_pose = self.fkine(self.q, start=self.base_link, fast=True, end=self.gripper)
-
+        ee_pose = self.fkine(self.q, start=self.base_link, end=self.gripper, fast=True)
         header = Header()
         header.frame_id = self.base_link.name
         header.stamp = rospy.Time.now()

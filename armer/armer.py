@@ -211,7 +211,7 @@ class Armer:
 
                 self.backend.step(dt=dt)
 
-                for backend in self.readonly_backends:
+                for backend, args in self.readonly_backends:
                     backend.step(dt=dt)
 
                 self.publish_transforms()
