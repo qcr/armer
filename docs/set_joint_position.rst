@@ -29,7 +29,7 @@ This example shows the setting of all the joints to 0 radians and the second joi
 
 Via Command Line
 -----------------
-While not entirely offical, requests to the action server can be made on the command line using tab auto-complete.
+Requests to the action server can be made on the command line using tab auto-complete.
 
 .. code-block:: bash
 

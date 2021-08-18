@@ -37,7 +37,7 @@ Services
     Removes the joint configuration of the provided pose name.
 
 * **/arm/set_cartesian_impedance** `armer_msgs/SetCartesianImpedance <https://github.com/qcr/armer_msgs/blob/main/srv/SetCartesianImpedance.srv>`_
-    Adjusts the impedance of the end-effector position in cartesian space.
+    Adjusts the impedance of the end-effector position in Cartesian space.
 
 * **/arm/add_named_pose_config** `armer_msgs/SetNamedPoseConfig <https://github.com/qcr/armer_msgs/blob/main/srv/SetNamedPoseConfig.srv>`_
     Instructs the driver to load named poses stored in the indicated config file.

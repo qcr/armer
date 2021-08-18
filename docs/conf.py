@@ -1,4 +1,6 @@
 import sphinx_rtd_theme
+
+
 # Configuration file for the Sphinx documentation builder.
 #
 # This file only contains a selection of the most common options. For a full
@@ -20,7 +22,7 @@ sys.path.insert(0, os.path.abspath('../armer'))
 
 project = 'Armer Driver'
 copyright = '2021, Gavin Suddrey'
-author = 'Gavin Suddrey'
+author = 'Gavin Suddrey, Faith Lim'
 
 
 # -- General configuration ---------------------------------------------------
@@ -36,7 +38,13 @@ extensions = [
     'sphinx.ext.viewcode',
     'sphinx.ext.autosectionlabel',
     'sphinx.ext.inheritance_diagram',
+    
 ]
+
+
+rinoh_documents = [dict(doc='index',        
+                        target='manual')]   
+
 autosectionlabel_prefix_document = True
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

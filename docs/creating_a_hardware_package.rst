@@ -5,7 +5,7 @@ Armer drivers provide a high level interface to command a manipulator. Armer rel
 For convenience, a hardware package should be created to launch the drivers for an arm or arm group. This consists of:
 
 * A `ROS launch file <http://wiki.ros.org/roslaunch/XML>`_ which launches the manipulator drivers and then the Armer drivers
-* A `yaml configuration file <http://wiki.ros.org/YAML%20Overview>`_ which sets run time parameters such as the model being launched and the type of backend 
+* A `yaml configuration file <http://wiki.ros.org/YAML%20Overview>`_ which sets runtime parameters such as the model being launched and the type of backend 
 
 These files are packaged togther as a hardware package. To skip to folder structure and naming convention, see the `Putting it All Together <creating_a_hardware_package.html#putting-it-all-together>`_ section of this guide.
 

@@ -1,9 +1,9 @@
 Setting Cartesian Velocites
 ====================================
 
-The Armer API listens to ROS messages published on the ``/arm/cartesian/velocity`` topic to move with cartesian velocity in a specified frame.
+The Armer API listens to ROS messages published on the ``/arm/cartesian/velocity`` topic to move with Cartesian velocity in a specified frame.
 
-Users can publish to this topic to set the cartesian velocites of the end effector.
+Users can publish to this topic to set the Cartesian velocites of the end effector.
 
 
 Via Python
