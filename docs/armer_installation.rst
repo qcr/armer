@@ -1,13 +1,13 @@
 Armer Installation
 ========================================
 
-.. note::
-    Requires ROS Noetic preinstalled
+Requirements
+-------------
 
-Quickstart Installation Script
+Quickstart Installation
 --------------------------------
 
-Copy and paste the following script into a terminal to create a new catkin workspace and install the Armer drivers to it. Note this script will also add the workspace to be sourced every time a bash terminal is opened.
+Copy and paste the following code snippet into a terminal to create a new catkin workspace and install the Armer drivers to it. Note this script will also add the workspace to be sourced every time a bash terminal is opened.
 
     .. code-block:: bash
         
@@ -18,5 +18,6 @@ Copy and paste the following script into a terminal to create a new catkin works
         catkin_make &&
         echo "source ~/armer_ws/devel/setup.bash" >> ~/.bashrc &&
         source ~/armer_ws/devel/setup.bash
+        echo "Installation complete!"
         
 If the script has completed with no errors, continue on to `Working With a New Arm <working_with_a_new_arm/>`_.

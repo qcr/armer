@@ -9,14 +9,36 @@ Welcome to Armer Driver's documentation!
 .. image:: https://github.com/qcr/armer/wiki/armer_example.gif
   :alt: Armer example gif
 
+Armer aims to provide an interface layer between the hardware drivers of a robotic arm giving the user control in several ways:
 
-The Armer driver provides a simple mechanism for building high-level configurations to seamlessly control a broad range of manipulators under different actuation modes (simulation or physical).
+* `Joint velocity control <set_joint_velocity.html>`_
+* `Joint position control <set_joint_position.html>`_
+* `End effector cartesian velocity control <set_cartesian_velocity.html>`_
+* `End effector cartesian position control <set_cartesian_pose.html>`_
 
-Several ROS action servers, topics and services are set up by this package to enable this functionality. A summary of these can be found [here](#driver-component-summary). 
+In addition to a multiple control method layer, Armer is designed to also be a compatability layer allowing the user to use the same code across different robotic platforms. Armer supports control for physical and simulated arms giving users the ability to develop even without access to a physical manipulator.
 
-Additionally, the driver is built off the `Python Robotics Toolbox <https://qcr.github.io/code/robotics-toolbox-python>`_ and uses `Swift <https://qcr.github.io/code/swift/>`_ as a backend to simulate supported manipulators.
+Requirements
+--------------
 
-To get started, check out the `Armer Installation <armer_installation>`_ page!
+Several ROS action servers, topics and services are set up by this package to enable this functionality. A summary of these can be found `here <API.html>`_.
+
+The driver is built off the `Python Robotics Toolbox <https://qcr.github.io/code/robotics-toolbox-python>`_ and requires a URDF loaded RTB model to calculate the required movement kinematics, RTB comes with browser based simulator `Swift <https://qcr.github.io/code/swift/>`_ which Armer uses as an out of the box simulator.
+
+Due to these supporting packages using Armer with a manipulator will require several requirements:
+
+General software requirements
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* `Python <https://www.python.org/>`_ >= 3.6
+* `ROS Noetic <http://wiki.ros.org/noetic>`_
+* `Robotics Toolbox for Python <https://pypi.org/project/roboticstoolbox-python/>`_
+
+Robot specific requirements
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Joint velocity ROS controllers
+* Robotics Toolbox model
+
+To get started, check out the `Armer Installation <armer_installation.html>`_ page!
 
 .. toctree::
    :maxdepth: 2
@@ -32,8 +54,9 @@ To get started, check out the `Armer Installation <armer_installation>`_ page!
    creating_a_hardware_package
    create_an_RTB_model
    set_joint_velocity
-   set_cartesian_velocity
    set_joint_position
+   set_cartesian_velocity
+   set_cartesian_position
 
 
 .. toctree::
