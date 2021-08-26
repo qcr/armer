@@ -7,7 +7,11 @@ The main Armer class creates an instance of the ROSRobot class. The ROSRobot cla
 Armer class
 ---------------
 
-.. automodule:: armer
+.. inheritance-diagram:: armer.armer
+   :top-classes: roboticstoolbox.Robot
+   :parts: 1
+
+.. automodule:: armer.armer
    :members:
    :undoc-members:
    :show-inheritance:
@@ -15,9 +19,11 @@ Armer class
 ROSRobot module
 ---------------
 
-.. inheritance-diagram:: robots.ROSRobot
+.. inheritance-diagram:: armer.robots.ROSRobot
+   :top-classes: roboticstoolbox.Robot
+   :parts: 1
 
-.. automodule:: robots.ROSRobot
+.. automodule:: armer.robots.ROSRobot
    :members:
    :undoc-members:
    :show-inheritance:

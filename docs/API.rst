@@ -54,7 +54,7 @@ Services
 
 
 Action Servers
--------------
+----------------
 
 * **/arm/cartesian/pose** `armer_msgs/MoveToPose.action <https://github.com/qcr/armer_msgs/blob/main/action/MoveToPose.action>`_
     Moves the end-effector to the requested goal pose w.r.t. the indicated frame id.
@@ -65,5 +65,5 @@ Action Servers
 * **/arm/joint/named** `armer_msgs/MoveToNamedPose.action <https://github.com/qcr/armer_msgs/blob/main/action/MoveToNamedPose.action>`_
     Moves the end-effector to a pre-defined joint configuration.
 
-* **/arm/joint/pose** `armer_msgs/MoveToJointPoseAction <https://github.com/qcr/armer_msgs/blob/main/action/MoveToJointPose.action>`_
+* **/arm/joint/pose** `armer_msgs/MoveToJointPoseAction.action <https://github.com/qcr/armer_msgs/blob/main/action/MoveToJointPose.action>`_
     Moves the joints of the robot to the indicated positions (radians).
