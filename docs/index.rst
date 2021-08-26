@@ -9,6 +9,8 @@ Welcome to Armer Driver's documentation!
 .. image:: https://github.com/qcr/armer/wiki/armer_example.gif
   :alt: Armer example gif
 
+`Armer's code on github: https://github.com/qcr/armer <https://github.com/qcr/armer>`_
+
 Armer aims to provide an interface layer between the hardware drivers of a robotic arm giving the user control in several ways:
 
 * `Joint velocity control <set_joint_velocity.html>`_

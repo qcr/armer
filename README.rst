@@ -1,8 +1,10 @@
-Welcome to Armer Driver's documentation!
+Armer Driver
 ========================================
 
 .. image:: https://github.com/qcr/armer/wiki/armer_example.gif
   :alt: Armer example gif
+
+Armer documentation can be found `here <https://qcr.github.io/armer>`_
 
 Armer aims to provide an interface layer between the hardware drivers of a robotic arm giving the user control in several ways:
 
@@ -16,7 +18,7 @@ In addition to a multiple control method layer, Armer is designed to also be a c
 Requirements
 --------------
 
-Several ROS action servers, topics and services are set up by this package to enable this functionality. A summary of these can be found `here <API.html>`_.
+Several ROS action servers, topics and services are set up by this package to enable this functionality. A summary of these can be found `here <https://qcr.github.io/armer/API.html>`_.
 
 The driver is built off the `Python Robotics Toolbox <https://qcr.github.io/code/robotics-toolbox-python>`_ and requires a URDF loaded RTB model to calculate the required movement kinematics, RTB comes with browser based simulator `Swift <https://qcr.github.io/code/swift/>`_ which Armer uses as an out of the box simulator.
 

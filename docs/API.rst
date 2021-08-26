@@ -1,5 +1,9 @@
-API
+Interface 
 ==========
+The following ROS components are utilized by Armer to allow the user to command with an arm. 
+
+For more details on how to use these interfaces see the tutorials.
+
 Subscribed Topics
 -------------------
 
@@ -49,7 +53,7 @@ Services
     Instructs the driver to remove named poses stored in the indicated config file.
 
 
-Action API
+Action Servers
 -------------
 
 * **/arm/cartesian/pose** `armer_msgs/MoveToPose.action <https://github.com/qcr/armer_msgs/blob/main/action/MoveToPose.action>`_
