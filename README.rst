@@ -6,10 +6,10 @@ Welcome to Armer Driver's documentation!
 
 Armer aims to provide an interface layer between the hardware drivers of a robotic arm giving the user control in several ways:
 
-* `Joint velocity control <set_joint_velocity.html>`_
-* `Joint position control <set_joint_position.html>`_
-* `End effector cartesian velocity control <set_cartesian_velocity.html>`_
-* `End effector cartesian position control <set_cartesian_pose.html>`_
+* `Joint velocity control <https://qcr.github.io/armer/set_joint_velocity.html>`_
+* `Joint position control <https://qcr.github.io/armer/set_joint_position.html>`_
+* `End effector cartesian velocity control <https://qcr.github.io/armer/set_joint_position.html>`_
+* `End effector cartesian position control <https://qcr.github.io/armer/set_cartesian_position.html>`_
 
 In addition to a multiple control method layer, Armer is designed to also be a compatability layer allowing the user to use the same code across different robotic platforms. Armer supports control for physical and simulated arms giving users the ability to develop even without access to a physical manipulator.
 
