@@ -28,4 +28,4 @@ Copy and paste the following code snippet into a terminal to create a new catkin
         source ~/armer_ws/devel/setup.bash
         echo "Installation complete!"
         
-If the script has completed with no errors, continue on to `Supported Arms <supported_arms.html/>`_.
+If the script has completed with no errors, continue on to `Supported Arms <supported_arms.html>`_.
