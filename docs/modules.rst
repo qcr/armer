@@ -18,10 +18,6 @@ ROSRobot module
 
 The ROSRobot class inheirits from the RTB ERobot class to wrap ROS functionality and movement into the implementation.
 
-.. inheritance-diagram:: armer.robots.ROSRobot
-   :top-classes: roboticstoolbox.Robot
-   :parts: 1
-
 .. automodule:: armer.robots.ROSRobot
    :members:
    :undoc-members:
