@@ -574,7 +574,7 @@ class ROSRobot(rtb.ERobot):
             if np.all(np.fabs(qfunc(1) - self.q) < 0.005):
                 print('Too close to goal, quitting movement...')
                 break
-
+            
             jV = (qfunc(t + delta) - self.q) / delta #self.q) / delta
             jv = jV * kP
 
@@ -784,27 +784,21 @@ class ROSRobot(rtb.ERobot):
                 self.e_v *= 0.9 if np.sum(np.absolute(self.e_v)
                                           ) >= 0.0001 else 0
 
-            wTe = self.fkine(self.q, start=self.base_link, fast=True, end=self.gripper)
-            error = self.e_p @ np.linalg.inv(wTe)
-            # print(e)
-            trans = self.e_p[:3, 3]  # .astype('float64')
-            trans += self.e_v[:3] * dt
-            rotation = SO3(self.e_p[:3, :3])
+            p = self.e_p[:3, 3] + self.e_v[:3] * dt
+            R = SO3(self.e_p[:3, :3]) * SO3.EulerVec(self.e_v[3:] * dt)
+            
+            T = SE3.Rt(R, p)
 
-            # Rdelta = SO3.EulerVec(self.e_v[3:])
+            Tactual = SE3(self.fkine(self.q, start=self.base_link, fast=True, end=self.gripper))
+            T = SE3.Rt(R, p)
 
-            # R = Rdelta * R
-            # R = R.norm()
-            # # print(self.e_p)
-            self.e_p = SE3.Rt(rotation, t=trans).A
-
-            v_t = self.e_v[:3] + Kp * error[:3, 3]
-            v_r = self.e_v[3:]  # + (e[.rpy(]) * 0.5)
-
-            e_v = np.concatenate([v_t, v_r])
-
+            delta = Tactual.delta(T)
+            e_v = self.e_v + delta
+            
             self.j_v = np.linalg.pinv(
                 self.jacob0(self.q, fast=True, end=self.gripper)) @ e_v
+
+            self.e_p = SE3.Rt(R, t=p).A
 
         # apply desired joint velocity to robot
         if any(self.j_v):
