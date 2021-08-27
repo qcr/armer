@@ -6,10 +6,7 @@ The main Armer class creates an instance of the ROSRobot class. The ROSRobot cla
 
 Armer class
 ---------------
-
-.. inheritance-diagram:: armer.armer
-   :top-classes: roboticstoolbox.Robot
-   :parts: 1
+The Armer class is the wrapper class that launches the ROSRobot object class and backends. 
 
 .. automodule:: armer.armer
    :members:
@@ -18,6 +15,8 @@ Armer class
 
 ROSRobot module
 ---------------
+
+The ROSRobot class inheirits from the RTB ERobot class to wrap ROS functionality and movement into the implementation.
 
 .. inheritance-diagram:: armer.robots.ROSRobot
    :top-classes: roboticstoolbox.Robot
@@ -29,3 +28,11 @@ ROSRobot module
    :show-inheritance:
 
 
+ROS Backend
+-------------
+Armer implements a ROS backend as a Python class for interfacing with physical arms. The class contains several functions to simplify ROS interactions.
+
+.. automodule:: armer.backends.ROS.ROS
+   :members:
+   :undoc-members:
+   :show-inheritance:

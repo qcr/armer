@@ -39,7 +39,6 @@ jobs:
           sudo apt install python3-rospy
           sudo apt install python3-rospkg
           sudo apt install python3-sphinx
-          python3 -m pip install numpy==1.18.0
           python3 -m pip install roboticstoolbox-python
           python3 -m pip install sphinx-markdown-tables
           python3 -m pip install sphinx-rtd-theme
@@ -51,7 +50,8 @@ jobs:
       - name: Push result to gh_pages branch
         run: |
           pushd docs
-          source /opt/ros/${{ matrix.ros-distro }}/setup.bash && PYTHONPATH=$PYTHONPATH:/usr/lib/$(python --version | sed 's/Python \([0-9]\.[0-9]\).*/python\1/')/dist-packages:/usr/lib/$(python --version | sed 's/Python \([0-9]\)\.[0-9].*/python\1/')/dist-packages make html 
+          source /opt/ros/${{ matrix.ros-distro }}/setup.bash && make html 
+          # source /opt/ros/${{ matrix.ros-distro }}/setup.bash && PYTHONPATH=$PYTHONPATH:/usr/lib/$(python --version | sed 's/Python \([0-9]\.[0-9]\).*/python\1/')/dist-packages:/usr/lib/$(python --version | sed 's/Python \([0-9]\)\.[0-9].*/python\1/')/dist-packages make html 
           popd 
           cp -r docs/build/ ../
           git fetch --all
