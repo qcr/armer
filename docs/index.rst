@@ -51,7 +51,6 @@ To get started, check out the `Armer Installation <armer_installation.html>`_ pa
 
    armer_installation
    supported_arms
-   working_with_a_new_arm  
 
 .. toctree::
    :maxdepth: 3

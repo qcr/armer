@@ -1,6 +1,5 @@
 Creating a Hardware Package 
 ====================================
-Armer drivers provide a high level interface to command a manipulator. Armer relies on the manipulator's ROS driver implementation to communicate with the low level hardware.
 
 For convenience, a hardware package should be created to launch the drivers for an arm or arm group. This consists of:
 
