@@ -1,5 +1,11 @@
 Interface 
 ==========
+
+.. image:: https://github.com/qcr/armer/wiki/armer_architecture.png
+  :alt: Armer architecture diagram
+
+This diagram shows the layers a user command goes through to finally be translated into movement on the robot.
+
 The following ROS components are utilized by Armer to allow the user to command with an arm. 
 
 For more details on how to use these interfaces see the tutorials.
