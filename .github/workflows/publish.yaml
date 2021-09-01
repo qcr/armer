@@ -35,20 +35,21 @@ jobs:
       - name: Install dependencies
         run: |
           echo "TODO"
-          sudo apt install python3-rospy
           sudo apt install python3-rospkg
           sudo apt install python3-sphinx
+          sudo apt install ros-noetic-tf
+          python3 -m pip install roboticstoolbox-python
           python3 -m pip install sphinx-markdown-tables
           python3 -m pip install sphinx-rtd-theme
           python3 -m pip install recommonmark
-          python3 -m pip install sphinxcontrib-openapi
+          python3 -m pip install sphinxcontrib-openapi          
       - name: Build
         run: |
           echo "TODO"
       - name: Push result to gh_pages branch
         run: |
           pushd docs
-          source /opt/ros/${{ matrix.ros-distro }}/setup.bash && PYTHONPATH=$PYTHONPATH:/usr/lib/$(python --version | sed 's/Python \([0-9]\.[0-9]\).*/python\1/')/dist-packages make html 
+          source /opt/ros/${{ matrix.ros-distro }}/setup.bash && PYTHONPATH=/opt/hostedtoolcache/Python/3.8.11/x64/lib/python3.8/site-packages:$PYTHONPATH:/usr/lib/$(python --version | sed 's/Python \([0-9]\.[0-9]\).*/python\1/')/dist-packages:/usr/lib/$(python --version | sed 's/Python \([0-9]\)\.[0-9].*/python\1/')/dist-packages make html 
           popd 
           cp -r docs/build/ ../
           git fetch --all
