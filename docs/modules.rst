@@ -15,7 +15,7 @@ The Armer class is the wrapper class that launches the ROSRobot object class and
 .. automodule:: armer.armer
    :members:
    :undoc-members:
-   :show-inheritance:
+   
 
 ROSRobot module
 ---------------
@@ -25,7 +25,7 @@ The ROSRobot class inheirits from the RTB ERobot class to wrap ROS functionality
 .. automodule:: armer.robots.ROSRobot
    :members:
    :undoc-members:
-   :show-inheritance:
+   
 
 
 ROS Backend
@@ -35,4 +35,4 @@ Armer implements a ROS backend as a Python class for interfacing with physical a
 .. automodule:: armer.backends.ROS.ROS
    :members:
    :undoc-members:
-   :show-inheritance:
+   

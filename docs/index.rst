@@ -37,6 +37,7 @@ Software requirements
 * `Python <https://www.python.org/>`_ >= 3.6
 * `ROS Noetic <http://wiki.ros.org/noetic>`_
 * `Robotics Toolbox for Python <https://pypi.org/project/roboticstoolbox-python/>`_
+* `QCR repos <https://qcr.github.io/armer/add_qcr_repos.html>`_
 
 Robot specific requirements
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

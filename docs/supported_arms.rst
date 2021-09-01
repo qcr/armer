@@ -4,10 +4,14 @@ Armer provides a high level interface to command a manipulator and relies on the
 
 For convenience, hardware packages consisting of a config file for setting `run parameters <creating_a_hardware_package.html#creating-a-launch-file>`_ and a `launch file <creating_a_hardware_package.html#creating-a-launch-file>`_ that launches Armer and the target manipulator's drivers are bundled together.
 
+..note::
+
+    It is highly recommended to test the manipulator's ROS drivers installation before attempting to use Armer to ensure a working base.
+
 
 Arms with Armer hardware packages
 ----------------------------------
-Currently Armer driver has packages for a few arms. If your arm model has a hardware package, control should be a fairly plug and play experience. (An experience we are still working on so please let us know if it isn't.)
+Currently Armer driver has packages for a few arms. If your arm model has a hardware package, control should be a fairly plug and play experience. (An experience we are still working on so please let us know if it isn't.). Below are the github pages to arms with hardware packages. Install directions can be found on their respective pages.
 
 * Franka Panda: `https://github.com/qcr/armer_panda <https://github.com/qcr/armer_panda>`_
 
