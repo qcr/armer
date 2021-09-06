@@ -29,7 +29,8 @@ from std_srvs.srv import Empty, EmptyRequest, EmptyResponse
 
 from std_msgs.msg import Float64MultiArray
 
-from armer_msgs.msg import ManipulatorState, JointVelocity
+from armer_msgs.msg import ManipulatorState, JointVelocity, Guards
+from armer_msgs.msg import GuardedVelocityAction, GuardedVelocityGoal, GuardedVelocityResult
 from armer_msgs.msg import MoveToJointPoseAction, MoveToJointPoseGoal, MoveToJointPoseResult
 from armer_msgs.msg import MoveToNamedPoseAction, MoveToNamedPoseGoal, MoveToNamedPoseResult
 from armer_msgs.msg import MoveToPoseAction, MoveToPoseGoal, MoveToPoseResult
@@ -86,13 +87,13 @@ class ROSRobot(rtb.ERobot):
 
         super().__init__(robot)
         self.__dict__.update(robot.__dict__)
-        self.gripper=gripper
 
+        self.gripper = gripper if gripper else self.grippers[0].links[0].name
         self.name = name if name else self.name
         
         sorted_links=[]
         #sort links by parents starting from gripper
-        link=self.link_dict[gripper]   
+        link=self.link_dict[self.gripper]   
         while link is not None:
             sorted_links.append(link)
             link=link.parent
@@ -105,7 +106,7 @@ class ROSRobot(rtb.ERobot):
             self.base = SE3(origin[:3]) @ SE3.RPY(origin[3:])
 
         self.frequency = frequency if frequency else rospy.get_param(joint_state_topic + '/frequency', 500)
-        print(self.frequency)
+        
         self.q = self.qr if hasattr(self, 'qr') else self.q # pylint: disable=no-member
         self.joint_states = None # Joint state message
 
@@ -119,7 +120,7 @@ class ROSRobot(rtb.ERobot):
         self.event: Event = Event()
 
         # Arm state property
-        self.state: ManipulatorState = ManipulatorState()
+        self.state: ManipulatorState = self.get_state()
 
         self.e_v_frame: str = None # Expected cartesian velocity
 
@@ -191,6 +192,15 @@ class ROSRobot(rtb.ERobot):
             )
 
             # Action Servers
+            self.velocity_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
+                '{}/cartesian/guarded_velocity'.format(self.name.lower()),
+                GuardedVelocityAction,
+                execute_cb=self.guarded_velocity_cb,
+                auto_start=False
+            )
+            self.velocity_server.register_preempt_callback(self.preempt)
+            self.velocity_server.start()
+
             self.pose_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
                 '{}/cartesian/pose'.format(self.name.lower()),
                 MoveToPoseAction,
@@ -287,28 +297,26 @@ class ROSRobot(rtb.ERobot):
             self.preempt()
 
         with self.lock:
-            target: Twist = msg.twist
+            self.__vel_move(msg)
 
-            if msg.header.frame_id and msg.header.frame_id != self.base_link.name:
-                self.e_v_frame = msg.header.frame_id
-            else:
-                self.e_v_frame = None
+    def guarded_velocity_cb(self, msg: GuardedVelocityGoal) -> None:
+        if self.moving:
+            self.preempt()
+        
+        with self.lock:
+            start_time = timeit.default_timer()
+            triggered = 0
+            
+            while not self.preempted:
+                triggered = self.test_guards(msg.guards, start_time=start_time)
 
-            e_v = np.array([
-                target.linear.x,
-                target.linear.y,
-                target.linear.z,
-                target.angular.x,
-                target.angular.y,
-                target.angular.z
-            ])
+                if triggered != 0:
+                    break
 
-            if np.any(e_v - self.e_v):
-                self.e_p = self.fkine(self.q, start=self.base_link, fast=True, end=self.gripper)
+                self.__vel_move(msg.twist_stamped)
+                rospy.sleep(0.01)
 
-            self.e_v = e_v
-
-            self.last_update = timeit.default_timer()
+            self.velocity_server.set_succeeded(GuardedVelocityResult(triggered=True))
 
     def joint_velocity_cb(self, msg: JointVelocity) -> None:
         """
@@ -551,6 +559,30 @@ class ROSRobot(rtb.ERobot):
         self.j_v *= 0
         self.qd *= 0
 
+    def __vel_move(self, twist_stamped: TwistStamped) -> None:
+        target: Twist = twist_stamped.twist
+
+        if twist_stamped.header.frame_id and twist_stamped.header.frame_id != self.base_link.name:
+            self.e_v_frame = twist_stamped.header.frame_id
+        else:
+            self.e_v_frame = None
+
+        e_v = np.array([
+            target.linear.x,
+            target.linear.y,
+            target.linear.z,
+            target.angular.x,
+            target.angular.y,
+            target.angular.z
+        ])
+
+        if np.any(e_v - self.e_v):
+            self.e_p = self.fkine(self.q, start=self.base_link, fast=True, end=self.gripper)
+
+        self.e_v = e_v
+
+        self.last_update = timeit.default_timer()
+
     def __traj_move(self, traj: np.array, max_speed=0.2) -> bool:
         """[summary]
 
@@ -665,12 +697,39 @@ class ROSRobot(rtb.ERobot):
             state.joint_torques = [0] * self.n
         
         return state
-        
-    def publish_state(self) -> None:
-        """
-        Publishes the current state of the robot generated by ROSRobot.get_state
-        """
-        self.state_publisher.publish(self.get_state())
+
+    def test_guards(
+        self,
+        guards: Guards,
+        start_time: float) -> int:
+
+        triggered = 0
+
+        if (guards.enabled & guards.GUARD_DURATION) == guards.GUARD_DURATION:
+            triggered |= guards.GUARD_DURATION if timeit.default_timer() - start_time > guards.duration else 0
+
+        if (guards.enabled & guards.GUARD_EFFORT) == guards.GUARD_EFFORT:
+            eActual = np.fabs(np.array([
+                self.state.ee_wrench.wrench.force.x,
+                self.state.ee_wrench.wrench.force.y,
+                self.state.ee_wrench.wrench.force.z,
+                self.state.ee_wrench.wrench.torque.x,
+                self.state.ee_wrench.wrench.torque.y,
+                self.state.ee_wrench.wrench.torque.z,
+            ]))
+
+            eThreshold = np.array([
+                guards.effort.force.x,
+                guards.effort.force.y,
+                guards.effort.force.z,
+                guards.effort.torque.x,
+                guards.effort.torque.y,
+                guards.effort.torque.z,
+            ])
+
+            triggered |= guards.GUARD_EFFORT if np.any(eActual > eThreshold) else 0
+            
+        return triggered
 
     def get_named_poses_cb(self, req: GetNamedPosesRequest) -> GetNamedPosesResponse:
         """
@@ -774,10 +833,6 @@ class ROSRobot(rtb.ERobot):
 
         current_time = timeit.default_timer()
 
-        Kp = 1
-
-        self.publish_state()
-
         # calculate joint velocities from desired cartesian velocity
         if any(self.e_v):
             if current_time - self.last_update > 0.1:
@@ -811,8 +866,10 @@ class ROSRobot(rtb.ERobot):
         self.joint_publisher.publish(Float64MultiArray(data=self.qd))
         self.last_tick = current_time
 
-        self.event.set()
+        self.state = self.get_state()
+        self.state_publisher.publish(self.state)
 
+        self.event.set()
 
     def __load_config(self):
         """[summary]
