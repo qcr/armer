@@ -8,5 +8,6 @@ robots:
     logging: 
       frequency: true
     # readonly: true
+publish_transforms: true
 backend:
   - type: roboticstoolbox.backends.Swift.Swift

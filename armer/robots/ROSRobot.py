@@ -608,7 +608,7 @@ class ROSRobot(rtb.ERobot):
                 break
             
             jV = (qfunc(t + delta) - self.q) / delta #self.q) / delta
-            jv = jV * kP
+            # jV = jV * kP
 
             jacob0 = self.jacob0(self.q, fast=True, end=self.gripper)
 
@@ -832,6 +832,7 @@ class ROSRobot(rtb.ERobot):
             return
 
         current_time = timeit.default_timer()
+        self.state = self.get_state()
 
         # calculate joint velocities from desired cartesian velocity
         if any(self.e_v):
@@ -866,7 +867,6 @@ class ROSRobot(rtb.ERobot):
         self.joint_publisher.publish(Float64MultiArray(data=self.qd))
         self.last_tick = current_time
 
-        self.state = self.get_state()
         self.state_publisher.publish(self.state)
 
         self.event.set()

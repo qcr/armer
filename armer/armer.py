@@ -186,12 +186,13 @@ class Armer:
                 readonly_backends.append((backend_cls(), spec['args'] if 'args' in spec else dict()))
 
         logging = config['logging'] if 'logging' in config else {}
-
+        publish_transforms = config['publish_transforms'] if 'publish_transforms' in config else False
         return Armer(
             robots=robots,
             backend=backend,
             backend_args=backend_args,
             readonly_backends=readonly_backends,
+            publish_transforms=publish_transforms,
             logging=logging
         )
 
