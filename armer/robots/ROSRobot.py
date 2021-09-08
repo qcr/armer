@@ -822,6 +822,9 @@ class ROSRobot(rtb.ERobot):
         """
         return self.custom_configs
 
+    def publish(self):
+        self.joint_publisher.publish(Float64MultiArray(data=self.qd))
+
     def step(self, dt: float = 0.01) -> None:  # pylint: disable=unused-argument
         """
         Updates the robot joints (robot.q) used in computing kinematics
@@ -863,8 +866,6 @@ class ROSRobot(rtb.ERobot):
                                           ) >= 0.0001 else 0
 
         self.qd = self.j_v
-
-        self.joint_publisher.publish(Float64MultiArray(data=self.qd))
         self.last_tick = current_time
 
         self.state_publisher.publish(self.state)

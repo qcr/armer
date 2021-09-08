@@ -73,8 +73,8 @@ class ROS(Connector):  # pragma nocover
         types.
 
         '''
-
-        pass
+        for robot_name in self.robots:
+            self.robots[robot_name].publish()
 
     def reset(self):
         '''
