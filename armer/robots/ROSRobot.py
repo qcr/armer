@@ -120,7 +120,7 @@ class ROSRobot(rtb.ERobot):
         self.event: Event = Event()
 
         # Arm state property
-        self.state: ManipulatorState = self.get_state()
+        self.state: ManipulatorState = ManipulatorState()
 
         self.e_v_frame: str = None # Expected cartesian velocity
 
