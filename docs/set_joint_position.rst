@@ -1,7 +1,7 @@
 Setting Joint Positions
 ====================================
 
-The Armer interface contains a ROS action server which listens for requests to set of joint positions.
+The Armer interface contains a ROS action server which listens for requests to set joint positions.
 
 The user can use a ROS action client to set the joint positions of any or all of the joints on a manipulator.
 

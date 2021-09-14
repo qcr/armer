@@ -20,7 +20,7 @@ a robotic arm giving the user control in several ways:
     control](https://qcr.github.io/armer/set_cartesian_position.html)
 
 In addition to a multiple control method layer, Armer is designed to
-also be a compatability layer allowing the user to use the same code
+be a compatability layer allowing the user to use the same code
 across different robotic platforms. Armer supports control for physical
 and simulated arms giving users the ability to develop even without
 access to a physical manipulator.
@@ -28,8 +28,8 @@ access to a physical manipulator.
 Requirements
 ------------
 
-Several ROS action servers, topics and services are set up by this
-package to enable this functionality. A summary of these can be found
+Several ROS action servers, topics and services are set up by Armer 
+to enable this functionality. A summary of these can be found
 [here](https://qcr.github.io/armer/API.html).
 
 The driver is built off the [Python Robotics Toolbox
@@ -52,7 +52,7 @@ require several requirements:
 
 ### Robot specific requirements
 
--   Joint velocity ROS controllers
+-   ROS drivers with joint velocity controllers
 -   Robotics Toolbox model
 
 Installation
@@ -73,6 +73,45 @@ terminal is opened.
 > source ~/armer_ws/devel/setup.bash
 > echo "Installation complete!"
 > ```
+
+Supported Arms
+---------------
+Armer relies on the manipulator's ROS driver to communicate with the low level hardware so the the ROS drivers must be started along side Armer.
+
+Currently Armer driver has packages that launches Armer and the target manipulator's drivers are bundled together. If your arm model has a hardware package, control should be a fairly plug and play experience. (An experience we are still working on so please let us know if it isn't.). Below are the github pages to arms with hardware packages. Install directions can be found on their respective pages.
+
+* Franka Panda: [https://github.com/qcr/armer_panda](https://github.com/qcr/armer_panda)
+
+* Universal Robot UR3: [https://github.com/qcr/armer_ur](https://github.com/qcr/armer_ur)
+
+* Universal Robot UR5: [https://github.com/qcr/armer_ur](https://github.com/qcr/armer_ur)
+
+* Universal Robot UR10: [https://github.com/qcr/armer_ur](https://github.com/qcr/armer_ur)
+
+* ABB IRB6700: [https://github.com/qcr/armer_abb](https://github.com/qcr/armer_abb)
+
+For more information on setting up manipulators not listed here see the Armer documentation, [Supported Arms](https://qcr.github.io/armer/supported_arms.html).
+
+Usage
+-------
+
+The Armer interface can be launched with the following command:
+
+> ``` {.sourceCode .bash}
+> roslaunch armer_{ROBOT_MODEL} robot_bringup.launch config:={PATH_TO_CONFIG_YAML_FILE} sim:={true/false}
+> ```
+
+After launching, an arm can be controlled in several ways. Some quick tutorials can be referenced below:
+
+-   [Joint velocity
+    control](https://qcr.github.io/armer/set_joint_velocity.html)
+-   [Joint position
+    control](https://qcr.github.io/armer/set_joint_position.html)
+-   [End effector cartesian velocity
+    control](https://qcr.github.io/armer/set_joint_position.html)
+-   [End effector cartesian position
+    control](https://qcr.github.io/armer/set_cartesian_position.html)
+-   [End effector cartesian velocity control with guarded motion](https://qcr.github.io/armer/guarded_motion.html)
 
 For more information and examples see the [Armer
 documentation](https://qcr.github.io/armer/)

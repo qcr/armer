@@ -7,10 +7,8 @@ Requirements
 * `Python <https://www.python.org/>`_ >= 3.6
 * `ROS Noetic <http://wiki.ros.org/noetic>`_
 * `Robotics Toolbox for Python <https://pypi.org/project/roboticstoolbox-python/>`_
+* `QCR repos <https://qcr.github.io/armer/add_qcr_repos.html>`_
 
-.. note::
-
-    You will probably need to add the QCR Robotic Vision repos so ``rosdep`` won't fail. See `Adding QCR Robotic Vision Repos <add_qcr_repos.html>`_
 
 Quickstart Installation
 --------------------------------
@@ -27,5 +25,10 @@ Copy and paste the following code snippet into a terminal to create a new catkin
         echo "source ~/armer_ws/devel/setup.bash" >> ~/.bashrc 
         source ~/armer_ws/devel/setup.bash
         echo "Installation complete!"
+
+
+.. note::
+
+    If the ``rosdep`` command is failing to find dependencies, make sure the QCR Robotic Vision repos have been added. See `Adding QCR Robotic Vision Repos <add_qcr_repos.html>`_
         
 If the script has completed with no errors, continue on to `Supported Arms <supported_arms.html>`_.

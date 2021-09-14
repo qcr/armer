@@ -5,7 +5,7 @@ The Armer drivers loads a URDF model into the Python Robotic Toolbox framework t
 .. note:: 
     For more information on the Robotics Toolbox see their `documentation page <https://petercorke.github.io/robotics-toolbox-python/index.html>`_
 
-The Robotics Toolbox contains a reasonable `selection of arms <https://petercorke.github.io/robotics-toolbox-python/_modules/index.html>`_  so always check first before setting out to creating your own.
+The Robotics Toolbox contains a reasonable `selection of arms <https://petercorke.github.io/robotics-toolbox-python/_modules/index.html>`_ so always check first before setting out to creating your own.
 
 #. Find the xarco URDF model of your robot 
 #. Fill in the following template 

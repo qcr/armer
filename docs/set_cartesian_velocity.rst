@@ -3,7 +3,7 @@ Setting Cartesian Velocites
 
 The Armer interface listens to ROS messages published on the ``/arm/cartesian/velocity`` topic to move with Cartesian velocity in a specified frame.
 
-Users can publish to this topic to set the Cartesian velocites of the end effector.
+Users can publish to this topic to set the Cartesian velocities of the end effector.
 
 
 Via Python
@@ -11,7 +11,7 @@ Via Python
 
 ROS topics can be published in a Python script using Rospy, the ROS Python client.
 
-The following code block shows a Python3 script of setting the linear velocty in the x direction to 0.1 m/s. The node continues to publish the message requesting a velocity of 0.1 m/s in the x direction so the manipulator will continue in the direction until the script is killed.
+The following code block shows a Python3 script of setting the linear velocty in the x direction to 0.1 m/s. The node continues to publish the message requesting a velocity of 0.1 m/s in the x direction so the manipulator will continue in this direction until the script is killed.
 
 .. warning::
     This example will continuously request a linear velocity in the x direction of 0.1 m/s so the robot will move until killed (``ctrl+c``).

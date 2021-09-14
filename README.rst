@@ -36,7 +36,7 @@ Software requirements
 
 Robot specific requirements
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-* Joint velocity ROS controllers
+* ROS drivers with joint velocity controllers
 * Robotics Toolbox model
 
 Installation

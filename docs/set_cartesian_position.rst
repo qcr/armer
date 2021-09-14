@@ -11,7 +11,7 @@ Via Python
 
 Requests to the ROS action server can be made by creating a ROS action client in Python. This client is used to send requests to the action server.
 
-This example shows a request to the action server to move the arm so the end effector will be located at 0.300 meters in the x direction, 0.200 meters in the y direction and 0.290 in the z direction with a orientation of -1.00 in the x axis.
+This example shows a request to the action server to move the arm so the end effector will be located at 0.300 meters in the x direction, 0.200 meters in the y direction and 0.290 in the z direction with a orientation of -1.00 in the x axis in the world frame.
 
 .. code-block:: python
 

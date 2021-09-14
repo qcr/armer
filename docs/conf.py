@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.abspath('..'))
 
 # -- Project information -----------------------------------------------------
 
-project = 'Armer Driver'
+project = 'Armer Manipulator Control Interface'
 copyright = '2021, Gavin Suddrey'
 author = 'Gavin Suddrey, Faith Lim'
 

@@ -11,7 +11,7 @@ These files are packaged togther as a hardware package. To skip to folder struct
 Examples of hardware packages can be seen with the `armer_panda <https://github.com/qcr/armer_panda/>`_ or the `armer_ur <https://github.com/qcr/armer_ur/>`_ packages.
 
 .. note::
-    At this point in time, only manipulators with joint velocity controllers are supported by Armer. If an arm does not support this, it cannot be used with the Armer drivers.
+    At this point in time, only manipulators with joint velocity controllers are supported by Armer. If an arm does not support this, it cannot be used with Armer.
 
 Creating a Launch File
 ---------------------------
@@ -22,7 +22,7 @@ This is a ROS launch file which starts the manipulator's drivers as well as the 
 
 #. After the drivers have been installed to the relevant workspace, read the ROS driver's documentation to find the launch file that starts the driver. 
 
-    Copy and paste the manipulator driver's launch file contents into the template below and name the file ``robot_bringup.launch``:
+    This launch file usually will start the driver node and joint controllers. The launch file sections relevant to starting these should be copied over (or included) into the template below and the file should be named ``robot_bringup.launch``:
 
     .. code-block:: xml
 
@@ -55,7 +55,7 @@ This is a ROS launch file which starts the manipulator's drivers as well as the 
 Creating a Configuration File
 ---------------------------------
 
-To configure parameters such as if armer is interfacing with a simulation or a physical arm, a yaml config file should be created. 
+To configure parameters such as if Armer is interfacing with a simulation or a physical arm, a yaml config file should be created. 
 
 Armer uses the Robotics Toolbox to perform calculations and this config file will point to the Robotics toolbox ERobot object so movement can be processed. If the manipulator does not have an existing RTB model or if unsure, see `Creating a Robotics Toolbox model <create_an_RTB_model.html#creating-a-robotics-toolbox-model/>`_.
 
@@ -147,6 +147,8 @@ Create a config for launching the physical robot backend using the following as 
     
     Certain arms (such as the UR3) have multiple end effectors so specifying the link must be done by adding a "gripper" field to the robots section with the link name as a string.
 
+    The ``joint_state_topic`` and ``joint_velocity_topic`` are how Armer gets feedback and controls the manipulator via the ROS drivers. If the ROS drivers do not map to the Armer defaults of ``/joint_states`` and ``/joint_group_velocity_controller/command``, the topics will need to be specified.
+
 Putting it All Together
 ------------------------------
 
@@ -159,7 +161,6 @@ For ease of deployment and use, the launch and config file should be packaged in
         │   ├─ robot_bringup.launch
         ├─ cfg/
         │   ├─ {ROBOT_MODEL}_{BACKEND_MODE}.yaml
-
 
  
 #. The name of the package should be ``armer_{ROBOT_MODEL}``. 
@@ -176,7 +177,7 @@ For ease of deployment and use, the launch and config file should be packaged in
 
     .. code-block:: bash
 
-        roslaunch armer_{ROBOT_MODEL} robot_bringup.launch
+        roslaunch armer_{ROBOT_MODEL} robot_bringup.launch config:={PATH_TO_CONFIG_YAML_FILE} sim:={true/false}
 
 .. note::
 
