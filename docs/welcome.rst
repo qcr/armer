@@ -21,6 +21,11 @@ Armer aims to provide an interface layer between the hardware drivers of a robot
 
 In addition to a multiple control method layer, Armer is designed to be a compatability layer allowing the user to use the same code across different robotic platforms. Armer supports control for physical and simulated arms giving users the ability to develop even without access to a physical manipulator.
 
+Below is a gif of 3 different simulated arms moving with the same cartesian velocity commands.
+
+.. image:: https://github.com/qcr/armer/wiki/same_code_example.gif
+  :alt: Armer same code example gif
+  
 Requirements
 --------------
 

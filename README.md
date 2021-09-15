@@ -25,6 +25,10 @@ across different robotic platforms. Armer supports control for physical
 and simulated arms giving users the ability to develop even without
 access to a physical manipulator.
 
+Below is a gif of 3 different simulated arms moving with the same cartesian velocity commands.
+
+![image](https://github.com/qcr/armer/wiki/same_code_example.gif)
+
 Requirements
 ------------
 
