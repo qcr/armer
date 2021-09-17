@@ -40,7 +40,7 @@ Services
 * **/arm/get_named_poses** `armer_msgs/GetNamesList <https://github.com/qcr/armer_msgs/blob/main/srv/GetNamesList.srv>`_
     Gets a list of currently stored named poses (includes both moveit and driver stored named poses).
 
-* **/arm/set_named_pose** `armer_msgs/SetNamedPose <https://github.com/qcr/armer_msgs/blob/main/srv/SetNamedPose.srv>`_
+* **/arm/set_named_pose** `armer_msgs/AddNamedPose <https://github.com/qcr/armer_msgs/blob/main/srv/AddNamedPose.srv>`_
     Saves the current joint configuration of the robot with the provided pose name.
 
 * **/arm/remove_named_pose** `armer_msgs/RemoveNamedPose <https://github.com/qcr/armer_msgs/blob/main/srv/RemoveNamedPose.srv>`_
@@ -49,13 +49,13 @@ Services
 * **/arm/set_cartesian_impedance** `armer_msgs/SetCartesianImpedance <https://github.com/qcr/armer_msgs/blob/main/srv/SetCartesianImpedance.srv>`_
     Adjusts the impedance of the end-effector position in Cartesian space.
 
-* **/arm/add_named_pose_config** `armer_msgs/SetNamedPoseConfig <https://github.com/qcr/armer_msgs/blob/main/srv/SetNamedPoseConfig.srv>`_
+* **/arm/add_named_pose_config** `armer_msgs/AddNamedPoseConfig <https://github.com/qcr/armer_msgs/blob/main/srv/AddNamedPoseConfig.srv>`_
     Instructs the driver to load named poses stored in the indicated config file.
 
 * **/arm/get_named_pose_configs** `armer_msgs/GetNamedPoseConfigs <https://github.com/qcr/armer_msgs/blob/main/srv/GetNamedPoseConfigs.srv>`_
     Gets the list of config files to check for named poses.
 
-* **/arm/remove_named_pose_config** `armer_msgs/SetNamedPoseConfig <https://github.com/qcr/armer_msgs/blob/main/srv/SetNamedPoseConfig.srv>`_
+* **/arm/remove_named_pose_config** `armer_msgs/RemoveNamedPoseConfig <https://github.com/qcr/armer_msgs/blob/main/srv/RemoveNamedPoseConfig.srv>`_
     Instructs the driver to remove named poses stored in the indicated config file.
 
 

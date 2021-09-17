@@ -1,0 +1,11 @@
+robots:
+  - name: arm 
+    model: roboticstoolbox.models.KinovaGen3
+    joint_state_topic: /joint_states 
+    joint_velocity_topic:  /joint_group_velocity_controller/joint_velocity 
+    gripper: "end_effector_link"
+backend: 
+  type: roboticstoolbox.backends.Swift.Swift
+publish_transforms: true
+logging: 
+  frequency: false
