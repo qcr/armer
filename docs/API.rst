@@ -37,7 +37,7 @@ Services
 * **/arm/stop** `std_srvs/Empty <http://docs.ros.org/noetic/api/std_srvs/html/srv/Empty.html>`_
     Stops the current motion of the current.
 
-* **/arm/get_named_poses** `armer_msgs/GetNamesList <https://github.com/qcr/armer_msgs/blob/main/srv/GetNamesList.srv>`_
+* **/arm/get_named_poses** `armer_msgs/GetNamedPoses <https://github.com/qcr/armer_msgs/blob/main/srv/GetNamedPoses.srv>`_
     Gets a list of currently stored named poses (includes both moveit and driver stored named poses).
 
 * **/arm/set_named_pose** `armer_msgs/AddNamedPose <https://github.com/qcr/armer_msgs/blob/main/srv/AddNamedPose.srv>`_

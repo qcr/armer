@@ -1,4 +1,4 @@
-Creating a Robotics Toolbox model
+Creating a Robotics Toolbox Model
 ==================================
 The Armer drivers loads a URDF model into the Python Robotic Toolbox framework to process the kinematics and other movement related calculations. 
 

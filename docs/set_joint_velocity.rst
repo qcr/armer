@@ -13,6 +13,7 @@ ROS topics can be published to from a Python script using Rospy, the ROS Python 
 The following code block shows an example of setting the velocty of the second joint from the base to rotate at 0.1 rad/s in a clockwise direction.
 
 .. warning::
+
     The joint will continue rotating till the script is killed (``ctrl+c``).
  
 .. code-block:: python
@@ -39,12 +40,14 @@ Publishing to the joint velocity topic can be done from the command line.
 The ROS command to publish to a topic syntax begins with ``rostopic pub`` followed by the topic to publish to, the message type and finally the message itself to publish. This can be greatly simplfied on the command line by using tab to autocomplete.
 
 .. note::
+
     Unfortunately the autocomplete this message type is broken and should be manually corrected from ``joints:- 0"`` to ``"joints: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]"`` where the number of elements in the joints array corresponds to the number of joints on the manipulator.
 
 The following code snippet displays an example of setting the velocty of the second joint of the manipulator to rotate at 0.1 rad/s.
 
 .. warning::
     The ``-r`` argument tells the node to publish continuously at 100 Hz. This example will continuously request the second joint of the manipulator to rotate at 0.1 rad/s so the robot will move until killed (``ctrl+c``).
+
 .. code-block:: bash
 
     rostopic pub -r 100 /arm/joint/velocity armer_msgs/JointVelocity "joints: [0.0, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0]" 

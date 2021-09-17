@@ -3,7 +3,7 @@ Armer Driver
 
 ![image](https://github.com/qcr/armer/wiki/armer_example.gif)
 
-[![Armer documentation can be found here](https://github.com/qcr/armer/wiki/doclink.png)](https://qcr.github.io/armer)
+[![Armer documentation can be found here](https://github.com/qcr/armer/wiki/doclink.png)](https://qcr.github.io/armer/welcome.html)
 
 ![image](https://github.com/qcr/armer/wiki/blockdiagram.png)
 
