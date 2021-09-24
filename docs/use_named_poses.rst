@@ -3,10 +3,6 @@ Using Named Poses
 
 Armer provides the ability to save and load poses for any arm. 
 
-.. warning::
-
-    This page is still in active development
-
 Adding a Named Pose
 ---------------------
 
@@ -22,7 +18,7 @@ The service can be summoned via Python:
     rospy.init_node('armer_example', disable_signals=True)
     add_pose_service = rospy.ServiceProxy('/arm/set_named_pose', AddNamedPose)
     
-    named_pose="ur5_better_home"
+    named_pose="my_pose"
     add_pose_service(named_pose, True)
 
 
@@ -51,7 +47,7 @@ This example shows a request to move to named pose `fully_extended`:
 
     rospy.init_node('armer_example', disable_signals=True)
 
-    named_pose="fully_extended"
+    named_pose="my_pose"
 
     servo_cli = actionlib.SimpleActionClient('/arm/joint/named', MoveToNamedPoseAction)
     servo_cli.wait_for_server()
@@ -77,7 +73,7 @@ Named poses can be removed via the ``/arm/remove_named_pose`` service. This can 
     rospy.init_node('armer_example', disable_signals=True)
     remove_pose_service = rospy.ServiceProxy('/arm/remove_named_pose', RemoveNamedPose)
     
-    named_pose="fully_extended"
+    named_pose="my_pose"
     remove_pose_service(named_pose)    
 
 Or bash: 
@@ -85,6 +81,29 @@ Or bash:
 .. code-block:: bash
 
     rosservice call /arm/remove_named_pose "pose_name: {POSE_TO_REMOVE}"
+
+Getting Saved Named Poses
+--------------------------
+
+To see a list of poses are saved, use the ``/arm/get_named_poses`` service.
+
+Via Python:
+
+.. code-block:: Python
+
+    from armer_msgs.srv import GetNamedPoses
+    import rospy
+
+    rospy.init_node('armer_example', disable_signals=True)
+    get_poses_service = rospy.ServiceProxy('/arm/get_named_poses', GetNamedPoses)
+
+    get_poses_service()    
+
+Bash: 
+
+.. code-block:: bash
+
+    rosservice call /arm/get_named_poses
 
 
 Loading Named Poses from Config files
@@ -138,25 +157,3 @@ Bash:
 
     rosservice call /arm/remove_named_pose_config "config_path: {PATH_TO_CONFIG.yaml}"
 
-Getting Saved Named Poses
---------------------------
-
-To see a list of poses are saved, use the ``/arm/get_named_poses`` service.
-
-Via Python:
-
-.. code-block:: Python
-
-    from armer_msgs.srv import GetNamedPoses
-    import rospy
-
-    rospy.init_node('armer_example', disable_signals=True)
-    get_poses_service = rospy.ServiceProxy('/arm/get_named_poses', GetNamedPoses)
-
-    get_poses_service()    
-
-Bash: 
-
-.. code-block:: bash
-
-    rosservice call /arm/get_named_poses
