@@ -11,7 +11,7 @@ Via Python
 
 Requests to the ROS action server can be made by creating a ROS action client in Python. This client is used to send requests to the action server.
 
-This example shows the setting of joints 1, 4, 5, and 6 to 0 radians, and joints 2 and 3 to pi/2 and pi/4 radians respectively.
+This example shows the setting of joint positions on a robot with 6 joints. Joints 1, 4, 5, and 6 are set to 0 radians, and joints 2 and 3 to pi/2 and pi/4 radians respectively. The number of elements in the goal.joints array should match with the joints on the target robot.
 
 .. code-block:: python
 

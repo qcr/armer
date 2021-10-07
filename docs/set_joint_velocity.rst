@@ -10,7 +10,7 @@ Via Python
 
 ROS topics can be published to from a Python script using Rospy, the ROS Python client.
 
-The following code block shows an example of setting the velocty of the second joint from the base to rotate at 0.1 rad/s in a clockwise direction.
+The following code example shows the setting of joint velocities on a robot with 6 joints. Joints 1, 3, 4, 5, and 6 are set to 0 rad/s while the second joint from the base  is set to rotate at 0.1 rad/s in a clockwise direction.. The number of elements in the vel_msg.joints array should match with the joints on the target robot.
 
 .. warning::
 
