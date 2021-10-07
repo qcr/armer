@@ -19,7 +19,7 @@ Armer aims to provide an interface layer between the hardware drivers of a robot
 * `End effector Cartesian position control <set_Cartesian_pose.html>`_
 * `End effector Cartesian velocity control with guarded motion <guarded_motion.html>`_
 
-In addition to a multiple control method layer, Armer is designed to be a compatability layer allowing the user to use the same code across different robotic platforms. Armer supports control for physical and simulated arms giving users the ability to develop even without access to a physical manipulator.
+In addition to a multiple control method layer, Armer is designed to be a compatibility layer allowing the user to use the same code across different robotic platforms. Armer supports control for physical and simulated arms giving users the ability to develop even without access to a physical manipulator.
 
 Below is a gif of 3 different simulated arms moving with the same Cartesian velocity commands.
 
@@ -31,7 +31,7 @@ Requirements
 
 Several ROS action servers, topics and services are set up by Armer to enable this functionality. A summary of these can be found `here <API.html>`_.
 
-The driver is built off the `Python Robotics Toolbox (RTB) <https://qcr.github.io/code/robotics-toolbox-python>`_ and requires a URDF loaded RTB model to calculate the required movement kinematics, RTB comes with browser based simulator `Swift <https://qcr.github.io/code/swift/>`_ which Armer uses as an out of the box simulator.
+The driver is built on the `Robotics Toolbox (RTB) for Python <https://qcr.github.io/code/robotics-toolbox-python>`_ and requires a URDF loaded RTB model to calculate the required movement kinematics, RTB comes with browser based simulator `Swift <https://qcr.github.io/code/swift/>`_ which Armer uses as an out of the box simulator.
 
 Due to these supporting packages using Armer with a manipulator will require several requirements:
 
