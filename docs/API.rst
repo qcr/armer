@@ -14,7 +14,7 @@ Subscribed Topics
 -------------------
 
 * **/arm/cartesian/velocity** `geometry_msgs/TwistStamped <https://docs.ros.org/api/geometry_msgs/html/msg/Twist.html>`_
-    Moves the end-effector in cartesian space w.r.t. the target frame_id (base frame if no frame_id is set).
+    Moves the end-effector in Cartesian space w.r.t. the target frame_id (base frame if no frame_id is set).
 
 * **/arm/joint/velocity** `armer_msgs/JointVelocity <https://github.com/qcr/armer_msgs/blob/main/msg/JointVelocity.html>`_
     Moves the joints of the manipulator at the requested velocity.

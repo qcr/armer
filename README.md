@@ -14,9 +14,9 @@ a robotic arm giving the user control in several ways:
     control](https://qcr.github.io/armer/set_joint_velocity.html)
 -   [Joint position
     control](https://qcr.github.io/armer/set_joint_position.html)
--   [End effector cartesian velocity
+-   [End effector Cartesian velocity
     control](https://qcr.github.io/armer/set_joint_position.html)
--   [End effector cartesian position
+-   [End effector Cartesian position
     control](https://qcr.github.io/armer/set_cartesian_position.html)
 
 In addition to a multiple control method layer, Armer is designed to
@@ -111,11 +111,11 @@ After launching, an arm can be controlled in several ways. Some quick tutorials 
     control](https://qcr.github.io/armer/set_joint_velocity.html)
 -   [Joint position
     control](https://qcr.github.io/armer/set_joint_position.html)
--   [End effector cartesian velocity
+-   [End effector Cartesian velocity
     control](https://qcr.github.io/armer/set_joint_position.html)
--   [End effector cartesian position
-    control](https://qcr.github.io/armer/set_cartesian_position.html)
--   [End effector cartesian velocity control with guarded motion](https://qcr.github.io/armer/guarded_motion.html)
+-   [End effector Cartesian position
+    control](https://qcr.github.io/armer/set_Cartesian_position.html)
+-   [End effector Cartesian velocity control with guarded motion](https://qcr.github.io/armer/guarded_motion.html)
 
 For more information and examples see the [Armer
 documentation](https://qcr.github.io/armer/)
