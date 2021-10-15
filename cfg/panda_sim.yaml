@@ -5,7 +5,7 @@ robots:
     joint_velocity_topic:  /joint_group_velocity_controller/joint_velocity # default
     origin: [0, 0, 0, 0, 0, 0] #default (xyzrpy)
 backend: 
-  type: roboticstoolbox.backends.Swift.Swift
+  type: roboticstoolbox.backends.swift.Swift
 #readonly_backends:
 #  - type: roboticstoolbox.backends.PyPlot.PyPlot
 # publish_transforms: true

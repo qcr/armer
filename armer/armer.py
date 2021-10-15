@@ -14,7 +14,7 @@ import tf2_ros
 import yaml
 
 import roboticstoolbox as rtb
-from roboticstoolbox.backends.Swift import Swift
+from roboticstoolbox.backends.swift import Swift
 
 from spatialmath.base.argcheck import getvector
 

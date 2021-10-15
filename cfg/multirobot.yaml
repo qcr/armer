@@ -10,4 +10,4 @@ robots:
     # readonly: true
 publish_transforms: true
 backend:
-  - type: roboticstoolbox.backends.Swift.Swift
+  - type: roboticstoolbox.backends.swift.Swift

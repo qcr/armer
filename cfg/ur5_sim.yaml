@@ -6,7 +6,7 @@ robots:
     gripper: "tool0"
     # origin: [-1, 0, 0, 0, 0, 0] #default (xyzrpy)
 backend: 
-  type: roboticstoolbox.backends.Swift.Swift
+  type: roboticstoolbox.backends.swift.Swift
 publish_transforms: true
 logging: 
   frequency: false

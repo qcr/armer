@@ -6,7 +6,7 @@ robots:
     # origin: [-1, 0, 0, 0, 0, 0] #default (xyzrpy)
     gripper: "j2n4s300_link_4"
 backend: 
-  type: roboticstoolbox.backends.Swift.Swift
+  type: roboticstoolbox.backends.swift.Swift
 #readonly_backends:
 #  - type: roboticstoolbox.backends.PyPlot.PyPlot
 publish_transforms: true

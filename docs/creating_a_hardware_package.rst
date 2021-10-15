@@ -89,11 +89,11 @@ Create a config for launching the physical robot backend using the following as 
             - ``None``
         *   - backend 
             - backend to be used
-            - roboticstoolbox.backends.Swift.Swift
+            - roboticstoolbox.backends.swift.Swift
             - ``None``
 
     The two current options for backend are: 
-            * ``roboticstoolbox.backends.Swift.Swift`` (Swift simulation robot)
+            * ``roboticstoolbox.backends.swift.Swift`` (Swift simulation robot)
             * ``armer.backends.ROS.ROS`` (Physical robot)
 
     Multiple robots can be launched at a time and parameters for each individual instance can be set under the corresponding namespace. For example: 
@@ -108,7 +108,7 @@ Create a config for launching the physical robot backend using the following as 
             model: roboticstoolbox.models.UR5
             origin: [-1, 0, 0, 0, 0, 0] 
         backend:
-        - type: roboticstoolbox.backends.Swift.Swift
+        - type: roboticstoolbox.backends.swift.Swift
 
     In this example, a Panda and a UR5 arm are being launched with different origin settings. The options for each different robot section is signaled with the ``-`` symbol before the name parameter.
 

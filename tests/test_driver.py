@@ -9,7 +9,7 @@ import signal
 import time
 import rospy
 
-from roboticstoolbox.backends.Swift import Swift
+from roboticstoolbox.backends.swift import Swift
 from roboticstoolbox.models.URDF.Panda import Panda
 
 from armer.robots.ROSRobot import ROSRobot
