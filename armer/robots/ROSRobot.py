@@ -355,6 +355,7 @@ class ROSRobot(rtb.ERobot):
                 self.base_link.name,
                 goal_pose
             )
+            print(goal_pose.pose)
             pose = goal_pose.pose
 
             target = SE3(pose.position.x, pose.position.y, pose.position.z) * UnitQuaternion([
@@ -364,7 +365,8 @@ class ROSRobot(rtb.ERobot):
                 pose.orientation.z
             ]).SE3()
 
-            dq = self.ikine_LMS(target, q0=self.q) #), end=self.gripper)
+            print(target)
+            dq = self.ikine_LMS(target, q0=self.q, end=self.gripper)
             traj = rtb.tools.trajectory.jtraj(self.q, dq.q, self.frequency)
 
             if self.__traj_move(traj, goal.speed if goal.speed else 0.2):
@@ -833,6 +835,9 @@ class ROSRobot(rtb.ERobot):
         """
         if self.readonly:
             return
+
+        self.q = self.q + np.random.normal(0, 0.00001, self.n)
+        #print(self.q)
 
         current_time = timeit.default_timer()
         self.state = self.get_state()
