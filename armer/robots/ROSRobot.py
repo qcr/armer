@@ -614,21 +614,19 @@ class ROSRobot(rtb.ERobot):
 
             jacob0 = self.jacob0(self.q, fast=True, end=self.gripper)
 
-            T = jacob0 @ jV
-            V = np.linalg.norm(T[:3])
+            twist = jacob0 @ jV
+            linear_vel = np.linalg.norm(twist[:3])
             
             time_scaling = 1
 
-            if V > max_speed:
-                T = T / V * max_speed
-                jV = (np.linalg.pinv(jacob0) @ T)
-
-                time_scaling = np.linalg.norm((jacob0 @ jV)[:3]) / V
-
+            if linear_vel > max_speed:
+                normalised_vel = (twist / linear_vel) * max_speed
+                time_scaling = np.linalg.norm(normalised_vel) / linear_vel
+                
             t += delta * time_scaling
-
+            
             self.event.clear()
-            self.j_v = jV
+            self.j_v = jV * time_scaling
             self.last_update = timeit.default_timer()
             self.event.wait()
 
