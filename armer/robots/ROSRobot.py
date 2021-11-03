@@ -836,9 +836,6 @@ class ROSRobot(rtb.ERobot):
         if self.readonly:
             return
 
-        self.q = self.q + np.random.normal(0, 0.00001, self.n)
-        #print(self.q)
-
         current_time = timeit.default_timer()
         self.state = self.get_state()
 
