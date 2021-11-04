@@ -26,7 +26,6 @@ This example shows a request to the action server to move the arm so the end eff
     pose_cli.wait_for_server()
 
     target = PoseStamped()
-    target.header.frame_id = 'world'
     target.pose.position.x = 0.300
     target.pose.position.y = 0.200
     target.pose.position.z = 0.290
@@ -39,3 +38,5 @@ This example shows a request to the action server to move the arm so the end eff
     goal.pose_stamped=target
     pose_cli.send_goal(goal)
     pose_cli.wait_for_result()
+
+The frame of the cartesian pose can be set via ``target.header.frame_id``. If it is not set, it defaults to world.

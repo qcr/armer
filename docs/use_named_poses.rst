@@ -10,7 +10,7 @@ Simply navigate a manipulator into any pose by any means and call the service ``
 
 The service can be summoned via Python:
 
-.. code-block:: Python
+.. code-block:: python
 
     from armer_msgs.srv import AddNamedPose
     import rospy
@@ -37,9 +37,9 @@ The Armer interface uses a ROS action server to listen for requests to move to a
 
 Requests to the ROS action server can be made by creating a ROS action client in Python. This client is used to send requests to the action server.
 
-This example shows a request to move to named pose `fully_extended`:
+This example shows a request to move to named pose `my_pose`:
 
-.. code-block:: Python
+.. code-block:: python
 
     from armer_msgs.msg import MoveToNamedPoseAction, MoveToNamedPoseGoal 
     import actionlib
@@ -65,7 +65,7 @@ Removing a Named Pose
 
 Named poses can be removed via the ``/arm/remove_named_pose`` service. This can be called via Python:
 
-.. code-block:: Python
+.. code-block:: python
 
     from armer_msgs.srv import RemoveNamedPose
     import rospy
@@ -89,7 +89,7 @@ To see a list of poses are saved, use the ``/arm/get_named_poses`` service.
 
 Via Python:
 
-.. code-block:: Python
+.. code-block:: python
 
     from armer_msgs.srv import GetNamedPoses
     import rospy
@@ -115,7 +115,7 @@ It can be summoned via Python or Bash.
 
 Python:
 
-.. code-block:: Python
+.. code-block:: python
 
     from armer_msgs.srv import AddNamedPoseConfig
     import rospy
@@ -140,7 +140,7 @@ To remove the config poses, the ``/arm/remove_named_pose_config`` service can be
 
 Via Python:
 
-.. code-block:: Python
+.. code-block:: python
 
     from armer_msgs.srv import RemoveNamedPoseConfig
     import rospy

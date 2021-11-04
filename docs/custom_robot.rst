@@ -13,7 +13,27 @@ Possible cases include:
 * The ROS drivers using different message types from Armer
 * Adding functionality such as recovery functionality
 
-To create a custom robot, the following template can be used:
+Create the following file structure:
+
+.. code-block:: bash
+
+    ├── HARDWARE_PACKAGE_NAME
+    │   ├── __init__.py
+    │   └── robots
+    │       ├── __init__.py
+    │       └── ROBOT_NAME.py
+    ├── cfg
+    │   ├── ROBOT_NAME_real.yaml
+    │   └── ROBOT_NAME_sim.yaml
+    ├── CMakeLists.txt
+    ├── launch
+    │   └── robot_bringup.launch
+    ├── LICENSE
+    ├── package.xml
+    ├── README.md
+    └── setup.py
+
+To create the custom robot, the following template can be used. Save it as ROBOT_NAME.py in the robots folder:
 
 .. code-block:: python
 
@@ -32,12 +52,28 @@ To create a custom robot, the following template can be used:
 
             super().__init__(robot, *args, **kwargs)
         
+        def the_function_to_override():
+            print("cool code")
+        
 
 Any variant functionality can be declared as a function that will be called instead of the default Armer functions such as get_state.
 
+In order for Armer and RTB to be able to find the custom robot, the ``__init__.py`` and ``setup.py`` files must also be configured correctly.
+
+The contents ``__init__.py`` of should be as follows:
+
+    .. code-block:: python
+
+        from armer_ROBOT_NAME.robots.ROBOT_NAME import {CUSTOM_ROBOT_NAME}ROSRobot
+        __all__ = [
+            {CUSTOM_ROBOT_NAME}ROSRobot
+        ]
+
+An example of ``setup.py`` can be found in `armer_mico <https://github.com/qcr/armer_mico>`_. Modify armer_mico instances to match the name of the custom package.
+
 To use the custom robot, call it in the config file. This is done by specifying the type field of the relevant robot subsection. For example:
 
-.. code-block:: YAML
+.. code-block:: yaml
 
     robots:
     - name: arm 

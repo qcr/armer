@@ -10,7 +10,7 @@ For convenience, hardware packages consisting of a config file for setting `run 
 
 Arms with Armer hardware packages
 ----------------------------------
-Currently Armer driver has packages for several popular arms. If your arm model has a hardware package, control should be a fairly plug and play experience. (An experience we are still working on so please let us know if it isn't.). Below are the github pages to arms with hardware packages. Install directions can be found on their respective pages.
+Currently Armer has packages for several popular arms. If your arm model has a hardware package, control should be a fairly plug and play experience. (An experience we are still working on so please let us know if it isn't.). Below are the github pages to arms with hardware packages. Install directions can be found on their respective pages.
 
 * Franka Panda: `https://github.com/qcr/armer_panda <https://github.com/qcr/armer_panda>`_
 

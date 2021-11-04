@@ -36,7 +36,7 @@ Several ROS action servers, topics and services are set up by Armer
 to enable this functionality. A summary of these can be found
 [here](https://qcr.github.io/armer/API.html).
 
-The driver is built off the [Python Robotics Toolbox
+Armer is built on the [Python Robotics Toolbox
 (RTB)](https://qcr.github.io/code/robotics-toolbox-python) and requires
 a URDF loaded RTB model to calculate the required movement kinematics,
 RTB comes with browser based simulator
@@ -53,6 +53,7 @@ require several requirements:
 -   [Robotics Toolbox for
     Python](https://pypi.org/project/roboticstoolbox-python/)
 -   [QCR repos](https://qcr.github.io/armer/add_qcr_repos.html)
+- Chrome browser (for using Swift sim)
 
 ### Robot specific requirements
 
@@ -63,7 +64,7 @@ Installation
 ------------
 
 Copy and paste the following code snippet into a terminal to create a
-new catkin workspace and install the Armer drivers to it. Note this
+new catkin workspace and install Armer to it. Note this
 script will also add the workspace to be sourced every time a bash
 terminal is opened.
 

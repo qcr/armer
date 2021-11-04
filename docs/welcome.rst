@@ -8,10 +8,22 @@ Introduction
   :alt: Armer's code on github
   :target: https://github.com/qcr/armer
 
-.. image:: https://github.com/qcr/armer/wiki/blockdiagram.png
+.. image:: https://github.com/qcr/armer/wiki/PetersDiagram.png
   :alt: Armer simplified block diagram
 
-Armer aims to provide an interface layer between the hardware drivers of a robotic arm giving the user control in several ways:
+Armer is a Python3 layer that extends the capability of a ROS-enabled robot arm. 
+
+Armer handles requests for advanced types of motion such as: 
+
+* Straight-line movement to a task-space pose
+* Straight-line movement to a named joint configuration
+* Task-space velocity with guarding compliant motion etc. 
+  
+Armer itself is a collection of ROS topics, services and action servers. It communicates with a ROS-enabled arm to execute the motion requests, communicating with the robot using ROS on the user’s behalf.  
+
+Armer is implemented in Python 3 and uses the Robotics Toolbox for Python to perform all kinematic and differential kinematics functions.
+
+Armer provides rich control modes such as:
 
 * `Joint velocity control <set_joint_velocity.html>`_
 * `Joint position control <set_joint_position.html>`_
@@ -19,13 +31,31 @@ Armer aims to provide an interface layer between the hardware drivers of a robot
 * `End effector Cartesian position control <set_Cartesian_pose.html>`_
 * `End effector Cartesian velocity control with guarded motion <guarded_motion.html>`_
 
-In addition to a multiple control method layer, Armer is designed to be a compatibility layer allowing the user to use the same code across different robotic platforms. Armer supports control for physical and simulated arms giving users the ability to develop even without access to a physical manipulator.
+Using Armer, the user is able to seamlessly switch between these modes of control.
 
-Below is a gif of 3 different simulated arms moving with the same Cartesian velocity commands.
+These control modes can be used to control real or simulated robots using Swift. This gives users the ability to develop even without access to a physical manipulator.
+
+The control instructions can be used across different robotic platforms allowing users to control robots with the same instructions.
+
+Below is a gif of 3 different simulated arms moving with the same Cartesian velocity control commands.
 
 .. image:: https://github.com/qcr/armer/wiki/same_code_example.gif
   :alt: Armer same code example gif
-  
+
+Armer is available for several popular robots including:
+
+* Franka Panda: `https://github.com/qcr/armer_panda <https://github.com/qcr/armer_panda>`_
+
+* Universal Robot UR3: `https://github.com/qcr/armer_ur <https://github.com/qcr/armer_ur>`_
+
+* Universal Robot UR5: `https://github.com/qcr/armer_ur <https://github.com/qcr/armer_ur>`_
+
+* Universal Robot UR10: `https://github.com/qcr/armer_ur <https://github.com/qcr/armer_ur>`_
+
+* ABB IRB6700: `https://github.com/qcr/armer_abb <https://github.com/qcr/armer_abb>`_
+
+Armer can be accessed primarily through Python3 scripts utilizing rospy to bridge Python code to the ROS framework.  
+
 Requirements
 --------------
 
@@ -40,7 +70,7 @@ Software requirements
 * `Python <https://www.python.org/>`_ >= 3.6
 * `ROS Noetic <http://wiki.ros.org/noetic>`_
 * `Robotics Toolbox for Python <https://pypi.org/project/roboticstoolbox-python/>`_
-* `QCR repos <https://qcr.github.io/armer/add_qcr_repos.html>`_
+* `Add QCR repos to apt <https://qcr.github.io/armer/add_qcr_repos.html>`_
 
 Robot specific requirements
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
