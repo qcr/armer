@@ -71,6 +71,7 @@ Software requirements
 * `ROS Noetic <http://wiki.ros.org/noetic>`_
 * `Robotics Toolbox for Python <https://pypi.org/project/roboticstoolbox-python/>`_
 * `Add QCR repos to apt <https://qcr.github.io/armer/add_qcr_repos.html>`_
+* Chrome browser (for using Swift sim)
 
 Robot specific requirements
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
