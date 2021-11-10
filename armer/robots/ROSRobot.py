@@ -600,8 +600,10 @@ class ROSRobot(rtb.ERobot):
         
         qfunc = interp1d(np.linspace(0, 1, traj.q.shape[0]), traj.q, axis=0)
  
-        # Updated by Dasun: reduced gain for better control (0.05)
-        kP = 0.05
+        # Updated by Dasun: reduced gain for better control
+        # This is a very large gain (not too sure why) that allows the arm to reach the goal 
+        # but the twist speed exceeds the 
+        kP = 4
 
         #Debugging Prints
         print(f"Traj_Move Prints:\n\tDelta: {delta}\n\tMax Speed: {max_speed}")
@@ -611,6 +613,7 @@ class ROSRobot(rtb.ERobot):
         frequency = self.frequency
         end_point = qfunc(1)
         beg_point = self.q
+        # This time is arbitrary, but we pick the maximum in order to reduce the joint velocities
         total_time_cal = np.max(np.fabs((end_point - beg_point) / av_vel))
         time_freq = int(total_time_cal * frequency)
 
@@ -618,6 +621,8 @@ class ROSRobot(rtb.ERobot):
         print(f"beg joint positions: {beg_point}")
         print(f"end joint positions: {end_point}")
         time = 1
+        # For debugging
+        twist_speed_vect = []
         while t + delta < total_time_cal and not self.preempted:
 
             # Check if we are close to goal state as an exit point
@@ -631,26 +636,35 @@ class ROSRobot(rtb.ERobot):
             jV = frequency * (1.0/time_freq) * (end_point - beg_point) * (30.0 * (time/time_freq)**2.0
                 - 60.0 * (time/time_freq)**3.0
                 + 30.0 * (time/time_freq)**4.0)
+
+            # Minimum jerk trajectory calculation of expected position (Used for Debugging)
+            pos = beg_point + (end_point - beg_point) * (10.0 * (time/time_freq)**3
+             - 15.0 * (time/time_freq)**4
+             + 6.0 * (time/time_freq)**5)
             
             print(f"time step: {time}")
-            print(f"jV calculated at {t}: {jV}")
-            print(f"pos at {t}: {self.q}")
-            #print(f"qfunc pos at {t}: {qfunc(t)}")
+            #print(f"jV calculated at {t}: {jV}")
+            #print(f"pos at {t}: {self.q}")
+            #print(f"pos calculated at {t}: {pos}")
+
             # Added by Dasun: gain required to have smooth control on panda
-            #jV = jV * kP
+            jV = jV * kP
+            #print(f"jV corrected at {t}: {jV}")
 
             jacob0 = self.jacob0(self.q, fast=True, end=self.gripper)
-
             twist = jacob0 @ jV
             print(f"twist (after jacobian) at {t}: {twist}")
             linear_vel = np.linalg.norm(twist[:3])
-            print(f"linear_vel (norm twist) at {t}: {linear_vel}\n\n")
 
+            # Scale the twist velocity based on max_speed
             time_scaling = 1
-
-            # if linear_vel > max_speed:
-            #     normalised_vel = (twist / linear_vel) * max_speed
-            #     time_scaling = np.linalg.norm(normalised_vel) / linear_vel
+            if linear_vel > max_speed:
+                normalised_vel = (twist / linear_vel) * max_speed
+                time_scaling = np.linalg.norm(normalised_vel) / linear_vel    
+                linear_vel = linear_vel * time_scaling 
+            
+            twist_speed_vect.append(linear_vel)
+            print(f"linear vel at {t}: {linear_vel}\n\n")
                 
             t += delta * time_scaling
             
@@ -699,6 +713,10 @@ class ROSRobot(rtb.ERobot):
         #     self.last_update = timeit.default_timer()
         #     self.event.wait()
         #     count+=1
+
+        # Print of maximum twist velocity
+        print(f"Max twist velocity: {np.max(twist_speed_vect)}")
+        print(f"Average twist velocity: {np.average(twist_speed_vect)}")
 
         self.j_v = [0] * self.n
 
