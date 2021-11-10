@@ -603,27 +603,54 @@ class ROSRobot(rtb.ERobot):
         # Updated by Dasun: reduced gain for better control (0.05)
         kP = 0.05
 
-        while t + delta < 1 and not self.preempted:
+        #Debugging Prints
+        print(f"Traj_Move Prints:\n\tDelta: {delta}\n\tMax Speed: {max_speed}")
 
-            # Too close to goal state
+        # ------- TEST NEW Method -------------------------------------------------------
+        av_vel = max_speed
+        frequency = self.frequency
+        end_point = qfunc(1)
+        beg_point = self.q
+        total_time_cal = np.max(np.fabs((end_point - beg_point) / av_vel))
+        time_freq = int(total_time_cal * frequency)
+
+        print(f"max total time: {total_time_cal}")
+        print(f"beg joint positions: {beg_point}")
+        print(f"end joint positions: {end_point}")
+        time = 1
+        while t + delta < total_time_cal and not self.preempted:
+
+            # Check if we are close to goal state as an exit point
             if np.all(np.fabs(qfunc(1) - self.q) < 0.005):
                 print('Too close to goal, quitting movement...')
                 break
             
-            jV = (qfunc(t + delta) - self.q) / delta #self.q) / delta
+            # Calculate the joint velocity required in this step 
+            # Note this calculates a velocity profile from a minimum jerk traj 
+            # (based on https://mika-s.github.io/python/control-theory/trajectory-generation/2017/12/06/trajectory-generation-with-a-minimum-jerk-trajectory.html)
+            jV = frequency * (1.0/time_freq) * (end_point - beg_point) * (30.0 * (time/time_freq)**2.0
+                - 60.0 * (time/time_freq)**3.0
+                + 30.0 * (time/time_freq)**4.0)
+            
+            print(f"time step: {time}")
+            print(f"jV calculated at {t}: {jV}")
+            print(f"pos at {t}: {self.q}")
+            #print(f"qfunc pos at {t}: {qfunc(t)}")
             # Added by Dasun: gain required to have smooth control on panda
-            jV = jV * kP
+            #jV = jV * kP
 
             jacob0 = self.jacob0(self.q, fast=True, end=self.gripper)
 
             twist = jacob0 @ jV
+            print(f"twist (after jacobian) at {t}: {twist}")
             linear_vel = np.linalg.norm(twist[:3])
-            
+            print(f"linear_vel (norm twist) at {t}: {linear_vel}\n\n")
+
             time_scaling = 1
 
-            if linear_vel > max_speed:
-                normalised_vel = (twist / linear_vel) * max_speed
-                time_scaling = np.linalg.norm(normalised_vel) / linear_vel
+            # if linear_vel > max_speed:
+            #     normalised_vel = (twist / linear_vel) * max_speed
+            #     time_scaling = np.linalg.norm(normalised_vel) / linear_vel
                 
             t += delta * time_scaling
             
@@ -631,6 +658,47 @@ class ROSRobot(rtb.ERobot):
             self.j_v = jV * time_scaling
             self.last_update = timeit.default_timer()
             self.event.wait()
+            time+=1
+        
+        ### ----------- Original Method Commented Out For Now ------------------------
+        # while t + delta < 1 and not self.preempted:
+
+        #     # Check if we are close to goal state as an exit point
+        #     if np.all(np.fabs(qfunc(1) - self.q) < 0.005):
+        #         print('Too close to goal, quitting movement...')
+        #         break
+            
+        #     # Calculate the joint velocity required in this step based on the 
+        #     # current joint states (self.q) and the expected next state qfunc(t+delta)
+        #     jV = (qfunc(t + delta) - self.q) / delta #self.q) / delta
+            
+        #     print(f"count: {count}")
+        #     print(f"jV calculated at {t}: {jV}")
+        #     print(f"pos at {t}: {self.q}")
+        #     print(f"qfunc pos at {t}: {qfunc(t)}")
+        #     # Added by Dasun: gain required to have smooth control on panda
+        #     #jV = jV * kP
+
+        #     jacob0 = self.jacob0(self.q, fast=True, end=self.gripper)
+
+        #     twist = jacob0 @ jV
+        #     print(f"twist (after jacobian) at {t}: {twist}")
+        #     linear_vel = np.linalg.norm(twist[:3])
+        #     print(f"linear_vel (norm twist) at {t}: {linear_vel}\n\n")
+
+        #     time_scaling = 1
+
+        #     if linear_vel > max_speed:
+        #         normalised_vel = (twist / linear_vel) * max_speed
+        #         time_scaling = np.linalg.norm(normalised_vel) / linear_vel
+                
+        #     t += delta * time_scaling
+            
+        #     self.event.clear()
+        #     self.j_v = jV * time_scaling
+        #     self.last_update = timeit.default_timer()
+        #     self.event.wait()
+        #     count+=1
 
         self.j_v = [0] * self.n
 
