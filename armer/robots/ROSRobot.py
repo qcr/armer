@@ -599,23 +599,23 @@ class ROSRobot(rtb.ERobot):
         delta = 1/self.frequency
         
         qfunc = interp1d(np.linspace(0, 1, traj.q.shape[0]), traj.q, axis=0)
- 
-        # Updated by Dasun: reduced gain for better control
-        # This is a very large gain (not too sure why) that allows the arm to reach the goal 
-        # but the twist speed exceeds the 
-        kP = 4
 
         #Debugging Prints
         print(f"Traj_Move Prints:\n\tDelta: {delta}\n\tMax Speed: {max_speed}")
 
         # ------- TEST NEW Method -------------------------------------------------------
-        av_vel = max_speed
+        av_vel = 0.05 #max_speed
         frequency = self.frequency
         end_point = qfunc(1)
         beg_point = self.q
         # This time is arbitrary, but we pick the maximum in order to reduce the joint velocities
         total_time_cal = np.max(np.fabs((end_point - beg_point) / av_vel))
         time_freq = int(total_time_cal * frequency)
+
+        # Updated by Dasun: reduced gain for better control
+        # This is a very large gain (not too sure why) that allows the arm to reach the goal 
+        # This should also be a function of time (smaller gain for shorter distances)
+        kP = 2 * total_time_cal
 
         print(f"max total time: {total_time_cal}")
         print(f"beg joint positions: {beg_point}")
@@ -633,7 +633,7 @@ class ROSRobot(rtb.ERobot):
             # Calculate the joint velocity required in this step 
             # Note this calculates a velocity profile from a minimum jerk traj 
             # (based on https://mika-s.github.io/python/control-theory/trajectory-generation/2017/12/06/trajectory-generation-with-a-minimum-jerk-trajectory.html)
-            jV = frequency * (1.0/time_freq) * (end_point - beg_point) * (30.0 * (time/time_freq)**2.0
+            jV = frequency * (1.0/time_freq) * (end_point - self.q) * (30.0 * (time/time_freq)**2.0
                 - 60.0 * (time/time_freq)**3.0
                 + 30.0 * (time/time_freq)**4.0)
 
@@ -642,7 +642,7 @@ class ROSRobot(rtb.ERobot):
              - 15.0 * (time/time_freq)**4
              + 6.0 * (time/time_freq)**5)
             
-            print(f"time step: {time}")
+            #print(f"time step: {time}")
             #print(f"jV calculated at {t}: {jV}")
             #print(f"pos at {t}: {self.q}")
             #print(f"pos calculated at {t}: {pos}")
@@ -653,7 +653,7 @@ class ROSRobot(rtb.ERobot):
 
             jacob0 = self.jacob0(self.q, fast=True, end=self.gripper)
             twist = jacob0 @ jV
-            print(f"twist (after jacobian) at {t}: {twist}")
+            #print(f"twist (after jacobian) at {t}: {twist}")
             linear_vel = np.linalg.norm(twist[:3])
 
             # Scale the twist velocity based on max_speed
@@ -686,12 +686,12 @@ class ROSRobot(rtb.ERobot):
         #     # current joint states (self.q) and the expected next state qfunc(t+delta)
         #     jV = (qfunc(t + delta) - self.q) / delta #self.q) / delta
             
-        #     print(f"count: {count}")
+        #     #print(f"count: {count}")
         #     print(f"jV calculated at {t}: {jV}")
         #     print(f"pos at {t}: {self.q}")
         #     print(f"qfunc pos at {t}: {qfunc(t)}")
         #     # Added by Dasun: gain required to have smooth control on panda
-        #     #jV = jV * kP
+        #     jV = jV * 0.05
 
         #     jacob0 = self.jacob0(self.q, fast=True, end=self.gripper)
 
@@ -712,11 +712,12 @@ class ROSRobot(rtb.ERobot):
         #     self.j_v = jV * time_scaling
         #     self.last_update = timeit.default_timer()
         #     self.event.wait()
-        #     count+=1
 
         # Print of maximum twist velocity
-        print(f"Max twist velocity: {np.max(twist_speed_vect)}")
-        print(f"Average twist velocity: {np.average(twist_speed_vect)}")
+        if twist_speed_vect:
+            print(f"Max twist velocity: {np.max(twist_speed_vect)}")
+            print(f"Average twist velocity: {np.average(twist_speed_vect)}")
+            #print(twist_speed_vect)
 
         self.j_v = [0] * self.n
 
