@@ -488,7 +488,7 @@ class ROSRobot(rtb.ERobot):
             traj = rtb.tools.trajectory.jtraj(
                 self.q,
                 np.array(self.named_poses[goal.pose_name]),
-                100
+                self.frequency
             )
 
             if self.__traj_move(traj, goal.speed if goal.speed else 0.2):
@@ -604,7 +604,7 @@ class ROSRobot(rtb.ERobot):
         print(f"Traj_Move Prints:\n\tDelta: {delta}\n\tMax Speed: {max_speed}")
 
         # ------- TEST NEW Method -------------------------------------------------------
-        av_vel = 0.05 #max_speed
+        av_vel = 0.025 #max_speed
         frequency = self.frequency
         end_point = qfunc(1)
         beg_point = self.q
@@ -615,7 +615,7 @@ class ROSRobot(rtb.ERobot):
         # Updated by Dasun: reduced gain for better control
         # This is a very large gain (not too sure why) that allows the arm to reach the goal 
         # This should also be a function of time (smaller gain for shorter distances)
-        kP = 2 * total_time_cal
+        kP = 1500 # * total_time_cal
 
         print(f"max total time: {total_time_cal}")
         print(f"beg joint positions: {beg_point}")
@@ -626,7 +626,7 @@ class ROSRobot(rtb.ERobot):
         while t + delta < total_time_cal and not self.preempted:
 
             # Check if we are close to goal state as an exit point
-            if np.all(np.fabs(qfunc(1) - self.q) < 0.005):
+            if np.all(np.fabs(qfunc(1) - self.q) < 0.02):
                 print('Too close to goal, quitting movement...')
                 break
             
