@@ -586,6 +586,7 @@ class ROSRobot(rtb.ERobot):
         self.last_update = timeit.default_timer()
 
     # Temp addition of minimum jerk trajectory calculator
+    # Reference: https://mika-s.github.io/python/control-theory/trajectory-generation/2017/12/06/trajectory-generation-with-a-minimum-jerk-trajectory.html
     def __mjtg(self, current, setpoint, frequency, move_time):
         trajectory = []
         trajectory_derivative = []
@@ -625,7 +626,8 @@ class ROSRobot(rtb.ERobot):
         print(f"Traj_Move Prints:\n\tDelta: {delta}\n\tMax Speed: {max_speed}")
 
         # ------- Alternative TEST Method 12-11-21 --------------------------------------
-        # This is the max cartesian speed we want the robot to move at
+        # This is the average cartesian speed we want the robot to move at
+        # NOTE: divided by 2 to make the max speed the approx. peak of the speed achieved
         ave_cart_speed = max_speed / 2
         # Frequency of operation - set by configuration file
         frequency = self.frequency
@@ -636,15 +638,16 @@ class ROSRobot(rtb.ERobot):
         end_ee_pose = end_ee_mat[:3, 3]
 
         # Estimation of time taken based on linear motion from current to end cartesian pose
-        # We may require some optimisation of this given the curved nature of the actual ee pose
+        # We may require some optimisation of this given the curved nature of the actual ee trajectory
         move_time = np.sqrt((end_ee_pose[0] - current_ee_pose[0])**2 +
             (end_ee_pose[1] - current_ee_pose[1])**2 +
             (end_ee_pose[2] - current_ee_pose[2])**2) / ave_cart_speed 
 
-        # Move time correction 
-        move_time = move_time * 1.05
+        # Move time correction [currently un-used but requires optimisation]
+        # Correction to account for error in curved motion
+        move_time = move_time * 1
 
-        # Obtain minimum jerk velocity profile of end effector
+        # Obtain minimum jerk velocity profile of joints based on estimated end effector move time
         _, min_jerk_vel = self.__mjtg(self.q, traj.q[-1], frequency, move_time)
         print(f"Minimum Jerk (joint) Vel Profile lenght: {len(min_jerk_vel)}")
 
@@ -657,10 +660,11 @@ class ROSRobot(rtb.ERobot):
 
         #Time step initialise for trajectory
         time_step = 0
+        cartesian_ee_vel_vect = []
         while t + delta < move_time and time_step < time_freq_steps-1 and not self.preempted:
             # Check if we are close to goal state as an exit point
             # NOTE: this is based on the joint positions
-            if np.all(np.fabs(traj.q[-1] - self.q) < 0.005):
+            if np.all(np.fabs(traj.q[-1] - self.q) < 0.001):
                 print('Too close to goal, quitting movement...')
                 break
 
@@ -670,116 +674,42 @@ class ROSRobot(rtb.ERobot):
             # Get current joint velocity and calculate current twist
             current_jv = self.j_v
             current_twist = jacob0 @ current_jv
-            #print(f"current twist (after jacobian) at {t}: {current_twist}")
             current_linear_vel = np.linalg.norm(current_twist[:3])
+            cartesian_ee_vel_vect.append(current_linear_vel)
             #print(f"current joint velocities at {t}: {current_jv}")
-            print(f"Current cartesian velocity at {t}: {current_linear_vel}")
+            #print(f"Current cartesian velocity at {t}: {current_linear_vel}")
 
-            # Calculate required velocity at this point in time
+            # Calculate required joint velocity at this point in time based on minimum jerk
             req_jv = min_jerk_vel[time_step]
-            req_twist = jacob0 @ req_jv
-            #print(f"req twist (after jacobian) at {t}: {req_twist}")
-            req_linear_vel = np.linalg.norm(req_twist[:3])
-            #print(f"Req joint velocities at {t}: {req_jv}")
-            #print(f"Req cartesian velocity at {t}: {req_linear_vel}")
 
-            # Calculate error in joint velocities
+            # Calculate error in joint velocities based on current and expected
             erro_jv = req_jv - current_jv
 
-            # Calculate the difference in joint positions relative to the end
-            #error_jp = (traj.q[-1] - self.q) / traj.q[-1]
-            #print(f"error in joint position from current state to end state: {error_jp}")
+            time_scaling = 1
+            if current_linear_vel > max_speed:
+                normalised_vel = (current_twist / current_linear_vel) * max_speed
+                time_scaling = np.linalg.norm(normalised_vel) / current_linear_vel
+                print(f"time scale correction: {current_linear_vel * time_scaling}")
+
+            # Calculate corrected error based on error above
+            corr_jv = (current_jv + erro_jv) * time_scaling
 
             # Increment time step(s)
-            time_step += 1
-            t += delta #* time_scaling
+            time_step += 1  #Step value from calculated trajectory (minimum jerk)
+            t += delta * time_scaling      
             
+            # Update of new expected joint velocities for low level controllers
             self.event.clear()
-            #self.j_v = jV * time_scaling
-            # Temp update of actual jv based on error
-            self.j_v = current_jv + (erro_jv * 1)
+            self.j_v = corr_jv
             self.last_update = timeit.default_timer()
             self.event.wait()
         
-            #print(f"Test Mode: Exiting...")
-            #break
-
-        # ------- TEST NEW Method [Currently Working] -------------------------------------------------------
-        # av_vel = 0.025 #max_speed
-        # frequency = self.frequency
-        # end_point = qfunc(1)
-        # beg_point = self.q
-        # # This time is arbitrary, but we pick the maximum in order to reduce the joint velocities
-        # total_time_cal = np.max(np.fabs((end_point - beg_point) / av_vel))
-        # time_freq = int(total_time_cal * frequency)
-
-        # # Updated by Dasun: reduced gain for better control
-        # # This is a very large gain (not too sure why) that allows the arm to reach the goal 
-        # # This should also be a function of time (smaller gain for shorter distances)
-        # kP = 1500 # * total_time_cal
-
-        # print(f"max total time: {total_time_cal}")
-        # print(f"beg joint positions: {beg_point}")
-        # print(f"end joint positions: {end_point}")
-        # time = 1
-        # # For debugging
-        # twist_speed_vect = []
-        # while t + delta < total_time_cal and not self.preempted:
-
-        #     # Check if we are close to goal state as an exit point
-        #     if np.all(np.fabs(qfunc(1) - self.q) < 0.02):
-        #         print('Too close to goal, quitting movement...')
-        #         break
-            
-        #     # Calculate the joint velocity required in this step 
-        #     # Note this calculates a velocity profile from a minimum jerk traj 
-        #     # (based on https://mika-s.github.io/python/control-theory/trajectory-generation/2017/12/06/trajectory-generation-with-a-minimum-jerk-trajectory.html)
-        #     jV = frequency * (1.0/time_freq) * (end_point - self.q) * (30.0 * (time/time_freq)**2.0
-        #         - 60.0 * (time/time_freq)**3.0
-        #         + 30.0 * (time/time_freq)**4.0)
-
-        #     # Minimum jerk trajectory calculation of expected position (Used for Debugging)
-        #     pos = beg_point + (end_point - beg_point) * (10.0 * (time/time_freq)**3
-        #      - 15.0 * (time/time_freq)**4
-        #      + 6.0 * (time/time_freq)**5)
-            
-        #     #print(f"time step: {time}")
-        #     #print(f"jV calculated at {t}: {jV}")
-        #     #print(f"pos at {t}: {self.q}")
-        #     #print(f"pos calculated at {t}: {pos}")
-
-        #     # Added by Dasun: gain required to have smooth control on panda
-        #     jV = jV * kP
-        #     #print(f"jV corrected at {t}: {jV}")
-
-        #     jacob0 = self.jacob0(self.q, fast=True, end=self.gripper)
-        #     twist = jacob0 @ jV
-        #     #print(f"twist (after jacobian) at {t}: {twist}")
-        #     linear_vel = np.linalg.norm(twist[:3])
-
-        #     # Scale the twist velocity based on max_speed
-        #     time_scaling = 1
-        #     if linear_vel > max_speed:
-        #         normalised_vel = (twist / linear_vel) * max_speed
-        #         time_scaling = np.linalg.norm(normalised_vel) / linear_vel    
-        #         linear_vel = linear_vel * time_scaling 
-            
-        #     twist_speed_vect.append(linear_vel)
-        #     print(f"linear vel at {t}: {linear_vel}\n\n")
-                
-        #     t += delta * time_scaling
-            
-        #     self.event.clear()
-        #     self.j_v = jV * time_scaling
-        #     self.last_update = timeit.default_timer()
-        #     self.event.wait()
-        #     time+=1
-        
         # Print of maximum twist velocity
-        # if twist_speed_vect:
-        #     print(f"Max twist velocity: {np.max(twist_speed_vect)}")
-        #     print(f"Average twist velocity: {np.average(twist_speed_vect)}")
-            #print(twist_speed_vect)
+        if cartesian_ee_vel_vect:
+            print(f"End cartesian velocity: {current_linear_vel}")
+            print(f"Max twist velocity: {np.max(cartesian_ee_vel_vect)}")
+            print(f"Average twist velocity: {np.average(cartesian_ee_vel_vect)}")
+
         ### ----------- Original Method Commented Out For Now ------------------------
         # while t + delta < 1 and not self.preempted:
 
