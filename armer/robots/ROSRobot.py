@@ -672,7 +672,7 @@ class ROSRobot(rtb.ERobot):
             jacob0 = self.jacob0(self.q, fast=True, end=self.gripper)
 
             # Get current joint velocity and calculate current twist
-            current_jv = self.j_v
+            current_jv = self.qd #elf.j_v
             current_twist = jacob0 @ current_jv
             current_linear_vel = np.linalg.norm(current_twist[:3])
             cartesian_ee_vel_vect.append(current_linear_vel)
