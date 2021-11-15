@@ -967,45 +967,46 @@ class ROSRobot(rtb.ERobot):
                                           ) >= 0.0001 else 0
 
             ## --------- DEBUG: this is the new section that has issues ------
-            # p = self.e_p[:3, 3] + self.e_v[:3] * dt
-            # R = SO3(self.e_p[:3, :3]) * SO3.EulerVec(self.e_v[3:] * dt)
+            p = self.e_p[:3, 3] + self.e_v[:3] * dt                     # expected position
+            R = SO3(self.e_p[:3, :3]) * SO3.EulerVec(self.e_v[3:] * dt) # expected rotation
             
-            # T = SE3.Rt(R, p)
+            T = SE3.Rt(R, p)                                            # expected pose
+            Tactual = SE3(self.fkine(self.q, start=self.base_link, fast=True, end=self.gripper)) # actual pose
 
-            # Tactual = SE3(self.fkine(self.q, start=self.base_link, fast=True, end=self.gripper))
-            # T = SE3.Rt(R, p)
+            error = T.A @ np.linalg.inv(Tactual.A)
+            
+            e_v = self.e_v + np.concatenate((error[:3, 3], SO3(error[:3, :3]).rpy()), axis=0)
 
-            # delta = Tactual.delta(T)
-            # e_v = self.e_v + delta
+            self.e_p = T.A
+
             ## --------- DEBUG: end of new section with issues --------
 
             ## --------- DEBUG: Old stuff start [commit 3272b27] WORKING on PANDA
-            Kp = 1 
-            wTe = self.fkine(self.q, start=self.base_link, fast=True, end=self.gripper)
-            error = self.e_p @ np.linalg.inv(wTe)
-            # print(e)
-            trans = self.e_p[:3, 3]  # .astype('float64')
-            trans += self.e_v[:3] * dt
-            rotation = SO3(self.e_p[:3, :3])
+            # Kp = 1 
+            # wTe = self.fkine(self.q, start=self.base_link, fast=True, end=self.gripper)
+            # error = self.e_p @ np.linalg.inv(wTe)
+            # # print(e)
+            # trans = self.e_p[:3, 3]  # .astype('float64')
+            # trans += self.e_v[:3] * dt
+            # rotation = SO3(self.e_p[:3, :3])
 
-            # Rdelta = SO3.EulerVec(self.e_v[3:])
+            # # Rdelta = SO3.EulerVec(self.e_v[3:])
 
-            # R = Rdelta * R
-            # R = R.norm()
-            # # print(self.e_p)
-            self.e_p = SE3.Rt(rotation, t=trans).A
+            # # R = Rdelta * R
+            # # R = R.norm()
+            # # # print(self.e_p)
+            # self.e_p = SE3.Rt(rotation, t=trans).A
 
-            v_t = self.e_v[:3] + Kp * error[:3, 3]
-            v_r = self.e_v[3:]  # + (e[.rpy(]) * 0.5)
+            # v_t = self.e_v[:3] + Kp * error[:3, 3]
+            # v_r = self.e_v[3:]  # + (e[.rpy(]) * 0.5)
 
-            e_v = np.concatenate([v_t, v_r])
+            # e_v = np.concatenate([v_t, v_r])
             ## -------- DEBUG: old stuff end ---------------------------
             
             self.j_v = np.linalg.pinv(
                 self.jacob0(self.q, fast=True, end=self.gripper)) @ e_v
 
-            ## ---- DEBUG: part of current version commented out
-            #self.e_p = SE3.Rt(R, t=p).A
+
 
         # apply desired joint velocity to robot
         if any(self.j_v):
