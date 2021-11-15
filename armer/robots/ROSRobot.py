@@ -557,9 +557,9 @@ class ROSRobot(rtb.ERobot):
         """
         # pylint: disable=unused-argument
         self.preempted = True
-        self.e_v *= 0
-        self.j_v *= 0
-        self.qd *= 0
+        self.e_v = [0] * self.n
+        self.j_v = [0] * self.n
+        self.qd = [0] * self.n
 
     def __vel_move(self, twist_stamped: TwistStamped) -> None:
         target: Twist = twist_stamped.twist
@@ -645,10 +645,10 @@ class ROSRobot(rtb.ERobot):
 
         # Move time correction [currently un-used but requires optimisation]
         # Correction to account for error in curved motion
-        move_time = move_time * 1
+        move_time = move_time * 1.0
 
         # Obtain minimum jerk velocity profile of joints based on estimated end effector move time
-        _, min_jerk_vel = self.__mjtg(self.q, traj.q[-1], frequency, move_time)
+        min_jerk_pos, min_jerk_vel = self.__mjtg(self.q, traj.q[-1], frequency, move_time)
         print(f"Minimum Jerk (joint) Vel Profile lenght: {len(min_jerk_vel)}")
 
         # Calculate time frequency - based on the max time required for trajectory and the frequency of operation
@@ -672,7 +672,8 @@ class ROSRobot(rtb.ERobot):
             jacob0 = self.jacob0(self.q, fast=True, end=self.gripper)
 
             # Get current joint velocity and calculate current twist
-            current_jv = self.qd #elf.j_v
+            current_jv = self.state.joint_velocities #elf.j_v
+            current_jp = self.state.joint_poses
             current_twist = jacob0 @ current_jv
             current_linear_vel = np.linalg.norm(current_twist[:3])
             cartesian_ee_vel_vect.append(current_linear_vel)
@@ -681,22 +682,22 @@ class ROSRobot(rtb.ERobot):
 
             # Calculate required joint velocity at this point in time based on minimum jerk
             req_jv = min_jerk_vel[time_step]
-
+            req_jp = min_jerk_pos[time_step]
             # Calculate error in joint velocities based on current and expected
             erro_jv = req_jv - current_jv
+            erro_jp = req_jp - current_jp
 
-            time_scaling = 1
-            if current_linear_vel > max_speed:
-                normalised_vel = (current_twist / current_linear_vel) * max_speed
-                time_scaling = np.linalg.norm(normalised_vel) / current_linear_vel
-                print(f"time scale correction: {current_linear_vel * time_scaling}")
+            if np.any(np.max(np.fabs(erro_jp)) > 0.2):
+                print('E:', erro_jp)
+                self.preempt()
+                break
 
             # Calculate corrected error based on error above
-            corr_jv = (current_jv + erro_jv) * time_scaling
+            corr_jv = (current_jv + erro_jv * 1 + erro_jp * 1)
 
             # Increment time step(s)
             time_step += 1  #Step value from calculated trajectory (minimum jerk)
-            t += delta * time_scaling      
+            t += delta  
             
             # Update of new expected joint velocities for low level controllers
             self.event.clear()
@@ -955,6 +956,9 @@ class ROSRobot(rtb.ERobot):
 
         current_time = timeit.default_timer()
         self.state = self.get_state()
+
+        # if self.state.errors != 0:
+        #     self.preempt()
 
         # calculate joint velocities from desired cartesian velocity
         if any(self.e_v):
