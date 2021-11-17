@@ -571,25 +571,37 @@ class ROSRobot(rtb.ERobot):
             self.e_v_frame = None
 
         #----- [TESTING] Added section to control based on requested frame -----
-        print(f"Vel Move: \n\tRequested Frame: {self.e_v_frame}")
+        #print(f"Vel Move: \n\tRequested Frame: {self.e_v_frame}")
         # Get the forward kinematic solution of the provided frame
+        found = False
         for link in self.elinks:
             if link.parent is not None and link.name == self.e_v_frame:
                 e_v_frame_pos = link.fk
-                print(f"{link.name} forward kinematics up to this link: {e_v_frame_pos}")
+                #print(f"{link.name} forward kinematics up to this link: {e_v_frame_pos}")
+                found = True
                 break
+        
+        # Check if requested frame is a gripper link
+        if not found:
+            for gripper_link in self.grippers[0].links:
+                if gripper_link.parent is not None and gripper_link.name == self.e_v_frame:
+                    e_v_frame_pos = gripper_link.fk
+                    #print(f"{gripper_link.name} forward kinematics up to this gripper_link: {e_v_frame_pos}")
+                    found = True
+                    break
 
         # Transform given cartesian frame linear velocities (base) to requested frame
-        if self.e_v_frame is not None:
-            print(f"target frame: {target}")
-            print(f"rotational req: {e_v_frame_pos.R}")
+        # Default to base frame if no requested frame is found (above)
+        if self.e_v_frame is not None and found:
+            #print(f"target frame: {target}")
+            #print(f"rotational req: {e_v_frame_pos.R}")
             post_corr_e_v_linear = np.array([
                 target.linear.x,
                 target.linear.y,
                 target.linear.z
             ])
 
-            corr_e_v_linear = post_corr_e_v_linear @ e_v_frame_pos.R
+            corr_e_v_linear = e_v_frame_pos.R @ post_corr_e_v_linear
 
             e_v = np.array([
                 corr_e_v_linear[0],# target.linear.x,
@@ -608,9 +620,6 @@ class ROSRobot(rtb.ERobot):
                 target.angular.y,
                 target.angular.z
             ])
-
-        # Transform given cartesian frame (base) to requested frame
-        print(f"target frame as np: {e_v}")
         #------ END Updated Section ---------------------------------
 
         if np.any(e_v - self.e_v):
