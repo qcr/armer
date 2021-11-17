@@ -366,7 +366,7 @@ class ROSRobot(rtb.ERobot):
             ]).SE3()
 
             print(target)
-            dq = self.ikine_LMS(target, q0=self.q, end=self.gripper)
+            dq = self.ikine_min(target, q0=self.q, end=self.gripper, qlim=True, method='L-BFGS-B')
             traj = rtb.tools.trajectory.jtraj(self.q, dq.q, self.frequency)
 
             if self.__traj_move(traj, goal.speed if goal.speed else 0.2):
@@ -607,7 +607,7 @@ class ROSRobot(rtb.ERobot):
 
         return trajectory, trajectory_derivative
 
-    def __traj_move(self, traj: np.array, max_speed=0.2) -> bool:
+    def __traj_move(self, traj: np.array, max_speed=0.2, max_rot=0.5) -> bool:
         """[summary]
 
         :param traj: [description]
@@ -639,10 +639,17 @@ class ROSRobot(rtb.ERobot):
 
         # Estimation of time taken based on linear motion from current to end cartesian pose
         # We may require some optimisation of this given the curved nature of the actual ee trajectory
-        move_time = np.sqrt((end_ee_pose[0] - current_ee_pose[0])**2 +
+        linear_move_time = np.sqrt((end_ee_pose[0] - current_ee_pose[0])**2 +
             (end_ee_pose[1] - current_ee_pose[1])**2 +
             (end_ee_pose[2] - current_ee_pose[2])**2) / ave_cart_speed 
 
+        current_ee_rot = current_ee_mat[:3,:3]
+        end_ee_rot = end_ee_mat[:3,:3]
+
+        angular_move_time = np.arccos((np.trace(np.transpose(end_ee_rot) @ current_ee_rot) - 1) / 2) / max_rot
+
+        move_time = max(linear_move_time, angular_move_time)
+           
         # Move time correction [currently un-used but requires optimisation]
         # Correction to account for error in curved motion
         move_time = move_time * 1.0
@@ -687,7 +694,7 @@ class ROSRobot(rtb.ERobot):
             erro_jv = req_jv - current_jv
             erro_jp = req_jp - current_jp
 
-            if np.any(np.max(np.fabs(erro_jp)) > 0.2):
+            if np.any(np.max(np.fabs(erro_jp)) > 0.5):
                 print('E:', erro_jp)
                 self.preempt()
                 break
@@ -710,45 +717,6 @@ class ROSRobot(rtb.ERobot):
             print(f"End cartesian velocity: {current_linear_vel}")
             print(f"Max twist velocity: {np.max(cartesian_ee_vel_vect)}")
             print(f"Average twist velocity: {np.average(cartesian_ee_vel_vect)}")
-
-        ### ----------- Original Method Commented Out For Now ------------------------
-        # while t + delta < 1 and not self.preempted:
-
-        #     # Check if we are close to goal state as an exit point
-        #     if np.all(np.fabs(qfunc(1) - self.q) < 0.005):
-        #         print('Too close to goal, quitting movement...')
-        #         break
-            
-        #     # Calculate the joint velocity required in this step based on the 
-        #     # current joint states (self.q) and the expected next state qfunc(t+delta)
-        #     jV = (qfunc(t + delta) - self.q) / delta #self.q) / delta
-            
-        #     #print(f"count: {count}")
-        #     print(f"jV calculated at {t}: {jV}")
-        #     print(f"pos at {t}: {self.q}")
-        #     print(f"qfunc pos at {t}: {qfunc(t)}")
-        #     # Added by Dasun: gain required to have smooth control on panda
-        #     jV = jV * 0.05
-
-        #     jacob0 = self.jacob0(self.q, fast=True, end=self.gripper)
-
-        #     twist = jacob0 @ jV
-        #     print(f"twist (after jacobian) at {t}: {twist}")
-        #     linear_vel = np.linalg.norm(twist[:3])
-        #     print(f"linear_vel (norm twist) at {t}: {linear_vel}\n\n")
-
-        #     time_scaling = 1
-
-        #     if linear_vel > max_speed:
-        #         normalised_vel = (twist / linear_vel) * max_speed
-        #         time_scaling = np.linalg.norm(normalised_vel) / linear_vel
-                
-        #     t += delta * time_scaling
-            
-        #     self.event.clear()
-        #     self.j_v = jV * time_scaling
-        #     self.last_update = timeit.default_timer()
-        #     self.event.wait()
 
         self.j_v = [0] * self.n
 
@@ -775,7 +743,7 @@ class ROSRobot(rtb.ERobot):
         pose_stamped = PoseStamped()
         pose_stamped.header = header
 
-        translation = ee_pose[:3, 3]
+        translation = ee_pose[:3, 3]    
         pose_stamped.pose.position.x = translation[0]
         pose_stamped.pose.position.y = translation[1]
         pose_stamped.pose.position.z = translation[2]
@@ -957,8 +925,8 @@ class ROSRobot(rtb.ERobot):
         current_time = timeit.default_timer()
         self.state = self.get_state()
 
-        # if self.state.errors != 0:
-        #     self.preempt()
+        if self.state.errors != 0:
+            self.preempt()
 
         # calculate joint velocities from desired cartesian velocity
         if any(self.e_v):
@@ -966,7 +934,6 @@ class ROSRobot(rtb.ERobot):
                 self.e_v *= 0.9 if np.sum(np.absolute(self.e_v)
                                           ) >= 0.0001 else 0
 
-            ## --------- DEBUG: this is the new section that has issues ------
             p = self.e_p[:3, 3] + self.e_v[:3] * dt                     # expected position
             R = SO3(self.e_p[:3, :3]) * SO3.EulerVec(self.e_v[3:] * dt) # expected rotation
             
@@ -978,35 +945,9 @@ class ROSRobot(rtb.ERobot):
             e_v = self.e_v + np.concatenate((error[:3, 3], SO3(error[:3, :3]).rpy()), axis=0)
 
             self.e_p = T.A
-
-            ## --------- DEBUG: end of new section with issues --------
-
-            ## --------- DEBUG: Old stuff start [commit 3272b27] WORKING on PANDA
-            # Kp = 1 
-            # wTe = self.fkine(self.q, start=self.base_link, fast=True, end=self.gripper)
-            # error = self.e_p @ np.linalg.inv(wTe)
-            # # print(e)
-            # trans = self.e_p[:3, 3]  # .astype('float64')
-            # trans += self.e_v[:3] * dt
-            # rotation = SO3(self.e_p[:3, :3])
-
-            # # Rdelta = SO3.EulerVec(self.e_v[3:])
-
-            # # R = Rdelta * R
-            # # R = R.norm()
-            # # # print(self.e_p)
-            # self.e_p = SE3.Rt(rotation, t=trans).A
-
-            # v_t = self.e_v[:3] + Kp * error[:3, 3]
-            # v_r = self.e_v[3:]  # + (e[.rpy(]) * 0.5)
-
-            # e_v = np.concatenate([v_t, v_r])
-            ## -------- DEBUG: old stuff end ---------------------------
             
             self.j_v = np.linalg.pinv(
                 self.jacob0(self.q, fast=True, end=self.gripper)) @ e_v
-
-
 
         # apply desired joint velocity to robot
         if any(self.j_v):
