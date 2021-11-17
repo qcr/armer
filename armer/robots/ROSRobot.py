@@ -14,7 +14,7 @@ import actionlib
 import tf
 import roboticstoolbox as rtb
 import spatialmath as sp
-from spatialmath import SE3, SO3, UnitQuaternion
+from spatialmath import SE3, SO3, UnitQuaternion, base
 import numpy as np
 import yaml
 
@@ -65,6 +65,7 @@ from armer_msgs.srv import RemoveNamedPoseConfig, \
     RemoveNamedPoseConfigResponse
 
 # pylint: disable=too-many-instance-attributes
+from spatialmath.base.argcheck import getvector
 
 
 class ROSRobot(rtb.ERobot):
@@ -569,14 +570,48 @@ class ROSRobot(rtb.ERobot):
         else:
             self.e_v_frame = None
 
-        e_v = np.array([
-            target.linear.x,
-            target.linear.y,
-            target.linear.z,
-            target.angular.x,
-            target.angular.y,
-            target.angular.z
-        ])
+        #----- [TESTING] Added section to control based on requested frame -----
+        print(f"Vel Move: \n\tRequested Frame: {self.e_v_frame}")
+        # Get the forward kinematic solution of the provided frame
+        for link in self.elinks:
+            if link.parent is not None and link.name == self.e_v_frame:
+                e_v_frame_pos = link.fk
+                print(f"{link.name} forward kinematics up to this link: {e_v_frame_pos}")
+                break
+
+        # Transform given cartesian frame linear velocities (base) to requested frame
+        if self.e_v_frame is not None:
+            print(f"target frame: {target}")
+            print(f"rotational req: {e_v_frame_pos.R}")
+            post_corr_e_v_linear = np.array([
+                target.linear.x,
+                target.linear.y,
+                target.linear.z
+            ])
+
+            corr_e_v_linear = post_corr_e_v_linear @ e_v_frame_pos.R
+
+            e_v = np.array([
+                corr_e_v_linear[0],# target.linear.x,
+                corr_e_v_linear[1],# target.linear.y,
+                corr_e_v_linear[2],# target.linear.z,
+                target.angular.x,
+                target.angular.y,
+                target.angular.z
+            ])
+        else:
+            e_v = np.array([
+                target.linear.x,
+                target.linear.y,
+                target.linear.z,
+                target.angular.x,
+                target.angular.y,
+                target.angular.z
+            ])
+
+        # Transform given cartesian frame (base) to requested frame
+        print(f"target frame as np: {e_v}")
+        #------ END Updated Section ---------------------------------
 
         if np.any(e_v - self.e_v):
             self.e_p = self.fkine(self.q, start=self.base_link, fast=True, end=self.gripper)
