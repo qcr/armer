@@ -9,6 +9,8 @@ import timeit
 from typing import List, Any
 from threading import Lock, Event
 
+from spatialmath import quaternion
+
 import rospy
 import actionlib
 import tf
@@ -17,6 +19,8 @@ import spatialmath as sp
 from spatialmath import SE3, SO3, UnitQuaternion, base
 import numpy as np
 import yaml
+
+from armer.timer import Timer
 
 from scipy.interpolate import interp1d
 
@@ -354,7 +358,7 @@ class ROSRobot(rtb.ERobot):
 
             goal_pose = self.tf_listener.transformPose(
                 self.base_link.name,
-                goal_pose
+                goal_pose,
             )
             print(goal_pose.pose)
             pose = goal_pose.pose
@@ -558,37 +562,57 @@ class ROSRobot(rtb.ERobot):
         """
         # pylint: disable=unused-argument
         self.preempted = True
-        self.e_v = [0] * self.n
+        self.e_v = [0] * 6
         self.j_v = [0] * self.n
         self.qd = [0] * self.n
 
     def __vel_move(self, twist_stamped: TwistStamped) -> None:
         target: Twist = twist_stamped.twist
 
-        if twist_stamped.header.frame_id and twist_stamped.header.frame_id != self.base_link.name:
-            self.e_v_frame = twist_stamped.header.frame_id
-        else:
-            self.e_v_frame = None
+        with Timer('loops', enabled=False):
+            if twist_stamped.header.frame_id and twist_stamped.header.frame_id != self.base_link.name:
+                self.e_v_frame = twist_stamped.header.frame_id
+            else:
+                self.e_v_frame = None
 
-        #----- [TESTING] Added section to control based on requested frame -----
-        #print(f"Vel Move: \n\tRequested Frame: {self.e_v_frame}")
-        # Get the forward kinematic solution of the provided frame
-        found = False
-        for link in self.elinks:
-            if link.parent is not None and link.name == self.e_v_frame:
-                e_v_frame_pos = link.fk
-                #print(f"{link.name} forward kinematics up to this link: {e_v_frame_pos}")
-                found = True
-                break
-        
-        # Check if requested frame is a gripper link
-        if not found:
-            for gripper_link in self.grippers[0].links:
-                if gripper_link.parent is not None and gripper_link.name == self.e_v_frame:
-                    e_v_frame_pos = gripper_link.fk
-                    #print(f"{gripper_link.name} forward kinematics up to this gripper_link: {e_v_frame_pos}")
+            #----- [TESTING] Added section to control based on requested frame -----
+            #print(f"Vel Move: \n\tRequested Frame: {self.e_v_frame}")
+            # Get the forward kinematic solution of the provided frame
+            found = False
+            for link in self.elinks:
+                if link.parent is not None and link.name == self.e_v_frame:
+                    e_v_frame_pos = link.fk
+                    #print(f"{link.name} forward kinematics up to this link: {e_v_frame_pos}")
                     found = True
                     break
+            
+            # Check if requested frame is a gripper link
+            if not found:
+                for gripper_link in self.grippers[0].links:
+                    if gripper_link.parent is not None and gripper_link.name == self.e_v_frame:
+                        e_v_frame_pos = gripper_link.fk
+                        #print(f"{gripper_link.name} forward kinematics up to this gripper_link: {e_v_frame_pos}")
+                        found = True
+                        break
+            
+
+        with Timer('tf_lookup', enabled=False):
+            if twist_stamped.header.frame_id == '':
+                twist_stamped.header.frame_id = self.base_link.name
+
+            position, orientation = self.tf_listener.lookupTransform(
+                self.base_link.name,
+                twist_stamped.header.frame_id,
+                twist_stamped.header.stamp
+            )
+            
+            TF = SE3(*position, check=False) * UnitQuaternion([
+                    orientation[-1],
+                    *orientation[:3]
+                ], norm=False, check=False).SE3()
+
+        # print(e_v_frame_pos)
+        # print(TF)
 
         # Transform given cartesian frame linear velocities (base) to requested frame
         # Default to base frame if no requested frame is found (above)
@@ -989,7 +1013,7 @@ class ROSRobot(rtb.ERobot):
             e_v = self.e_v + np.concatenate((error[:3, 3], SO3(error[:3, :3]).rpy()), axis=0)
 
             self.e_p = T.A
-            
+                
             self.j_v = np.linalg.pinv(
                 self.jacob0(self.q, fast=True, end=self.gripper)) @ e_v
 
@@ -999,6 +1023,13 @@ class ROSRobot(rtb.ERobot):
                 self.j_v *= 0.9 if np.sum(np.absolute(self.j_v)
                                           ) >= 0.0001 else 0
 
+        J = self.jacob0(self.q + self.j_v, fast=True, end=self.gripper)
+        S = np.linalg.det(J @ J.T)
+            
+        # Stop near singularities
+        if S < 0.000001:
+            self.preempt()
+            
         self.qd = self.j_v
         self.last_tick = current_time
 
