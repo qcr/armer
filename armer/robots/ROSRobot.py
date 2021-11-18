@@ -569,54 +569,22 @@ class ROSRobot(rtb.ERobot):
     def __vel_move(self, twist_stamped: TwistStamped) -> None:
         target: Twist = twist_stamped.twist
 
-        with Timer('loops', enabled=False):
-            if twist_stamped.header.frame_id and twist_stamped.header.frame_id != self.base_link.name:
-                self.e_v_frame = twist_stamped.header.frame_id
-            else:
-                self.e_v_frame = None
+        if twist_stamped.header.frame_id == '':
+            twist_stamped.header.frame_id = self.base_link.name
 
-            #----- [TESTING] Added section to control based on requested frame -----
-            #print(f"Vel Move: \n\tRequested Frame: {self.e_v_frame}")
-            # Get the forward kinematic solution of the provided frame
-            found = False
-            for link in self.elinks:
-                if link.parent is not None and link.name == self.e_v_frame:
-                    e_v_frame_pos = link.fk
-                    #print(f"{link.name} forward kinematics up to this link: {e_v_frame_pos}")
-                    found = True
-                    break
-            
-            # Check if requested frame is a gripper link
-            if not found:
-                for gripper_link in self.grippers[0].links:
-                    if gripper_link.parent is not None and gripper_link.name == self.e_v_frame:
-                        e_v_frame_pos = gripper_link.fk
-                        #print(f"{gripper_link.name} forward kinematics up to this gripper_link: {e_v_frame_pos}")
-                        found = True
-                        break
-            
-
-        with Timer('tf_lookup', enabled=False):
-            if twist_stamped.header.frame_id == '':
-                twist_stamped.header.frame_id = self.base_link.name
-
+        # Transform given cartesian frame linear velocities (base) to requested frame
+        # Default to base frame if no requested frame is found (above)
+        if twist_stamped.header.frame_id != self.base_link.name:
             position, orientation = self.tf_listener.lookupTransform(
                 self.base_link.name,
                 twist_stamped.header.frame_id,
                 twist_stamped.header.stamp
             )
-            
-            TF = SE3(*position, check=False) * UnitQuaternion([
-                    orientation[-1],
-                    *orientation[:3]
-                ], norm=False, check=False).SE3()
-
-        # print(e_v_frame_pos)
-        # print(TF)
-
-        # Transform given cartesian frame linear velocities (base) to requested frame
-        # Default to base frame if no requested frame is found (above)
-        if self.e_v_frame is not None and found:
+        
+            e_v_frame_pos = SE3(*position, check=False) * UnitQuaternion([
+                orientation[-1],
+                *orientation[:3]
+            ], norm=False, check=False).SE3()
             #print(f"target frame: {target}")
             #print(f"rotational req: {e_v_frame_pos.R}")
             post_corr_e_v_linear = np.array([
