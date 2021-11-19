@@ -21,6 +21,7 @@ import numpy as np
 import yaml
 
 from armer.timer import Timer
+from armer.utils import ikine_qpj
 
 from scipy.interpolate import interp1d
 
@@ -371,7 +372,7 @@ class ROSRobot(rtb.ERobot):
             ]).SE3()
 
             print(target)
-            dq = self.ikine_min(target, q0=self.q, end=self.gripper, qlim=True, method='L-BFGS-B')
+            dq = ikine_qpj(self, pose, q0=self.q, end=self.gripper)
             traj = rtb.tools.trajectory.jtraj(self.q, dq.q, self.frequency)
 
             if self.__traj_move(traj, goal.speed if goal.speed else 0.2):
