@@ -139,12 +139,13 @@ from trac_ik_python.trac_ik import IK
 
 #         return False
 
-def ikine_qpj(robot, target, q0, end, threshold=2, attempts=10):
+def ikine(robot, target, q0, end, threshold=2, attempts=10):
     bx = by = bz = 0.001
     brx = bry = brz = 0.1
-    print('Limits:', robot.qlim)
+    
     ik_solver = IK(robot.base_link.name,
                    end,
+                   timeout=0.1,
                    solve_type='Manipulation1')
     
     ik_solver.set_joint_limits(*robot.qlim)
@@ -155,32 +156,6 @@ def ikine_qpj(robot, target, q0, end, threshold=2, attempts=10):
                         bx, by, bz,
                         brx, bry, brz)
 
-    print(sol)
-    # for _ in range(attempts):
-    #     _, q0 = gen_pose(robot, robot.qlim)
-    #     solver = QP(robot, q0, target.A, end=end, it_max=100, threshold=threshold)
-    #     iter = 0
-    #     arrived = False
-
-    #     while not arrived:
-    #         try:
-    #             arrived = solver.step()
-    #         except np.linalg.LinAlgError:
-    #             break
-
-    #         iter += 1
-
-    #         if iter >= solver.it_max:
-    #             break
-
-    #     if arrived:
-    #         print('Arrived')
-    #         break
-    # print(arrived)
-    # if not arrived:
-    #     solver.q = robot.q
-    
-    # robot.q = solver.q
     return type('obj', (object,), {'q' : sol})
     
 

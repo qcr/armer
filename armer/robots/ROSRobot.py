@@ -21,7 +21,7 @@ import numpy as np
 import yaml
 
 from armer.timer import Timer
-from armer.utils import ikine_qpj
+from armer.utils import ikine
 
 from scipy.interpolate import interp1d
 
@@ -361,20 +361,12 @@ class ROSRobot(rtb.ERobot):
                 self.base_link.name,
                 goal_pose,
             )
-            print(goal_pose.pose)
+            
             pose = goal_pose.pose
 
-            target = SE3(pose.position.x, pose.position.y, pose.position.z) * UnitQuaternion([
-                pose.orientation.w,
-                pose.orientation.x,
-                pose.orientation.y,
-                pose.orientation.z
-            ]).SE3()
-
-            print(target)
-            dq = ikine_qpj(self, pose, q0=self.q, end=self.gripper)
+            dq = ikine(self, pose, q0=self.q, end=self.gripper)
             traj = rtb.tools.trajectory.jtraj(self.q, dq.q, self.frequency)
-
+            
             if self.__traj_move(traj, goal.speed if goal.speed else 0.2):
                 self.pose_server.set_succeeded(MoveToPoseResult(success=True))
             else:
@@ -462,9 +454,9 @@ class ROSRobot(rtb.ERobot):
                 np.array(goal.joints),
                 self.frequency,
             )
-
+            print(goal.speed)
             if self.__traj_move(traj, goal.speed if goal.speed else 0.2):
-                self.named_pose_server.set_succeeded(
+                self.joint_pose_server.set_succeeded(
                     MoveToJointPoseResult(success=True)
                 )
             else:
@@ -523,7 +515,7 @@ class ROSRobot(rtb.ERobot):
                 self.qr if hasattr(self, 'qr') else self.q, # pylint: disable=no-member
                 self.frequency
             )
-            self.__traj_move(traj, max_speed=0.2)
+            self.__traj_move(traj, max_speed=0.5)
             return EmptyResponse()
 
     def recover_cb(self, req: EmptyRequest) -> EmptyResponse: # pylint: disable=no-self-use
@@ -657,10 +649,8 @@ class ROSRobot(rtb.ERobot):
         t = 0
         delta = 1/self.frequency
         
-        qfunc = interp1d(np.linspace(0, 1, traj.q.shape[0]), traj.q, axis=0)
-
         #Debugging Prints
-        print(f"Traj_Move Prints:\n\tDelta: {delta}\n\tMax Speed: {max_speed}")
+        #print(f"Traj_Move Prints:\n\tDelta: {delta}\n\tMax Speed: {max_speed}")
 
         # ------- Alternative TEST Method 12-11-21 --------------------------------------
         # This is the average cartesian speed we want the robot to move at
@@ -693,14 +683,14 @@ class ROSRobot(rtb.ERobot):
 
         # Obtain minimum jerk velocity profile of joints based on estimated end effector move time
         min_jerk_pos, min_jerk_vel = self.__mjtg(self.q, traj.q[-1], frequency, move_time)
-        print(f"Minimum Jerk (joint) Vel Profile lenght: {len(min_jerk_vel)}")
+        #print(f"Minimum Jerk (joint) Vel Profile lenght: {len(min_jerk_vel)}")
 
         # Calculate time frequency - based on the max time required for trajectory and the frequency of operation
         time_freq_steps = int(move_time * frequency)
 
-        print(f"current ee pose: {current_ee_pose}")
-        print(f"end ee pose: {end_ee_pose}")
-        print(f"Estimated linear time: {move_time} | time frequency steps: {time_freq_steps} given freq: {frequency}")
+        #print(f"current ee pose: {current_ee_pose}")
+        #print(f"end ee pose: {end_ee_pose}")
+        #print(f"Estimated linear time: {move_time} | time frequency steps: {time_freq_steps} given freq: {frequency}")
 
         #Time step initialise for trajectory
         time_step = 0
@@ -709,7 +699,7 @@ class ROSRobot(rtb.ERobot):
             # Check if we are close to goal state as an exit point
             # NOTE: this is based on the joint positions
             if np.all(np.fabs(traj.q[-1] - self.q) < 0.001):
-                print('Too close to goal, quitting movement...')
+                rospy.loginfo('Too close to goal, quitting movement...')
                 break
 
             # Compute current state jacobian
@@ -724,6 +714,9 @@ class ROSRobot(rtb.ERobot):
             #print(f"current joint velocities at {t}: {current_jv}")
             #print(f"Current cartesian velocity at {t}: {current_linear_vel}")
 
+            if np.any(current_jp > self.qlim[1]) or np.any(current_jp < self.qlim[0]):
+                print('VIOLANTION!!!')
+
             # Calculate required joint velocity at this point in time based on minimum jerk
             req_jv = min_jerk_vel[time_step]
             req_jp = min_jerk_pos[time_step]
@@ -732,7 +725,7 @@ class ROSRobot(rtb.ERobot):
             erro_jp = req_jp - current_jp
 
             if np.any(np.max(np.fabs(erro_jp)) > 0.5):
-                print('E:', erro_jp)
+                #print('E:', erro_jp)
                 self.preempt()
                 break
 
@@ -750,10 +743,10 @@ class ROSRobot(rtb.ERobot):
             self.event.wait()
         
         # Print of maximum twist velocity
-        if cartesian_ee_vel_vect:
-            print(f"End cartesian velocity: {current_linear_vel}")
-            print(f"Max twist velocity: {np.max(cartesian_ee_vel_vect)}")
-            print(f"Average twist velocity: {np.average(cartesian_ee_vel_vect)}")
+        # if cartesian_ee_vel_vect:
+        #     print(f"End cartesian velocity: {current_linear_vel}")
+        #     print(f"Max twist velocity: {np.max(cartesian_ee_vel_vect)}")
+        #     print(f"Average twist velocity: {np.average(cartesian_ee_vel_vect)}")
 
         self.j_v = [0] * self.n
 
