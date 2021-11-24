@@ -8,15 +8,22 @@ import timeit
 
 from typing import List, Any
 from threading import Lock, Event
+from numpy import linalg
+
+from spatialmath import quaternion
+from spatialmath.twist import Twist3
 
 import rospy
 import actionlib
 import tf
 import roboticstoolbox as rtb
 import spatialmath as sp
-from spatialmath import SE3, SO3, UnitQuaternion
+from spatialmath import SE3, SO3, UnitQuaternion, base
 import numpy as np
 import yaml
+
+from armer.timer import Timer
+from armer.utils import ikine, mjtg
 
 from scipy.interpolate import interp1d
 
@@ -24,7 +31,7 @@ from std_msgs.msg import Header
 from sensor_msgs.msg import JointState
 from geometry_msgs.msg import PoseStamped
 
-from geometry_msgs.msg import TwistStamped, Twist
+from geometry_msgs.msg import TwistStamped, Twist, Vector3Stamped, QuaternionStamped
 from std_srvs.srv import Empty, EmptyRequest, EmptyResponse
 
 from std_msgs.msg import Float64MultiArray
@@ -65,7 +72,14 @@ from armer_msgs.srv import RemoveNamedPoseConfig, \
     RemoveNamedPoseConfigResponse
 
 # pylint: disable=too-many-instance-attributes
+from spatialmath.base.argcheck import getvector
 
+import tf2_py
+import tf2_ros
+
+np.set_printoptions(precision=3)
+np.set_printoptions(suppress=True)
+            
 
 class ROSRobot(rtb.ERobot):
     """
@@ -297,6 +311,7 @@ class ROSRobot(rtb.ERobot):
             self.preempt()
 
         with self.lock:
+            self.preempted = False
             self.__vel_move(msg)
 
     def guarded_velocity_cb(self, msg: GuardedVelocityGoal) -> None:
@@ -304,6 +319,8 @@ class ROSRobot(rtb.ERobot):
             self.preempt()
         
         with self.lock:
+            self.preempted = False
+            
             start_time = timeit.default_timer()
             triggered = 0
             
@@ -353,21 +370,14 @@ class ROSRobot(rtb.ERobot):
 
             goal_pose = self.tf_listener.transformPose(
                 self.base_link.name,
-                goal_pose
+                goal_pose,
             )
+            
             pose = goal_pose.pose
-
-            target = SE3(pose.position.x, pose.position.y, pose.position.z) * UnitQuaternion([
-                pose.orientation.w,
-                pose.orientation.x,
-                pose.orientation.y,
-                pose.orientation.z
-            ]).SE3()
-
-            dq = self.ikine_LMS(target, q0=self.q) #), end=self.gripper)
-            traj = rtb.tools.trajectory.jtraj(self.q, dq.q, self.frequency)
-
-            if self.__traj_move(traj, goal.speed if goal.speed else 0.2):
+            
+            solution = ikine(self, pose, q0=self.q, end=self.gripper)
+            
+            if self.__traj_move(solution.q, goal.speed if goal.speed else 0.2):
                 self.pose_server.set_succeeded(MoveToPoseResult(success=True))
             else:
                 self.pose_server.set_aborted(MoveToPoseResult(success=False))
@@ -408,6 +418,7 @@ class ROSRobot(rtb.ERobot):
             arrived = False
 
             self.moving = True
+            self.preempted = False
 
             while not arrived and not self.preempted:
                 velocities, arrived = rtb.p_servo(
@@ -448,15 +459,9 @@ class ROSRobot(rtb.ERobot):
         if self.moving:
             self.preempt()
 
-        with self.lock:
-            traj = rtb.tools.trajectory.jtraj(
-                self.q,
-                np.array(goal.joints),
-                self.frequency,
-            )
-
-            if self.__traj_move(traj, goal.speed if goal.speed else 0.2):
-                self.named_pose_server.set_succeeded(
+        with self.lock:           
+            if self.__traj_move(goal.joints, goal.speed if goal.speed else 0.2):
+                self.joint_pose_server.set_succeeded(
                     MoveToJointPoseResult(success=True)
                 )
             else:
@@ -483,13 +488,9 @@ class ROSRobot(rtb.ERobot):
                     'Unknown named pose'
                 )
 
-            traj = rtb.tools.trajectory.jtraj(
-                self.q,
-                np.array(self.named_poses[goal.pose_name]),
-                100
-            )
+            dq = np.array(self.named_poses[goal.pose_name])
 
-            if self.__traj_move(traj, goal.speed if goal.speed else 0.2):
+            if self.__traj_move(dq, goal.speed if goal.speed else 0.2):
                 self.named_pose_server.set_succeeded(
                     MoveToNamedPoseResult(success=True)
                 )
@@ -510,12 +511,8 @@ class ROSRobot(rtb.ERobot):
             self.preempt()
 
         with self.lock:
-            traj = rtb.tools.trajectory.jtraj(
-                self.q,
-                self.qr if hasattr(self, 'qr') else self.q, # pylint: disable=no-member
-                self.frequency
-            )
-            self.__traj_move(traj, max_speed=0.2)
+            qd = self.qr if hasattr(self, 'qr') else self.q
+            self.__traj_move(qd, max_speed=0.5)
             return EmptyResponse()
 
     def recover_cb(self, req: EmptyRequest) -> EmptyResponse: # pylint: disable=no-self-use
@@ -555,18 +552,61 @@ class ROSRobot(rtb.ERobot):
         """
         # pylint: disable=unused-argument
         self.preempted = True
-        self.e_v *= 0
-        self.j_v *= 0
-        self.qd *= 0
+        self.last_update = 0
 
     def __vel_move(self, twist_stamped: TwistStamped) -> None:
         target: Twist = twist_stamped.twist
 
-        if twist_stamped.header.frame_id and twist_stamped.header.frame_id != self.base_link.name:
-            self.e_v_frame = twist_stamped.header.frame_id
-        else:
-            self.e_v_frame = None
+        if twist_stamped.header.frame_id == '':
+            twist_stamped.header.frame_id = self.base_link.name
 
+        # Transform given cartesian frame linear velocities (base) to requested frame
+        # Default to base frame if no requested frame is found (above)
+        # if twist_stamped.header.frame_id != self.base_link.name:
+        #     position, orientation = self.tf_listener.lookupTransform(
+        #         self.base_link.name,
+        #         twist_stamped.header.frame_id,
+        #         twist_stamped.header.stamp
+        #     )
+        
+        #     T = UnitQuaternion([
+        #         orientation[-1],
+        #         *orientation[:3]
+        #     ], norm=False, check=False).SE3()
+            
+        #     #print(f"target frame: {target}")
+        #     #print(f"rotational req: {e_v_frame_pos.R}")
+
+        #     twist = np.array([
+        #       target.linear.x,
+        #       target.linear.y,
+        #       target.linear.z,
+        #       target.angular.x,
+        #       target.angular.y,
+        #       target.angular.z,
+        #     ])
+        #     print(T)
+        #     M = SE3(*twist[:3], check=False) * SE3.RPY(twist[3:])
+        #     print(T @ M)
+        #     return
+
+        #     post_corr_e_v_linear = np.array([
+        #         target.linear.x,
+        #         target.linear.y,
+        #         target.linear.z
+        #     ])
+
+        #     corr_e_v_linear = e_v_frame_pos.R @ post_corr_e_v_linear
+
+        #     e_v = np.array([
+        #         corr_e_v_linear[0],# target.linear.x,
+        #         corr_e_v_linear[1],# target.linear.y,
+        #         corr_e_v_linear[2],# target.linear.z,
+        #         target.angular.x,
+        #         target.angular.y,
+        #         target.angular.z
+        #     ])
+        # # else:
         e_v = np.array([
             target.linear.x,
             target.linear.y,
@@ -575,15 +615,17 @@ class ROSRobot(rtb.ERobot):
             target.angular.y,
             target.angular.z
         ])
+        #------ END Updated Section ---------------------------------
 
         if np.any(e_v - self.e_v):
-            self.e_p = self.fkine(self.q, start=self.base_link, fast=True, end=self.gripper)
-
+            self.e_p = SE3(self.fkine(self.q, start=self.base_link, fast=True, end=self.gripper))
+        
         self.e_v = e_v
+        self.e_v_frame = twist_stamped.header.frame_id
 
         self.last_update = timeit.default_timer()
 
-    def __traj_move(self, traj: np.array, max_speed=0.2) -> bool:
+    def __traj_move(self, qd: np.array, max_speed=0.2, max_rot=0.5) -> bool:
         """[summary]
 
         :param traj: [description]
@@ -591,45 +633,113 @@ class ROSRobot(rtb.ERobot):
         :return: [description]
         :rtype: bool
         """
+        self.preempted = False
         self.moving = True
-
+        
         t = 0
         delta = 1/self.frequency
         
-        qfunc = interp1d(np.linspace(0, 1, traj.q.shape[0]), traj.q, axis=0)
- 
-        kP = 0.1
+        #Debugging Prints
+        #print(f"Traj_Move Prints:\n\tDelta: {delta}\n\tMax Speed: {max_speed}")
 
-        while t + delta < 1 and not self.preempted:
+        # ------- Alternative TEST Method 12-11-21 --------------------------------------
+        # This is the average cartesian speed we want the robot to move at
+        # NOTE: divided by 2 to make the max speed the approx. peak of the speed achieved
+        ave_cart_speed = max_speed / 2
+        # Frequency of operation - set by configuration file
+        frequency = self.frequency
+        # Calculate start and end pose linear distance to estimate the expected time
+        current_ee_mat = self.fkine(self.q, start=self.base_link, fast=True, end=self.gripper)
+        end_ee_mat = self.fkine(qd, start=self.base_link, fast=True, end=self.gripper)
+        current_ee_pose = current_ee_mat[:3, 3]
+        end_ee_pose = end_ee_mat[:3, 3]
 
-            # Too close to goal state
-            if np.all(np.fabs(qfunc(1) - self.q) < 0.005):
-                print('Too close to goal, quitting movement...')
+        # Estimation of time taken based on linear motion from current to end cartesian pose
+        # We may require some optimisation of this given the curved nature of the actual ee trajectory
+        linear_move_time = np.sqrt((end_ee_pose[0] - current_ee_pose[0])**2 +
+            (end_ee_pose[1] - current_ee_pose[1])**2 +
+            (end_ee_pose[2] - current_ee_pose[2])**2) / ave_cart_speed 
+
+        current_ee_rot = current_ee_mat[:3,:3]
+        end_ee_rot = end_ee_mat[:3,:3]
+
+        angular_move_time = np.arccos((np.trace(np.transpose(end_ee_rot) @ current_ee_rot) - 1) / 2) / max_rot
+
+        move_time = max(linear_move_time, angular_move_time)
+           
+        # Move time correction [currently un-used but requires optimisation]
+        # Correction to account for error in curved motion
+        move_time = move_time * 1.0
+
+        # Obtain minimum jerk velocity profile of joints based on estimated end effector move time
+        min_jerk_pos, min_jerk_vel = mjtg(self.q, qd, frequency, move_time)
+        #print(f"Minimum Jerk (joint) Vel Profile lenght: {len(min_jerk_vel)}")
+
+        # Calculate time frequency - based on the max time required for trajectory and the frequency of operation
+        time_freq_steps = int(move_time * frequency)
+
+        # print(f"current ee pose: {current_ee_pose}")
+        # print(f"end ee pose: {end_ee_pose}")
+        # print(f"Estimated linear time: {move_time} | time frequency steps: {time_freq_steps} given freq: {frequency}")
+
+        #Time step initialise for trajectory
+        time_step = 0
+        cartesian_ee_vel_vect = []
+
+        Kp = 1
+        Ki = 1
+        Kd = 1
+        
+        while t + delta < move_time and time_step < time_freq_steps-1 and not self.preempted:
+        
+            # Check if we are close to goal state as an exit point
+            # NOTE: this is based on the joint positions
+            if np.all(np.fabs(qd - self.q) < 0.001):
+                rospy.loginfo('Too close to goal, quitting movement...')
                 break
-            
-            jV = (qfunc(t + delta) - self.q) / delta #self.q) / delta
-            # jV = jV * kP
 
+            # Compute current state jacobian
             jacob0 = self.jacob0(self.q, fast=True, end=self.gripper)
 
-            T = jacob0 @ jV
-            V = np.linalg.norm(T[:3])
+            # Get current joint velocity and calculate current twist
+            current_jv = self.state.joint_velocities #elf.j_v
+            current_jp = self.state.joint_poses
+            current_twist = jacob0 @ current_jv
+            current_linear_vel = np.linalg.norm(current_twist[:3])
+            cartesian_ee_vel_vect.append(current_linear_vel)
+            #print(f"current joint velocities at {t}: {current_jv}")
+            #print(f"Current cartesian velocity at {t}: {current_linear_vel}")
+
+            # Calculate required joint velocity at this point in time based on minimum jerk
+            req_jv = min_jerk_vel[time_step]
+            req_jp = min_jerk_pos[time_step]
+            # Calculate error in joint velocities based on current and expected
+            erro_jv = req_jv - current_jv
+            erro_jp = req_jp - current_jp
+
+            if np.any(np.max(np.fabs(erro_jp)) > 0.5):
+                #print('E:', erro_jp)
+                self.preempt()
+                break
+
+            # Calculate corrected error based on error above
+            corr_jv = (current_jv + erro_jv * Kp + erro_jp * Ki)
+
+            # Increment time step(s)
+            time_step += 1  #Step value from calculated trajectory (minimum jerk)
+            t += delta  
             
-            time_scaling = 1
-
-            if V > max_speed:
-                T = T / V * max_speed
-                jV = (np.linalg.pinv(jacob0) @ T)
-
-                time_scaling = np.linalg.norm((jacob0 @ jV)[:3]) / V
-
-            t += delta * time_scaling
-
+            # Update of new expected joint velocities for low level controllers
             self.event.clear()
-            self.j_v = jV
+            self.j_v = corr_jv
             self.last_update = timeit.default_timer()
             self.event.wait()
-
+        
+        # Print of maximum twist velocity
+        # if cartesian_ee_vel_vect:
+        #     print(f"End cartesian velocity: {current_linear_vel}")
+        #     print(f"Max twist velocity: {np.max(cartesian_ee_vel_vect)}")
+        #     print(f"Average twist velocity: {np.average(cartesian_ee_vel_vect)}")
         self.j_v = [0] * self.n
 
         self.moving = False
@@ -655,7 +765,7 @@ class ROSRobot(rtb.ERobot):
         pose_stamped = PoseStamped()
         pose_stamped.header = header
 
-        translation = ee_pose[:3, 3]
+        translation = ee_pose[:3, 3]    
         pose_stamped.pose.position.x = translation[0]
         pose_stamped.pose.position.y = translation[1]
         pose_stamped.pose.position.z = translation[2]
@@ -837,34 +947,59 @@ class ROSRobot(rtb.ERobot):
         current_time = timeit.default_timer()
         self.state = self.get_state()
 
+        if self.state.errors != 0:
+            self.preempt()
+
         # calculate joint velocities from desired cartesian velocity
         if any(self.e_v):
             if current_time - self.last_update > 0.1:
                 self.e_v *= 0.9 if np.sum(np.absolute(self.e_v)
                                           ) >= 0.0001 else 0
 
-            p = self.e_p[:3, 3] + self.e_v[:3] * dt
-            R = SO3(self.e_p[:3, :3]) * SO3.EulerVec(self.e_v[3:] * dt)
-            
-            T = SE3.Rt(R, p)
+            try:
+              _, orientation = self.tf_listener.lookupTransform(
+                  self.base_link.name,
+                  self.e_v_frame,
+                  rospy.Time(0)
+              )
+              
+              U = UnitQuaternion([
+                  orientation[-1],
+                  *orientation[:3]
+              ], norm=True, check=False).SE3()
+              
+              e_v = np.concatenate((
+                (U.A @ np.concatenate((self.e_v[:3], [1]), axis=0))[:3],
+                (U.A @ np.concatenate((self.e_v[3:], [1]), axis=0))[:3]
+              ), axis=0)
 
-            Tactual = SE3(self.fkine(self.q, start=self.base_link, fast=True, end=self.gripper))
-            T = SE3.Rt(R, p)
-
-            delta = Tactual.delta(T)
-            e_v = self.e_v + delta
-            
-            self.j_v = np.linalg.pinv(
+              # Calculate error in base frame
+              p = self.e_p.A[:3, 3] + e_v[:3] * dt                     # expected position
+              
+              Rq = UnitQuaternion(self.e_p.R) * UnitQuaternion.RPY(e_v[3:] * dt)
+              
+              T = SE3.Rt(SO3(Rq.R), p, check=False)   # expected pose
+              Tactual = SE3(self.fkine(self.q, start=self.base_link, fast=True, end=self.gripper), check=False) # actual pose
+              
+              error = np.concatenate((p - Tactual.t, np.array([0,0,0])), axis=0)
+              
+              e_v = e_v + error
+              
+              self.e_p = T
+              
+              self.j_v = np.linalg.pinv(
                 self.jacob0(self.q, fast=True, end=self.gripper)) @ e_v
-
-            self.e_p = SE3.Rt(R, t=p).A
+              
+            except (tf.LookupException, tf2_ros.ExtrapolationException):
+              rospy.logwarn('No valid transform found between %s and %s', self.base_link.name, self.e_v_frame)
+              self.preempt()
 
         # apply desired joint velocity to robot
         if any(self.j_v):
             if current_time - self.last_update > 0.1:
                 self.j_v *= 0.9 if np.sum(np.absolute(self.j_v)
                                           ) >= 0.0001 else 0
-
+            
         self.qd = self.j_v
         self.last_tick = current_time
 
