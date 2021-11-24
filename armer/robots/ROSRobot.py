@@ -560,53 +560,6 @@ class ROSRobot(rtb.ERobot):
         if twist_stamped.header.frame_id == '':
             twist_stamped.header.frame_id = self.base_link.name
 
-        # Transform given cartesian frame linear velocities (base) to requested frame
-        # Default to base frame if no requested frame is found (above)
-        # if twist_stamped.header.frame_id != self.base_link.name:
-        #     position, orientation = self.tf_listener.lookupTransform(
-        #         self.base_link.name,
-        #         twist_stamped.header.frame_id,
-        #         twist_stamped.header.stamp
-        #     )
-        
-        #     T = UnitQuaternion([
-        #         orientation[-1],
-        #         *orientation[:3]
-        #     ], norm=False, check=False).SE3()
-            
-        #     #print(f"target frame: {target}")
-        #     #print(f"rotational req: {e_v_frame_pos.R}")
-
-        #     twist = np.array([
-        #       target.linear.x,
-        #       target.linear.y,
-        #       target.linear.z,
-        #       target.angular.x,
-        #       target.angular.y,
-        #       target.angular.z,
-        #     ])
-        #     print(T)
-        #     M = SE3(*twist[:3], check=False) * SE3.RPY(twist[3:])
-        #     print(T @ M)
-        #     return
-
-        #     post_corr_e_v_linear = np.array([
-        #         target.linear.x,
-        #         target.linear.y,
-        #         target.linear.z
-        #     ])
-
-        #     corr_e_v_linear = e_v_frame_pos.R @ post_corr_e_v_linear
-
-        #     e_v = np.array([
-        #         corr_e_v_linear[0],# target.linear.x,
-        #         corr_e_v_linear[1],# target.linear.y,
-        #         corr_e_v_linear[2],# target.linear.z,
-        #         target.angular.x,
-        #         target.angular.y,
-        #         target.angular.z
-        #     ])
-        # # else:
         e_v = np.array([
             target.linear.x,
             target.linear.y,
@@ -615,7 +568,6 @@ class ROSRobot(rtb.ERobot):
             target.angular.y,
             target.angular.z
         ])
-        #------ END Updated Section ---------------------------------
 
         if np.any(e_v - self.e_v):
             self.e_p = SE3(self.fkine(self.q, start=self.base_link, fast=True, end=self.gripper))
