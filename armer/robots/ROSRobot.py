@@ -374,10 +374,10 @@ class ROSRobot(rtb.ERobot):
             )
             
             pose = goal_pose.pose
-
-            dq = ikine(self, pose, q0=self.q, end=self.gripper)
             
-            if self.__traj_move(dq, goal.speed if goal.speed else 0.2):
+            solution = ikine(self, pose, q0=self.q, end=self.gripper)
+            
+            if self.__traj_move(solution.q, goal.speed if goal.speed else 0.2):
                 self.pose_server.set_succeeded(MoveToPoseResult(success=True))
             else:
                 self.pose_server.set_aborted(MoveToPoseResult(success=False))
@@ -678,9 +678,9 @@ class ROSRobot(rtb.ERobot):
         # Calculate time frequency - based on the max time required for trajectory and the frequency of operation
         time_freq_steps = int(move_time * frequency)
 
-        #print(f"current ee pose: {current_ee_pose}")
-        #print(f"end ee pose: {end_ee_pose}")
-        #print(f"Estimated linear time: {move_time} | time frequency steps: {time_freq_steps} given freq: {frequency}")
+        # print(f"current ee pose: {current_ee_pose}")
+        # print(f"end ee pose: {end_ee_pose}")
+        # print(f"Estimated linear time: {move_time} | time frequency steps: {time_freq_steps} given freq: {frequency}")
 
         #Time step initialise for trajectory
         time_step = 0
@@ -689,8 +689,9 @@ class ROSRobot(rtb.ERobot):
         Kp = 1
         Ki = 1
         Kd = 1
-
+        
         while t + delta < move_time and time_step < time_freq_steps-1 and not self.preempted:
+        
             # Check if we are close to goal state as an exit point
             # NOTE: this is based on the joint positions
             if np.all(np.fabs(qd - self.q) < 0.001):
@@ -739,7 +740,6 @@ class ROSRobot(rtb.ERobot):
         #     print(f"End cartesian velocity: {current_linear_vel}")
         #     print(f"Max twist velocity: {np.max(cartesian_ee_vel_vect)}")
         #     print(f"Average twist velocity: {np.average(cartesian_ee_vel_vect)}")
-
         self.j_v = [0] * self.n
 
         self.moving = False
@@ -999,13 +999,6 @@ class ROSRobot(rtb.ERobot):
             if current_time - self.last_update > 0.1:
                 self.j_v *= 0.9 if np.sum(np.absolute(self.j_v)
                                           ) >= 0.0001 else 0
-
-        J = self.jacob0(self.q + self.j_v, fast=True, end=self.gripper)
-        S = np.linalg.det(J @ J.T)
-            
-        # Stop near singularities
-        if S < 0.000001:
-            self.preempt()
             
         self.qd = self.j_v
         self.last_tick = current_time

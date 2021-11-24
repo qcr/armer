@@ -19,17 +19,18 @@ def ikine(robot, target, q0, end):
     ik_solver = IK(robot.base_link.name,
                    end,
                    timeout=0.1,
+                   urdf_string=robot.urdf_string,
                    solve_type='Manipulation1')
     
     ik_solver.set_joint_limits(*robot.qlim)
-
+    
     sol = ik_solver.get_ik(q0,
                         target.position.x, target.position.y, target.position.z,
                         target.orientation.x, target.orientation.y, target.orientation.z, target.orientation.w,
                         bx, by, bz,
                         brx, bry, brz)
 
-    return type('obj', (object,), {'q' : sol})
+    return type('obj', (object,), {'q' : np.array(sol)})
     
 
 
