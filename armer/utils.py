@@ -14,7 +14,7 @@ from trac_ik_python.trac_ik import IK
 
 def ikine(robot, target, q0, end):
     bx = by = bz = 0.001
-    brx = bry = brz = 0.1
+    brx = bry = brz = 0.01
     
     ik_solver = IK(robot.base_link.name,
                    end,
