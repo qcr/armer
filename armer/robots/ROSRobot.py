@@ -143,11 +143,7 @@ class ROSRobot(rtb.ERobot):
             shape=(len(self.q),)
         )  # expected joint velocity
 
-        self.e_p = self.fkine(
-            self.q, 
-            start=self.base_link, 
-            end=self.gripper
-        ) # measured end-effector position
+        self.e_p = None
 
         self.last_update: float = 0
         self.last_tick: float = 0
@@ -552,6 +548,7 @@ class ROSRobot(rtb.ERobot):
         """
         # pylint: disable=unused-argument
         self.preempted = True
+        self.e_p = None
         self.last_update = 0
 
     def __vel_move(self, twist_stamped: TwistStamped) -> None:
@@ -903,7 +900,7 @@ class ROSRobot(rtb.ERobot):
             self.preempt()
 
         # calculate joint velocities from desired cartesian velocity
-        if any(self.e_v):
+        if self.e_p is not None:
             if current_time - self.last_update > 0.1:
                 self.e_v *= 0.9 if np.sum(np.absolute(self.e_v)
                                           ) >= 0.0001 else 0
