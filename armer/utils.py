@@ -37,24 +37,25 @@ def ikine(robot, target, q0, end):
     # Temp addition of minimum jerk trajectory calculator
     # Reference: https://mika-s.github.io/python/control-theory/trajectory-generation/2017/12/06/trajectory-generation-with-a-minimum-jerk-trajectory.html
 def mjtg(current, setpoint, frequency, move_time):
-    trajectory = []
-    trajectory_derivative = []
+    q = []
+    qd = []
+    
     timefreq = int(move_time * frequency)
 
     for time in range(1, timefreq):
-        trajectory.append(
+        q.append(
             current + (setpoint - current) *
             (10.0 * (time/timefreq)**3
             - 15.0 * (time/timefreq)**4
             + 6.0 * (time/timefreq)**5))
 
-        trajectory_derivative.append(
+        qd.append(
             frequency * (1.0/timefreq) * (setpoint - current) *
             (30.0 * (time/timefreq)**2.0
             - 60.0 * (time/timefreq)**3.0
             + 30.0 * (time/timefreq)**4.0))
 
-    return trajectory, trajectory_derivative
+    return q, qd
 
 def populate_transform_stamped(parent_name: str, link_name: str, transform: np.array):
     """

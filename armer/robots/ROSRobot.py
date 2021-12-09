@@ -99,6 +99,9 @@ class ROSRobot(rtb.ERobot):
                  readonly=False,
                  gripper=None,
                  frequency=None,
+                 Kp=None,
+                 Ki=None,
+                 Kd=None,
                  * args,
                  **kwargs):  # pylint: disable=unused-argument
 
@@ -149,6 +152,10 @@ class ROSRobot(rtb.ERobot):
         )  # expected joint velocity
 
         self.e_p = SE3(self.fkine(self.q, start=self.base_link, fast=True, end=self.gripper))
+
+        self.Kp: float = Kp if Kp else 0.0
+        self.Ki: float = Ki if Ki else 0.0
+        self.Kd: float = Kd if Kd else 0.0
 
         self.last_update: float = 0
         self.last_tick: float = 0
@@ -281,6 +288,18 @@ class ROSRobot(rtb.ERobot):
                 GetNamedPoseConfigs,
                 self.get_named_pose_configs_cb
             )
+
+            rospy.Subscriber(
+                '{}/set_pid'.format(self.name.lower()),
+                Float64MultiArray,
+                self.set_pid
+            )
+
+    def set_pid(self, msg):
+        self.Kp = msg.data[0]
+        self.Ki = msg.data[1]
+        self.Kd = msg.data[2]
+
 
     def close(self):
         """
@@ -640,10 +659,8 @@ class ROSRobot(rtb.ERobot):
         #Time step initialise for trajectory
         time_step = 0
         cartesian_ee_vel_vect = []
-
-        Kp = 1
-        Ki = 1
-        Kd = 1
+        
+        last_erro_jv = np.array([0] * self.n)
 
         while move_time > 0.1 and t + delta < move_time and time_step < time_freq_steps-1 and not self.preempted:
 
@@ -678,7 +695,10 @@ class ROSRobot(rtb.ERobot):
                 break
 
             # Calculate corrected error based on error above
-            corr_jv = (current_jv + erro_jv * Kp + erro_jp * Ki)
+            print('Kp:', self.Kp, 'Ki:', self.Ki, 'Kd:', self.Kd)
+            corr_jv = req_jv + (erro_jv * self.Kp) + (erro_jp * self.Ki) + (((erro_jv - last_erro_jv) / delta) * self.Kd)
+            print(req_jv)
+            last_erro_jv = erro_jv
 
             # Increment time step(s)
             time_step += 1  #Step value from calculated trajectory (minimum jerk)
