@@ -25,21 +25,21 @@ jobs:
     #   run: |
     #     pip install -e .[dev]
     #     pylint `find .| grep .py$ | xargs`
-    - name: Install ROS
-      uses: suddrey-qut/setup-ros@master
-      with:
-        required-ros-distributions: ${{ matrix.ros-distro }}
-    - name: ROSDep Install
-      run: |
-        source /opt/ros/${{ matrix.ros-distro }}/setup.bash && rosdep update
-        source /opt/ros/${{ matrix.ros-distro }}/setup.bash && rosdep install --from-paths . --ignore-src -r -y
-    - name: Test with pytest
-      run: |
-        pip install pytest-timeout
-        source /opt/ros/${{ matrix.ros-distro }}/setup.bash && PYTHONPATH=$PYTHONPATH:/usr/lib/$(python --version | sed 's/Python \([0-9]\.[0-9]\).*/python\1/')/dist-packages:/usr/lib/$(python --version | sed 's/Python \([0-9]\)\.[0-9].*/python\1/')/dist-packages pytest --cov=armer --cov-report xml:coverage.xml --timeout=30 --timeout_method thread -s
-        coverage report
-    - name: upload coverage to Codecov
-      uses: codecov/codecov-action@master
-      with:
-        file: ./coverage.xml
+    # - name: Install ROS
+    #   uses: suddrey-qut/setup-ros@master
+    #   with:
+    #     required-ros-distributions: ${{ matrix.ros-distro }}
+    # - name: ROSDep Install
+    #   run: |
+    #     source /opt/ros/${{ matrix.ros-distro }}/setup.bash && rosdep update
+    #     source /opt/ros/${{ matrix.ros-distro }}/setup.bash && rosdep install --from-paths . --ignore-src -r -y
+    # - name: Test with pytest
+    #   run: |
+    #     pip install pytest-timeout
+    #     source /opt/ros/${{ matrix.ros-distro }}/setup.bash && PYTHONPATH=$PYTHONPATH:/usr/lib/$(python --version | sed 's/Python \([0-9]\.[0-9]\).*/python\1/')/dist-packages:/usr/lib/$(python --version | sed 's/Python \([0-9]\)\.[0-9].*/python\1/')/dist-packages pytest --cov=armer --cov-report xml:coverage.xml --timeout=30 --timeout_method thread -s
+    #     coverage report
+    # - name: upload coverage to Codecov
+    #   uses: codecov/codecov-action@master
+    #   with:
+    #     file: ./coverage.xml
         
