@@ -578,7 +578,7 @@ class ROSRobot(rtb.ERobot):
             target.angular.z
         ])
 
-        if np.any(e_v - self.e_v):
+        if np.any(e_v - self.e_v) or self.control_mode == ControlMode.JOINTS:
             self.e_p = SE3(self.fkine(self.q, start=self.base_link, fast=True, end=self.gripper))
 
         self.e_v = e_v
