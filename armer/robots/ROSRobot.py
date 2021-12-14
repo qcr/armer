@@ -8,10 +8,6 @@ import timeit
 
 from typing import List, Any
 from threading import Lock, Event
-from numpy import linalg
-
-from spatialmath import quaternion
-from spatialmath.twist import Twist3
 
 import rospy
 import actionlib
@@ -22,10 +18,7 @@ from spatialmath import SE3, SO3, UnitQuaternion, base
 import numpy as np
 import yaml
 
-from armer.timer import Timer
 from armer.utils import ikine, mjtg
-
-from scipy.interpolate import interp1d
 
 from std_msgs.msg import Header
 from sensor_msgs.msg import JointState
@@ -72,13 +65,8 @@ from armer_msgs.srv import RemoveNamedPoseConfig, \
     RemoveNamedPoseConfigResponse
 
 # pylint: disable=too-many-instance-attributes
-from spatialmath.base.argcheck import getvector
 
-import tf2_py
 import tf2_ros
-
-np.set_printoptions(precision=3)
-np.set_printoptions(suppress=True)
 
 class ControlMode:
    JOINTS=1
@@ -121,7 +109,7 @@ class ROSRobot(rtb.ERobot):
 
         self.joint_indexes = []
         self.joint_names = list(map(lambda link: link._joint_name, filter(lambda link: link.isjoint, sorted_links)))
-
+        
         if origin:
             self.base = SE3(origin[:3]) @ SE3.RPY(origin[3:])
 
@@ -613,10 +601,6 @@ class ROSRobot(rtb.ERobot):
         t = 0
         delta = 1/self.frequency
 
-        #Debugging Prints
-        #print(f"Traj_Move Prints:\n\tDelta: {delta}\n\tMax Speed: {max_speed}")
-
-        # ------- Alternative TEST Method 12-11-21 --------------------------------------
         # This is the average cartesian speed we want the robot to move at
         # NOTE: divided by 2 to make the max speed the approx. peak of the speed achieved
         ave_cart_speed = max_speed / 2
@@ -647,18 +631,12 @@ class ROSRobot(rtb.ERobot):
 
         # Obtain minimum jerk velocity profile of joints based on estimated end effector move time
         min_jerk_pos, min_jerk_vel = mjtg(self.q, qd, frequency, move_time)
-        #print(f"Minimum Jerk (joint) Vel Profile lenght: {len(min_jerk_vel)}")
 
         # Calculate time frequency - based on the max time required for trajectory and the frequency of operation
         time_freq_steps = int(move_time * frequency)
 
-        # print(f"current ee pose: {current_ee_pose}")
-        # print(f"end ee pose: {end_ee_pose}")
-        # print(f"Estimated linear time: {move_time} | time frequency steps: {time_freq_steps} given freq: {frequency}")
-
         #Time step initialise for trajectory
         time_step = 0
-        cartesian_ee_vel_vect = []
         
         last_erro_jv = np.array([0] * self.n)
 
@@ -670,34 +648,24 @@ class ROSRobot(rtb.ERobot):
                 rospy.loginfo('Too close to goal, quitting movement...')
                 break
 
-            # Compute current state jacobian
-            jacob0 = self.jacob0(self.q, fast=True, end=self.gripper)
-
             # Get current joint velocity and calculate current twist
             current_jv = self.state.joint_velocities #elf.j_v
             current_jp = self.state.joint_poses
-            current_twist = jacob0 @ current_jv
-            current_linear_vel = np.linalg.norm(current_twist[:3])
-            cartesian_ee_vel_vect.append(current_linear_vel)
-            #print(f"current joint velocities at {t}: {current_jv}")
-            #print(f"Current cartesian velocity at {t}: {current_linear_vel}")
 
             # Calculate required joint velocity at this point in time based on minimum jerk
             req_jv = min_jerk_vel[time_step]
             req_jp = min_jerk_pos[time_step]
+            
             # Calculate error in joint velocities based on current and expected
             erro_jv = req_jv - current_jv
             erro_jp = req_jp - current_jp
 
             if np.any(np.max(np.fabs(erro_jp)) > 0.5):
-                #print('E:', erro_jp)
                 self.preempt()
                 break
 
             # Calculate corrected error based on error above
-            print('Kp:', self.Kp, 'Ki:', self.Ki, 'Kd:', self.Kd)
             corr_jv = req_jv + (erro_jv * self.Kp) + (erro_jp * self.Ki) + (((erro_jv - last_erro_jv) / delta) * self.Kd)
-            print(req_jv)
             last_erro_jv = erro_jv
 
             # Increment time step(s)
@@ -710,11 +678,6 @@ class ROSRobot(rtb.ERobot):
             self.last_update = timeit.default_timer()
             self.event.wait()
         
-        # Print of maximum twist velocity
-        # if cartesian_ee_vel_vect:
-        #     print(f"End cartesian velocity: {current_linear_vel}")
-        #     print(f"Max twist velocity: {np.max(cartesian_ee_vel_vect)}")
-        #     print(f"Average twist velocity: {np.average(cartesian_ee_vel_vect)}")
         self.j_v = [0] * self.n
 
         self.moving = False
@@ -932,7 +895,6 @@ class ROSRobot(rtb.ERobot):
                                           ) >= 0.0001 else 0
 
                 if np.all(self.e_v == 0):
-                    print('Exiting motion')
                     self.control_mode = ControlMode.JOINTS
 
             try:
@@ -946,31 +908,26 @@ class ROSRobot(rtb.ERobot):
                   orientation[-1],
                   *orientation[:3]
               ], norm=True, check=False).SE3()
-              #print(U.A)
+              
               e_v = np.concatenate((
                 (U.A @ np.concatenate((self.e_v[:3], [1]), axis=0))[:3],
                 (U.A @ np.concatenate((self.e_v[3:], [1]), axis=0))[:3]
               ), axis=0)
-              #print(e_v)
+              
               # Calculate error in base frame
               p = self.e_p.A[:3, 3] + e_v[:3] * dt                     # expected position
               Rq = UnitQuaternion.RPY(e_v[3:] * dt) * UnitQuaternion(self.e_p.R)
               
               T = SE3.Rt(SO3(Rq.R), p, check=False)   # expected pose
               Tactual = SE3(self.fkine(self.q, start=self.base_link, fast=True, end=self.gripper), check=False) # actual pose
-              print('Expected:', T.rpy())
-              print('Actual:', Tactual.rpy())
+              
               e_rot = (SO3(T.R @ np.linalg.pinv(Tactual.R), check=False).rpy() + np.pi) % (2*np.pi) - np.pi
-              #print(e_rot)
               error = np.concatenate((p - Tactual.t, e_rot), axis=0)
               
-              e_v = e_v + error * 0.5
-              #(error[3:] + np.pi) % (2*np.pi) - np.pi
-
-              print(error[3:])
+              e_v = e_v + error
               
               self.e_p = T
-              
+                            
               self.j_v = np.linalg.pinv(
                 self.jacob0(self.q, fast=True, end=self.gripper)) @ e_v
               
