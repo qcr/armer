@@ -8,7 +8,7 @@ import timeit
 
 from typing import List, Any
 from threading import Lock, Event
-
+from armer.timer import Timer
 import rospy
 import actionlib
 import tf
@@ -595,11 +595,14 @@ class ROSRobot(rtb.ERobot):
         :return: [description]
         :rtype: bool
         """
+
+        if len(self.state.joint_poses) == 0:
+          return False
+
         self.preempted = False
         self.moving = True
 
         t = 0
-        delta = 1/self.frequency
 
         # This is the average cartesian speed we want the robot to move at
         # NOTE: divided by 2 to make the max speed the approx. peak of the speed achieved
@@ -639,9 +642,11 @@ class ROSRobot(rtb.ERobot):
         time_step = 0
         
         last_erro_jv = np.array([0] * self.n)
+        
+        delta = 1/frequency
+        last_time = rospy.Time.now().to_sec()
 
         while move_time > 0.1 and t + delta < move_time and time_step < time_freq_steps-1 and not self.preempted:
-
             # Check if we are close to goal state as an exit point
             # NOTE: this is based on the joint positions
             if np.all(np.fabs(qd - self.q) < 0.01):
@@ -667,16 +672,18 @@ class ROSRobot(rtb.ERobot):
             # Calculate corrected error based on error above
             corr_jv = req_jv + (erro_jv * self.Kp) + (erro_jp * self.Ki) + (((erro_jv - last_erro_jv) / delta) * self.Kd)
             last_erro_jv = erro_jv
-
-            # Increment time step(s)
-            time_step += 1  #Step value from calculated trajectory (minimum jerk)
-            t += delta  
             
             # Update of new expected joint velocities for low level controllers
             self.event.clear()
             self.j_v = corr_jv
             self.last_update = timeit.default_timer()
             self.event.wait()
+
+            # Increment time step(s)
+            time_step += 1  #Step value from calculated trajectory (minimum jerk)
+            delta = rospy.Time.now().to_sec() - last_time
+            last_time = rospy.Time.now().to_sec()
+            t += delta  
         
         self.j_v = [0] * self.n
 
