@@ -87,6 +87,7 @@ class ROSRobot(rtb.ERobot):
                  readonly=False,
                  gripper=None,
                  frequency=None,
+                 modified_qr=None,
                  Kp=None,
                  Ki=None,
                  Kd=None,
@@ -116,6 +117,10 @@ class ROSRobot(rtb.ERobot):
         self.frequency = frequency if frequency else rospy.get_param(joint_state_topic + '/frequency', 500)
         
         self.q = self.qr if hasattr(self, 'qr') else self.q # pylint: disable=no-member
+        if modified_qr:
+            self.qr = modified_qr
+            self.q = modified_qr
+
         self.joint_states = None # Joint state message
 
         # Guards used to prevent multiple motion requests conflicting
