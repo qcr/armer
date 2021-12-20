@@ -308,7 +308,7 @@ class ROSRobot(rtb.ERobot):
             for joint_name in self.joint_names:
                 self.joint_indexes.append(msg.name.index(joint_name))
         
-        self.q = np.array(msg.position)[self.joint_indexes] if len(msg.position) == self.n else [0] * self.n
+        self.q = np.array(msg.position)[self.joint_indexes] if len(msg.position) == self.n else np.zeros(self.n)
         self.joint_states = msg
         
     def velocity_cb(self, msg: TwistStamped) -> None:
@@ -618,19 +618,28 @@ class ROSRobot(rtb.ERobot):
         current_ee_mat = self.fkine(self.q, start=self.base_link, fast=True, end=self.gripper)
         end_ee_mat = self.fkine(qd, start=self.base_link, fast=True, end=self.gripper)
         current_ee_pose = current_ee_mat[:3, 3]
-        end_ee_pose = end_ee_mat[:3, 3]
-
+        
+        mid_ee_mat = self.fkine(qd - (self.qd - self.q) / 2, start=self.base_link, fast=True, end=self.gripper)
+        mid_ee_pose = mid_ee_mat[:3, 3]
         # Estimation of time taken based on linear motion from current to end cartesian pose
         # We may require some optimisation of this given the curved nature of the actual ee trajectory
-        linear_move_time = np.sqrt((end_ee_pose[0] - current_ee_pose[0])**2 +
-            (end_ee_pose[1] - current_ee_pose[1])**2 +
-            (end_ee_pose[2] - current_ee_pose[2])**2) / ave_cart_speed 
+        
+        linear_move_time = np.sqrt((mid_ee_pose[0] - current_ee_pose[0])**2 +
+            (mid_ee_pose[1] - current_ee_pose[1])**2 +
+            (mid_ee_pose[2] - current_ee_pose[2])**2) * 2 / ave_cart_speed
 
         current_ee_rot = current_ee_mat[:3,:3]
         end_ee_rot = end_ee_mat[:3,:3]
 
-        angular_move_time = np.arccos((np.trace(np.transpose(end_ee_rot) @ current_ee_rot) - 1) / 2) / max_rot
+        # print('Joint Distance:', self.qd - self.q)
+        # D = self.jacob0(self.q, fast=True, end=self.gripper) @ (self.qd - self.q)
+        # Dn = np.linalg.norm(D[:3]) / max_speed
+        # print('Distance:', D[:3])
+        # print('Distance (norm):', np.linalg.norm(D[:3]))
+        # print('Max speed:', Dn)
 
+        angular_move_time = np.arccos((np.trace(np.transpose(end_ee_rot) @ current_ee_rot) - 1) / 2) / max_rot
+        print(angular_move_time, linear_move_time)
         move_time = max(linear_move_time, angular_move_time)
 
         # Move time correction [currently un-used but requires optimisation]
@@ -645,8 +654,9 @@ class ROSRobot(rtb.ERobot):
 
         #Time step initialise for trajectory
         time_step = 0
-        
-        last_erro_jv = np.array([0] * self.n)
+        cartesian_ee_vel_vect = []
+
+        last_erro_jv = np.zeros(self.n)
         
         delta = 1/frequency
         last_time = rospy.Time.now().to_sec()
@@ -658,9 +668,16 @@ class ROSRobot(rtb.ERobot):
                 rospy.loginfo('Too close to goal, quitting movement...')
                 break
 
+            # Compute current state jacobian
+            jacob0 = self.jacob0(self.q, fast=True, end=self.gripper)
+
             # Get current joint velocity and calculate current twist
             current_jv = self.state.joint_velocities #elf.j_v
             current_jp = self.state.joint_poses
+
+            current_twist = jacob0 @ current_jv
+            current_linear_vel = np.linalg.norm(current_twist[:3])
+            cartesian_ee_vel_vect.append(current_linear_vel)
 
             # Calculate required joint velocity at this point in time based on minimum jerk
             req_jv = min_jerk_vel[time_step]
@@ -690,7 +707,12 @@ class ROSRobot(rtb.ERobot):
             last_time = rospy.Time.now().to_sec()
             t += delta  
         
-        self.j_v = [0] * self.n
+        # Print of maximum twist velocity
+        if cartesian_ee_vel_vect:
+            print(f"End cartesian velocity: {current_linear_vel}")
+            print(f"Max twist velocity: {np.max(cartesian_ee_vel_vect)}")
+            print(f"Average twist velocity: {np.average(cartesian_ee_vel_vect)}")
+        self.j_v = np.zeros(self.n)
 
         self.moving = False
         result = not self.preempted
@@ -754,7 +776,7 @@ class ROSRobot(rtb.ERobot):
         else:
             state.joint_poses = list(self.q)
             state.joint_velocities = list(self.qd)
-            state.joint_torques = [0] * self.n
+            state.joint_torques = np.zeros(self.n)
         
         return state
 

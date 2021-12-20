@@ -13,22 +13,18 @@ import roboticstoolbox as rtb
 from trac_ik_python.trac_ik import IK
 
 def ikine(robot, target, q0, end):
-    bx = by = bz = 0.001
-    brx = bry = brz = 0.01
-    
+   
     ik_solver = IK(robot.base_link.name,
                    end,
                    timeout=0.1,
                    urdf_string=robot.urdf_string,
-                   solve_type='Manipulation1')
+                   solve_type='Manipulation2')
     
     ik_solver.set_joint_limits(*robot.qlim)
     
     sol = ik_solver.get_ik(q0,
                         target.position.x, target.position.y, target.position.z,
-                        target.orientation.x, target.orientation.y, target.orientation.z, target.orientation.w,
-                        bx, by, bz,
-                        brx, bry, brz)
+                        target.orientation.x, target.orientation.y, target.orientation.z, target.orientation.w)
 
     return type('obj', (object,), {'q' : np.array(sol)})
     
