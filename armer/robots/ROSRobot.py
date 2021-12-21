@@ -614,19 +614,30 @@ class ROSRobot(rtb.ERobot):
         ave_cart_speed = max_speed / 2
         # Frequency of operation - set by configuration file
         frequency = self.frequency
+
+        def wrap(r):
+           return (r + np.pi) % (2*np.pi) - np.pi
+           
         # Calculate start and end pose linear distance to estimate the expected time
         current_ee_mat = self.fkine(self.q, start=self.base_link, fast=True, end=self.gripper)
+        mid_ee_mat = self.fkine(qd - (qd - self.q) / 2, start=self.base_link, fast=True, end=self.gripper)
         end_ee_mat = self.fkine(qd, start=self.base_link, fast=True, end=self.gripper)
-        current_ee_pose = current_ee_mat[:3, 3]
         
-        mid_ee_mat = self.fkine(qd - (self.qd - self.q) / 2, start=self.base_link, fast=True, end=self.gripper)
+        current_ee_pose = current_ee_mat[:3, 3]
         mid_ee_pose = mid_ee_mat[:3, 3]
+        end_ee_pose = end_ee_mat[:3, 3]
+        
         # Estimation of time taken based on linear motion from current to end cartesian pose
         # We may require some optimisation of this given the curved nature of the actual ee trajectory
-        
-        linear_move_time = np.sqrt((mid_ee_pose[0] - current_ee_pose[0])**2 +
+        D1 = np.sqrt((mid_ee_pose[0] - current_ee_pose[0])**2 +
             (mid_ee_pose[1] - current_ee_pose[1])**2 +
-            (mid_ee_pose[2] - current_ee_pose[2])**2) * 2 / ave_cart_speed
+            (mid_ee_pose[2] - current_ee_pose[2])**2)
+        
+        D2 = np.sqrt((end_ee_pose[0] - mid_ee_pose[0])**2 +
+            (end_ee_pose[1] - mid_ee_pose[1])**2 +
+            (end_ee_pose[2] - mid_ee_pose[2])**2)
+
+        linear_move_time = (D1 + D2) / ave_cart_speed
 
         current_ee_rot = current_ee_mat[:3,:3]
         end_ee_rot = end_ee_mat[:3,:3]
@@ -639,9 +650,8 @@ class ROSRobot(rtb.ERobot):
         # print('Max speed:', Dn)
 
         angular_move_time = np.arccos((np.trace(np.transpose(end_ee_rot) @ current_ee_rot) - 1) / 2) / max_rot
-        # print(angular_move_time, linear_move_time)
         move_time = max(linear_move_time, angular_move_time)
-
+        
         # Move time correction [currently un-used but requires optimisation]
         # Correction to account for error in curved motion
         move_time = move_time * 1.0
@@ -664,9 +674,9 @@ class ROSRobot(rtb.ERobot):
         while move_time > 0.1 and t + delta < move_time and time_step < time_freq_steps-1 and not self.preempted:
             # Check if we are close to goal state as an exit point
             # NOTE: this is based on the joint positions
-            if np.all(np.fabs(qd - self.q) < 0.01):
-                rospy.loginfo('Too close to goal, quitting movement...')
-                break
+            # if np.all(np.fabs(qd - self.q) < 0.001):
+            #     rospy.loginfo('Too close to goal, quitting movement...')
+            #     break
 
             # Compute current state jacobian
             jacob0 = self.jacob0(self.q, fast=True, end=self.gripper)
@@ -709,13 +719,11 @@ class ROSRobot(rtb.ERobot):
             t += delta  
         
         # Print of maximum twist velocity
-        # if cartesian_ee_vel_vect:
-        #     print(f"End cartesian velocity: {current_linear_vel}")
-        #     print(f"Max twist velocity: {np.max(cartesian_ee_vel_vect)}")
-        #     print(f"Average twist velocity: {np.average(cartesian_ee_vel_vect)}")
-        #     print(f"Time taken: {t}")
-        #     print(f"End joint velocities: {self.j_v}")
-        #     print(f"Time steps taken out of expected: {time_step}/{time_freq_steps}")
+        if cartesian_ee_vel_vect:
+            print(f"End cartesian velocity: {current_linear_vel}")
+            print(f"Max twist velocity: {np.max(cartesian_ee_vel_vect)}")
+            print(f"Average twist velocity: {np.average(cartesian_ee_vel_vect)}")
+        print(self.j_v)
         self.j_v = np.zeros(self.n)
 
         self.moving = False
