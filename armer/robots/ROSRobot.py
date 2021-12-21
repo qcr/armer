@@ -639,7 +639,7 @@ class ROSRobot(rtb.ERobot):
         # print('Max speed:', Dn)
 
         angular_move_time = np.arccos((np.trace(np.transpose(end_ee_rot) @ current_ee_rot) - 1) / 2) / max_rot
-        print(angular_move_time, linear_move_time)
+        # print(angular_move_time, linear_move_time)
         move_time = max(linear_move_time, angular_move_time)
 
         # Move time correction [currently un-used but requires optimisation]
@@ -688,6 +688,7 @@ class ROSRobot(rtb.ERobot):
             erro_jp = req_jp - current_jp
 
             if np.any(np.max(np.fabs(erro_jp)) > 0.5):
+                rospy.logerr('Exceeded delta joint position max')
                 self.preempt()
                 break
 
@@ -708,10 +709,13 @@ class ROSRobot(rtb.ERobot):
             t += delta  
         
         # Print of maximum twist velocity
-        if cartesian_ee_vel_vect:
-            print(f"End cartesian velocity: {current_linear_vel}")
-            print(f"Max twist velocity: {np.max(cartesian_ee_vel_vect)}")
-            print(f"Average twist velocity: {np.average(cartesian_ee_vel_vect)}")
+        # if cartesian_ee_vel_vect:
+        #     print(f"End cartesian velocity: {current_linear_vel}")
+        #     print(f"Max twist velocity: {np.max(cartesian_ee_vel_vect)}")
+        #     print(f"Average twist velocity: {np.average(cartesian_ee_vel_vect)}")
+        #     print(f"Time taken: {t}")
+        #     print(f"End joint velocities: {self.j_v}")
+        #     print(f"Time steps taken out of expected: {time_step}/{time_freq_steps}")
         self.j_v = np.zeros(self.n)
 
         self.moving = False
