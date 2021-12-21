@@ -390,7 +390,7 @@ class ROSRobot(rtb.ERobot):
             
             solution = ikine(self, pose, q0=self.q, end=self.gripper)
             
-            if self.__traj_move(solution.q, goal.speed if goal.speed else 0.4):
+            if self.__traj_move(solution.q, goal.speed if goal.speed else 0.2):
                 self.pose_server.set_succeeded(MoveToPoseResult(success=True))
             else:
                 self.pose_server.set_aborted(MoveToPoseResult(success=False))
@@ -473,7 +473,7 @@ class ROSRobot(rtb.ERobot):
             self.preempt()
 
         with self.lock:           
-            if self.__traj_move(np.array(goal.joints), goal.speed if goal.speed else 0.4):
+            if self.__traj_move(np.array(goal.joints), goal.speed if goal.speed else 0.2):
                 self.joint_pose_server.set_succeeded(
                     MoveToJointPoseResult(success=True)
                 )
@@ -503,7 +503,7 @@ class ROSRobot(rtb.ERobot):
 
             dq = np.array(self.named_poses[goal.pose_name])
 
-            if self.__traj_move(dq, goal.speed if goal.speed else 0.4):
+            if self.__traj_move(dq, goal.speed if goal.speed else 0.2):
                 self.named_pose_server.set_succeeded(
                     MoveToNamedPoseResult(success=True)
                 )
@@ -525,7 +525,7 @@ class ROSRobot(rtb.ERobot):
 
         with self.lock:
             qd = self.qr if hasattr(self, 'qr') else self.q
-            self.__traj_move(np.array(qd), max_speed=0.5)
+            self.__traj_move(np.array(qd), max_speed=0.2)
             return EmptyResponse()
 
     def recover_cb(self, req: EmptyRequest) -> EmptyResponse: # pylint: disable=no-self-use
