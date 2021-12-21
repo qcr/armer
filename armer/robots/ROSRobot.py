@@ -614,9 +614,6 @@ class ROSRobot(rtb.ERobot):
         ave_cart_speed = max_speed / 2
         # Frequency of operation - set by configuration file
         frequency = self.frequency
-
-        def wrap(r):
-           return (r + np.pi) % (2*np.pi) - np.pi
            
         # Calculate start and end pose linear distance to estimate the expected time
         current_ee_mat = self.fkine(self.q, start=self.base_link, fast=True, end=self.gripper)
@@ -651,7 +648,7 @@ class ROSRobot(rtb.ERobot):
 
         angular_move_time = np.arccos((np.trace(np.transpose(end_ee_rot) @ current_ee_rot) - 1) / 2) / max_rot
         move_time = max(linear_move_time, angular_move_time)
-        
+
         # Move time correction [currently un-used but requires optimisation]
         # Correction to account for error in curved motion
         move_time = move_time * 1.0
