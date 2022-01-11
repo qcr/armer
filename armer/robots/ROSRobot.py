@@ -205,6 +205,11 @@ class ROSRobot(rtb.ERobot):
                 '{}/joint/velocity'.format(self.name.lower()
                                            ), JointVelocity, self.joint_velocity_cb
             )
+            # -- Testing New Servo Subscriber
+            self.cartesian_servo_subscriber: rospy.Subscriber = rospy.Subscriber(
+                '{}/cartesian/servo_pose/sub'.format(self.name.lower()
+                                            ), PoseStamped, self.servo_pose_cb
+            )
 
             # Action Servers
             self.velocity_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
@@ -394,6 +399,59 @@ class ROSRobot(rtb.ERobot):
                 self.pose_server.set_succeeded(MoveToPoseResult(success=True))
             else:
                 self.pose_server.set_aborted(MoveToPoseResult(success=False))
+
+    def servo_pose_cb(self, msg) -> None:
+        """
+        ROS Servoing Subscriber Callback:
+        Servos the end-effector to the cartesian pose given by msg
+        
+        :param msg: [description]
+        :type msg: PoseStamped
+
+        This callback makes use of the roboticstoolbox p_servo function
+        to generate velocities at each timestep.
+        """
+        # rospy.loginfo(f"Received: {msg}")
+
+        # Safely stop any current motion of the arm
+        if self.moving:
+            self.preempt()
+        
+        with self.lock:
+            goal_pose = msg
+            goal_gain = 2
+            goal_thresh = 0.005
+
+            if goal_pose.header.frame_id == '':
+                goal_pose.header.frame_id = self.base_link.name
+
+            goal_pose = self.tf_listener.transformPose(
+                self.base_link.name,
+                goal_pose
+            )
+            pose = goal_pose.pose
+
+            target = SE3(pose.position.x, pose.position.y, pose.position.z) * UnitQuaternion([
+                pose.orientation.w,
+                pose.orientation.x,
+                pose.orientation.y,
+                pose.orientation.z
+            ]).SE3()
+
+            arrived = False
+
+            self.moving = True
+            self.preempted = False
+
+            velocities, arrived = rtb.p_servo(
+                self.fkine(self.q, start=self.base_link, end=self.gripper),
+                target,
+                min(3, goal_gain) if goal_gain else 2,
+                threshold=goal_thresh if goal_thresh else 0.005
+            )
+            self.j_v = np.linalg.pinv(
+                self.jacobe(self.q)) @ velocities
+            self.last_update = timeit.default_timer()
 
     def servo_cb(self, goal: ServoToPoseGoal) -> None:
         """
