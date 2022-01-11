@@ -419,7 +419,7 @@ class ROSRobot(rtb.ERobot):
         
         with self.lock:
             goal_pose = msg
-            goal_gain = 2
+            goal_gain = 5
             goal_thresh = 0.005
 
             if goal_pose.header.frame_id == '':
