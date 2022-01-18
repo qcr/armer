@@ -20,7 +20,7 @@ import yaml
 
 from armer.utils import ikine, mjtg
 
-from std_msgs.msg import Header
+from std_msgs.msg import Header, Bool
 from sensor_msgs.msg import JointState
 from geometry_msgs.msg import PoseStamped
 
@@ -205,6 +205,10 @@ class ROSRobot(rtb.ERobot):
                                            ), JointVelocity, self.joint_velocity_cb
             )
             # -- Testing New Servo Subscriber
+            self.cartesian_servo_publisher: rospy.Publisher = rospy.Publisher(
+                '{}/cartesian/servo/arrived'.format(self.name.lower()
+                    ), Bool, queue_size=1
+            )
             self.cartesian_servo_subscriber: rospy.Subscriber = rospy.Subscriber(
                 '{}/cartesian/servo'.format(self.name.lower()
                                             ), ServoStamped, self.servo_cb
@@ -409,7 +413,7 @@ class ROSRobot(rtb.ERobot):
         
         with self.lock:
             goal_pose = msg.pose
-            goal_gain = msg.gain if msg.gain else 5
+            goal_gain = msg.gain if msg.gain else 3
             goal_thresh = msg.threshold if msg.threshold else 0.005
 
             if msg.header.frame_id == '':
@@ -436,12 +440,15 @@ class ROSRobot(rtb.ERobot):
             velocities, arrived = rtb.p_servo(
                 self.fkine(self.q, start=self.base_link, end=self.gripper),
                 target,
-                min(3, goal_gain) if goal_gain else 2,
-                threshold=goal_thresh if goal_thresh else 0.005
+                min(3, goal_gain),
+                threshold=goal_thresh
             )
+
             self.j_v = np.linalg.pinv(
                 self.jacobe(self.q)) @ velocities
             self.last_update = timeit.default_timer()
+
+        self.cartesian_servo_publisher.publish(arrived)
 
     def joint_pose_cb(self, goal: MoveToJointPoseGoal) -> None:
         """
