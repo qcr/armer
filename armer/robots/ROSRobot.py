@@ -207,8 +207,8 @@ class ROSRobot(rtb.ERobot):
             )
             # -- Testing New Servo Subscriber
             self.cartesian_servo_subscriber: rospy.Subscriber = rospy.Subscriber(
-                '{}/cartesian/servo_pose/sub'.format(self.name.lower()
-                                            ), PoseStamped, self.servo_pose_cb
+                '{}/cartesian/servo'.format(self.name.lower()
+                                            ), PoseStamped, self.servo_cb
             )
 
             # Action Servers
@@ -229,15 +229,6 @@ class ROSRobot(rtb.ERobot):
             )
             self.pose_server.register_preempt_callback(self.preempt)
             self.pose_server.start()
-
-            self.pose_servo_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
-                '{}/cartesian/servo_pose'.format(self.name.lower()),
-                ServoToPoseAction,
-                execute_cb=self.servo_cb,
-                auto_start=False
-            )
-            self.pose_servo_server.register_preempt_callback(self.preempt)
-            self.pose_servo_server.start()
 
             self.joint_pose_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
                 '{}/joint/pose'.format(self.name.lower()),
@@ -400,7 +391,7 @@ class ROSRobot(rtb.ERobot):
             else:
                 self.pose_server.set_aborted(MoveToPoseResult(success=False))
 
-    def servo_pose_cb(self, msg) -> None:
+    def servo_cb(self, msg) -> None:
         """
         ROS Servoing Subscriber Callback:
         Servos the end-effector to the cartesian pose given by msg
@@ -452,71 +443,6 @@ class ROSRobot(rtb.ERobot):
             self.j_v = np.linalg.pinv(
                 self.jacobe(self.q)) @ velocities
             self.last_update = timeit.default_timer()
-
-    def servo_cb(self, goal: ServoToPoseGoal) -> None:
-        """
-        ROS Action Server callback:
-        Servos the end-effector to the cartesian pose indicated by goal
-
-        :param goal: [description]
-        :type goal: ServoToPoseGoal
-
-        This callback makes use of the roboticstoolbox p_servo function
-        to generate velocities at each timestep.
-        """
-        if self.moving:
-            self.preempt()
-
-        with self.lock:
-            goal_pose = goal.pose_stamped
-
-            if goal_pose.header.frame_id == '':
-                goal_pose.header.frame_id = self.base_link.name
-
-            goal_pose = self.tf_listener.transformPose(
-                self.base_link.name,
-                goal_pose
-            )
-            pose = goal_pose.pose
-
-            target = SE3(pose.position.x, pose.position.y, pose.position.z) * UnitQuaternion([
-                pose.orientation.w,
-                pose.orientation.x,
-                pose.orientation.y,
-                pose.orientation.z
-            ]).SE3()
-
-            arrived = False
-
-            self.moving = True
-            self.preempted = False
-
-            while not arrived and not self.preempted:
-                velocities, arrived = rtb.p_servo(
-                    self.fkine(self.q, start=self.base_link, end=self.gripper),
-                    target,
-                    min(3, goal.gain) if goal.gain else 2,
-                    threshold=goal.threshold if goal.threshold else 0.005
-                )
-                self.event.clear()
-                self.j_v = np.linalg.pinv(
-                    self.jacobe(self.q)) @ velocities
-                self.last_update = timeit.default_timer()
-                self.event.wait()
-
-            self.moving = False
-            result = not self.preempted
-            self.preempted = False
-
-            # self.qd *= 0
-            if result:
-                self.pose_servo_server.set_succeeded(
-                    ServoToPoseResult(success=True)
-                )
-            else:
-                self.pose_servo_server.set_aborted(
-                    ServoToPoseResult(success=False)
-                )
 
     def joint_pose_cb(self, goal: MoveToJointPoseGoal) -> None:
         """
