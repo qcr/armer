@@ -29,12 +29,11 @@ from std_srvs.srv import Empty, EmptyRequest, EmptyResponse
 
 from std_msgs.msg import Float64MultiArray
 
-from armer_msgs.msg import ManipulatorState, JointVelocity, Guards
+from armer_msgs.msg import ManipulatorState, JointVelocity, ServoStamped, Guards
 from armer_msgs.msg import GuardedVelocityAction, GuardedVelocityGoal, GuardedVelocityResult
 from armer_msgs.msg import MoveToJointPoseAction, MoveToJointPoseGoal, MoveToJointPoseResult
 from armer_msgs.msg import MoveToNamedPoseAction, MoveToNamedPoseGoal, MoveToNamedPoseResult
 from armer_msgs.msg import MoveToPoseAction, MoveToPoseGoal, MoveToPoseResult
-from armer_msgs.msg import ServoToPoseAction, ServoToPoseGoal, ServoToPoseResult
 
 from armer_msgs.srv import SetCartesianImpedance, \
     SetCartesianImpedanceRequest, \
@@ -208,7 +207,7 @@ class ROSRobot(rtb.ERobot):
             # -- Testing New Servo Subscriber
             self.cartesian_servo_subscriber: rospy.Subscriber = rospy.Subscriber(
                 '{}/cartesian/servo'.format(self.name.lower()
-                                            ), PoseStamped, self.servo_cb
+                                            ), ServoStamped, self.servo_cb
             )
 
             # Action Servers
@@ -409,18 +408,18 @@ class ROSRobot(rtb.ERobot):
             self.preempt()
         
         with self.lock:
-            goal_pose = msg
-            goal_gain = 5
-            goal_thresh = 0.005
+            goal_pose = msg.pose
+            goal_gain = msg.gain if msg.gain else 5
+            goal_thresh = msg.threshold if msg.threshold else 0.005
 
-            if goal_pose.header.frame_id == '':
-                goal_pose.header.frame_id = self.base_link.name
-
-            goal_pose = self.tf_listener.transformPose(
+            if msg.header.frame_id == '':
+                msg.header.frame_id = self.base_link.name
+            
+            goal_pose_stamped = self.tf_listener.transformPose(
                 self.base_link.name,
-                goal_pose
+                PoseStamped(header=msg.header, pose=goal_pose)
             )
-            pose = goal_pose.pose
+            pose = goal_pose_stamped.pose
 
             target = SE3(pose.position.x, pose.position.y, pose.position.z) * UnitQuaternion([
                 pose.orientation.w,
