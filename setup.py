@@ -60,7 +60,7 @@ for data_folder in data_folders:
 setup(
     name='armer',
 
-    version='0.1.0',
+    version='0.2.0',
 
     description='Armer - The ROS Arm drivEr',
 
