@@ -440,7 +440,7 @@ class ROSRobot(rtb.ERobot):
             velocities, arrived = rtb.p_servo(
                 self.fkine(self.q, start=self.base_link, end=self.gripper),
                 target,
-                min(3, goal_gain),
+                min(20, goal_gain),
                 threshold=goal_thresh
             )
 
