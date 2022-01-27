@@ -34,6 +34,7 @@ from armer_msgs.msg import GuardedVelocityAction, GuardedVelocityGoal, GuardedVe
 from armer_msgs.msg import MoveToJointPoseAction, MoveToJointPoseGoal, MoveToJointPoseResult
 from armer_msgs.msg import MoveToNamedPoseAction, MoveToNamedPoseGoal, MoveToNamedPoseResult
 from armer_msgs.msg import MoveToPoseAction, MoveToPoseGoal, MoveToPoseResult
+from armer_msgs.msg import HomeAction, HomeGoal, HomeResult
 
 from armer_msgs.srv import SetCartesianImpedance, \
     SetCartesianImpedanceRequest, \
@@ -50,6 +51,10 @@ from armer_msgs.srv import AddNamedPoseConfig, \
 from armer_msgs.srv import GetNamedPoseConfigs, \
     GetNamedPoseConfigsRequest, \
     GetNamedPoseConfigsResponse
+
+from armer_msgs.srv import GetLinkName, \
+    GetLinkNameRequest, \
+    GetLinkNameResponse
 
 from armer_msgs.srv import GetNamedPoses, \
     GetNamedPosesRequest, \
@@ -183,8 +188,6 @@ class ROSRobot(rtb.ERobot):
             self.__load_config()
 
             # Services
-            rospy.Service('{}/home'.format(self.name.lower()),
-                          Empty, self.home_cb)
             rospy.Service('{}/recover'.format(self.name.lower()),
                           Empty, self.recover_cb)
             rospy.Service('{}/stop'.format(self.name.lower()),
@@ -251,12 +254,33 @@ class ROSRobot(rtb.ERobot):
             self.named_pose_server.register_preempt_callback(self.preempt)
             self.named_pose_server.start()
 
+            self.home_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
+                '{}/home'.format(self.name.lower()),
+                HomeAction,
+                execute_cb=self.home_cb,
+                auto_start=False
+            )
+            self.home_server.register_preempt_callback(self.preempt)
+            self.home_server.start()
+
             rospy.Service(
                 '{}/set_cartesian_impedance'.format(self.name.lower()),
                 SetCartesianImpedance,
                 self.set_cartesian_impedance_cb
             )
 
+            rospy.Service(
+                '{}/get_ee_link_name'.format(self.name.lower()),
+                GetLinkName,
+                lambda req: GetLinkNameResponse(name=self.gripper)
+            )
+            
+            rospy.Service(
+                '{}/get_base_link_name'.format(self.name.lower()),
+                GetLinkName,
+                lambda req: GetLinkNameResponse(name=self.base_link.name)
+            )
+            
             rospy.Service('{}/get_named_poses'.format(self.name.lower()), GetNamedPoses,
                           self.get_named_poses_cb)
 
@@ -491,9 +515,9 @@ class ROSRobot(rtb.ERobot):
                     'Unknown named pose'
                 )
 
-            dq = np.array(self.named_poses[goal.pose_name])
+            qd = np.array(self.named_poses[goal.pose_name])
 
-            if self.__traj_move(dq, goal.speed if goal.speed else 0.2):
+            if self.__traj_move(qd, goal.speed if goal.speed else 0.2):
                 self.named_pose_server.set_succeeded(
                     MoveToNamedPoseResult(success=True)
                 )
@@ -502,7 +526,7 @@ class ROSRobot(rtb.ERobot):
                     MoveToNamedPoseResult(success=False)
                 )
 
-    def home_cb(self, req: EmptyRequest) -> EmptyResponse:
+    def home_cb(self, goal: HomeGoal) -> HomeResult:
         """[summary]
 
         :param req: Empty request
@@ -512,11 +536,18 @@ class ROSRobot(rtb.ERobot):
         """
         if self.moving:
             self.preempt()
-
+            
         with self.lock:
             qd = self.qr if hasattr(self, 'qr') else self.q
-            self.__traj_move(np.array(qd), max_speed=0.2)
-            return EmptyResponse()
+            
+            if self.__traj_move(qd, goal.speed if goal.speed else 0.2):
+                self.home_server.set_succeeded(
+                    HomeResult(success=True)
+                )
+            else:
+                self.home_server.set_aborted(
+                    HomeResult(success=False)
+                )
 
     def recover_cb(self, req: EmptyRequest) -> EmptyResponse: # pylint: disable=no-self-use
         """[summary]
@@ -629,13 +660,6 @@ class ROSRobot(rtb.ERobot):
         current_ee_rot = current_ee_mat[:3,:3]
         end_ee_rot = end_ee_mat[:3,:3]
 
-        # print('Joint Distance:', self.qd - self.q)
-        # D = self.jacob0(self.q, fast=True, end=self.gripper) @ (self.qd - self.q)
-        # Dn = np.linalg.norm(D[:3]) / max_speed
-        # print('Distance:', D[:3])
-        # print('Distance (norm):', np.linalg.norm(D[:3]))
-        # print('Max speed:', Dn)
-
         angular_move_time = np.arccos((np.trace(np.transpose(end_ee_rot) @ current_ee_rot) - 1) / 2) / max_rot
         move_time = max(linear_move_time, angular_move_time)
 
@@ -657,14 +681,8 @@ class ROSRobot(rtb.ERobot):
         
         delta = 1/frequency
         last_time = rospy.Time.now().to_sec()
-
+        
         while move_time > 0.1 and t + delta < move_time and time_step < time_freq_steps-1 and not self.preempted:
-            # Check if we are close to goal state as an exit point
-            # NOTE: this is based on the joint positions
-            # if np.all(np.fabs(qd - self.q) < 0.001):
-            #     rospy.loginfo('Too close to goal, quitting movement...')
-            #     break
-
             # Compute current state jacobian
             jacob0 = self.jacob0(self.q, fast=True, end=self.gripper)
 
@@ -705,12 +723,6 @@ class ROSRobot(rtb.ERobot):
             last_time = rospy.Time.now().to_sec()
             t += delta  
         
-        # Print of maximum twist velocity
-        if cartesian_ee_vel_vect:
-            print(f"End cartesian velocity: {current_linear_vel}")
-            print(f"Max twist velocity: {np.max(cartesian_ee_vel_vect)}")
-            print(f"Average twist velocity: {np.average(cartesian_ee_vel_vect)}")
-        print(self.j_v)
         self.j_v = np.zeros(self.n)
 
         self.moving = False
