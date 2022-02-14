@@ -538,7 +538,7 @@ class ROSRobot(rtb.ERobot):
             self.preempt()
             
         with self.lock:
-            qd = self.qr if hasattr(self, 'qr') else self.q
+            qd = np.array(self.qr) if hasattr(self, 'qr') else self.q
             
             if self.__traj_move(qd, goal.speed if goal.speed else 0.2):
                 self.home_server.set_succeeded(
