@@ -665,7 +665,7 @@ class ROSRobot(rtb.ERobot):
 
         # Move time correction [currently un-used but requires optimisation]
         # Correction to account for error in curved motion
-        move_time = move_time * 1.0
+        move_time = move_time * 1
 
         # Obtain minimum jerk velocity profile of joints based on estimated end effector move time
         min_jerk_pos, min_jerk_vel = mjtg(self.q, qd, frequency, move_time)
@@ -682,7 +682,13 @@ class ROSRobot(rtb.ERobot):
         delta = 1/frequency
         last_time = rospy.Time.now().to_sec()
         
-        while move_time > 0.1 and t + delta < move_time and time_step < time_freq_steps-1 and not self.preempted:
+        # while move_time > 0.1 and t + delta <= move_time and time_step < time_freq_steps-1 and not self.preempted:
+        while move_time > 0.1 and time_step < time_freq_steps-1 and not self.preempted:
+            # Self termination if within goal space
+            if np.all(np.fabs(qd - self.q) < 0.001):
+                rospy.loginfo('Too close to goal, quitting movement...')
+                break
+
             # Compute current state jacobian
             jacob0 = self.jacob0(self.q, fast=True, end=self.gripper)
 
@@ -724,7 +730,9 @@ class ROSRobot(rtb.ERobot):
             t += delta  
         
         self.j_v = np.zeros(self.n)
-
+        rospy.logwarn(f"End of Traj Move\n-> [ move time: {move_time} | time taken: {t} ]\
+            \n-> End joint Error: {abs(min_jerk_pos[-1]-self.state.joint_poses) if min_jerk_pos else None}\
+            \n-> Time step: {time_step} | time steps req: {time_freq_steps}")
         self.moving = False
         result = not self.preempted
         self.preempted = False
