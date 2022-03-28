@@ -128,7 +128,7 @@ class ROSRobot(rtb.ERobot):
         self.joint_states = None # Joint state message
 
         # Guards used to prevent multiple motion requests conflicting
-        self.control_mode = ControlMode.JOINTS
+        self._control_mode = ControlMode.JOINTS
 
         self.moving: bool = False
         self.last_moving: bool = False
@@ -586,7 +586,7 @@ class ROSRobot(rtb.ERobot):
         """
         # pylint: disable=unused-argument
         self.preempted = True
-        self.control_mode = ControlMode.JOINTS
+        self._control_mode = ControlMode.JOINTS
         self.last_update = 0
 
     def __vel_move(self, twist_stamped: TwistStamped) -> None:
@@ -604,13 +604,13 @@ class ROSRobot(rtb.ERobot):
             target.angular.z
         ])
 
-        if np.any(e_v - self.e_v) or self.control_mode == ControlMode.JOINTS:
+        if np.any(e_v - self.e_v) or self._control_mode == ControlMode.JOINTS:
             self.e_p = SE3(self.fkine(self.q, start=self.base_link, fast=True, end=self.gripper))
 
         self.e_v = e_v
         self.e_v_frame = twist_stamped.header.frame_id
 
-        self.control_mode = ControlMode.CARTESIAN
+        self._control_mode = ControlMode.CARTESIAN
         self.last_update = timeit.default_timer()
 
     def __traj_move(self, qd: np.array, max_speed=0.2, max_rot=0.5) -> bool:
@@ -934,13 +934,13 @@ class ROSRobot(rtb.ERobot):
             self.preempt()
 
         # calculate joint velocities from desired cartesian velocity
-        if self.control_mode == ControlMode.CARTESIAN:
+        if self._control_mode == ControlMode.CARTESIAN:
             if current_time - self.last_update > 0.1:
                 self.e_v *= 0.9 if np.sum(np.absolute(self.e_v)
                                           ) >= 0.0001 else 0
 
                 if np.all(self.e_v == 0):
-                    self.control_mode = ControlMode.JOINTS
+                    self._control_mode = ControlMode.JOINTS
 
             try:
               _, orientation = self.tf_listener.lookupTransform(
