@@ -369,7 +369,7 @@ class ROSRobot(rtb.ERobot):
                 self.__vel_move(msg.twist_stamped)
                 rospy.sleep(0.01)
 
-            self.velocity_server.set_succeeded(GuardedVelocityResult(triggered=True))
+            self.velocity_server.set_succeeded(GuardedVelocityResult(triggered=triggered))
 
     def joint_velocity_cb(self, msg: JointVelocity) -> None:
         """
