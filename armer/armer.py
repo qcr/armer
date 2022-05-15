@@ -109,9 +109,9 @@ class Armer:
                     continue
 
                 if link.isjoint:
-                    transform = link.A(joint_positions[link.jindex], fast=True)
+                    transform = link._Ts @ link._ets[-1].A(joint_positions[link.jindex])
                 else:
-                    transform = link.A(fast=True)
+                    transform = link._Ts
 
                 self.broadcaster.sendTransform(populate_transform_stamped(
                     link.parent.name,
@@ -127,9 +127,9 @@ class Armer:
                         continue
 
                     if link.isjoint:
-                        transform = link.A(joint_positions[link.jindex], fast=True)
+                        transform = link._Ts @ link._ets[-1].A(joint_positions[link.jindex])
                     else:
-                        transform = link.A(fast=True)
+                        transform = link._Ts
 
                     self.broadcaster.sendTransform(populate_transform_stamped(
                         link.parent.name,
