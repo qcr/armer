@@ -197,6 +197,10 @@ class ROSRobot(rtb.ERobot):
             self.state_publisher: rospy.Publisher = rospy.Publisher(
                 '{}/state'.format(self.name.lower()), ManipulatorState, queue_size=1
             )
+            self.cartesian_servo_publisher: rospy.Publisher = rospy.Publisher(
+                '{}/cartesian/servo/arrived'.format(self.name.lower()
+                    ), Bool, queue_size=1
+            )
 
             # Subscribers
             self.cartesian_velocity_subscriber: rospy.Subscriber = rospy.Subscriber(
@@ -206,11 +210,6 @@ class ROSRobot(rtb.ERobot):
             self.joint_velocity_subscriber: rospy.Subscriber = rospy.Subscriber(
                 '{}/joint/velocity'.format(self.name.lower()
                                            ), JointVelocity, self.joint_velocity_cb
-            )
-            # -- Testing New Servo Subscriber
-            self.cartesian_servo_publisher: rospy.Publisher = rospy.Publisher(
-                '{}/cartesian/servo/arrived'.format(self.name.lower()
-                    ), Bool, queue_size=1
             )
             self.cartesian_servo_subscriber: rospy.Subscriber = rospy.Subscriber(
                 '{}/cartesian/servo'.format(self.name.lower()
@@ -429,8 +428,6 @@ class ROSRobot(rtb.ERobot):
         This callback makes use of the roboticstoolbox p_servo function
         to generate velocities at each timestep.
         """
-        # rospy.loginfo(f"Received: {msg}")
-
         # Safely stop any current motion of the arm
         if self.moving:
             self.preempt()
@@ -627,7 +624,6 @@ class ROSRobot(rtb.ERobot):
 
         self.preempted = False
         self.moving = True
-
         t = 0
 
         # This is the average cartesian speed we want the robot to move at
@@ -730,9 +726,6 @@ class ROSRobot(rtb.ERobot):
             t += delta  
         
         self.j_v = np.zeros(self.n)
-        rospy.logwarn(f"End of Traj Move\n-> [ move time: {move_time} | time taken: {t} ]\
-            \n-> End joint Error: {abs(min_jerk_pos[-1]-self.state.joint_poses) if min_jerk_pos else None}\
-            \n-> Time step: {time_step} | time steps req: {time_freq_steps}")
         self.moving = False
         result = not self.preempted
         self.preempted = False

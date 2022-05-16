@@ -76,8 +76,8 @@ terminal is opened.
 
 > ```sh
 > sudo apt install python3-pip 
-> pip install git+https://github.com/petercorke/robotics-toolbox-python.git@future
-> pip install git+https://github.com/petercorke/spatialmath-python.git@future
+> pip install git+https://github.com/petercorke/robotics-toolbox-python.git
+> pip install git+https://github.com/petercorke/spatialmath-python.git
 > mkdir -p ~/armer_ws/src && cd ~/armer_ws/src 
 > git clone https://github.com/qcr/armer.git && git clone https://github.com/qcr/armer_msgs 
 > cd .. && rosdep install --from-paths src --ignore-src -r -y 
