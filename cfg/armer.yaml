@@ -1,9 +1,6 @@
 robots:
-  - name: arm 
-    model: 
-      type: roboticstoolbox.models.Mico
+  - name: arm
 backend: 
   type: roboticstoolbox.backends.swift.Swift
-publish_transforms: true
 logging: 
   frequency: false

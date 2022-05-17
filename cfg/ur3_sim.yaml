@@ -1,14 +1,8 @@
 robots:
   - name: arm # default is panda model roboticstoolbox.models.Panda
-    model: roboticstoolbox.models.UR3
-    joint_state_topic: /joint_states # default
-    joint_velocity_topic:  /joint_group_velocity_controller/joint_velocity # default
-    # origin: [-1, 0, 0, 0, 0, 0] #default (xyzrpy)
-    gripper: "tool0"
+    model: 
+      urdf_file: ur_description/urdf/ur3_robot.urdf.xacro
+      gripper: tool0
 backend: 
   type: roboticstoolbox.backends.swift.Swift
-#readonly_backends:
-#  - type: roboticstoolbox.backends.PyPlot.PyPlot
 publish_transforms: true
-logging: 
-  frequency: false

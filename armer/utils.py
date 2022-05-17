@@ -13,7 +13,7 @@ import roboticstoolbox as rtb
 from trac_ik_python.trac_ik import IK
 
 def ikine(robot, target, q0, end):
-   
+    print(robot)
     ik_solver = IK(robot.base_link.name,
                    end,
                    timeout=0.1,

@@ -89,7 +89,6 @@ class ROSRobot(rtb.ERobot):
                  origin=None,
                  config_path=None,
                  readonly=False,
-                 gripper=None,
                  frequency=None,
                  modified_qr=None,
                  Kp=None,
@@ -97,13 +96,15 @@ class ROSRobot(rtb.ERobot):
                  Kd=None,
                  * args,
                  **kwargs):  # pylint: disable=unused-argument
-
+        
         super().__init__(robot)
         self.__dict__.update(robot.__dict__)
-
-        self.gripper = gripper if gripper else self.grippers[0].links[0].name
+        
         self.name = name if name else self.name
         
+        if not hasattr(self, 'gripper'):
+          self.gripper = self.grippers[0].name
+          
         sorted_links=[]
         #sort links by parents starting from gripper
         link=self.link_dict[self.gripper]   
@@ -118,7 +119,9 @@ class ROSRobot(rtb.ERobot):
         if origin:
             self.base = SE3(origin[:3]) @ SE3.RPY(origin[3:])
 
-        self.frequency = frequency if frequency else rospy.get_param(joint_state_topic + '/frequency', 500)
+        self.frequency = frequency if frequency else rospy.get_param((
+          joint_state_topic if joint_state_topic else '/joint_states') + '/frequency', 500
+        )
         
         self.q = self.qr if hasattr(self, 'qr') else self.q # pylint: disable=no-member
         if modified_qr:
@@ -321,7 +324,6 @@ class ROSRobot(rtb.ERobot):
         Closes the action servers associated with this robot
         """
         self.pose_server.need_to_terminate = True
-        self.pose_servo_server.need_to_terminate = True
         self.joint_pose_server.need_to_terminate = True
         self.named_pose_server.need_to_terminate = True
 

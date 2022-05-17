@@ -19,7 +19,7 @@ from roboticstoolbox.backends.swift import Swift
 from spatialmath.base.argcheck import getvector
 
 from armer.utils import populate_transform_stamped
-
+from armer.models import URDFRobot
 from armer.robots import ROSRobot
 from armer.timer import Timer
 
@@ -153,18 +153,30 @@ class Armer:
         robots: List[rtb.robot.Robot] = []
 
         for spec in config['robots']:
-            module_name, model_name = spec['model'].rsplit('.', maxsplit=1)
-            robot_cls = getattr(importlib.import_module(module_name), model_name)
-            del spec['model']
-
+            robot_cls = URDFRobot
             wrapper = ROSRobot
+
+            model_spec = {}
+            
+            if 'model' in spec:
+              model_type = spec['model'] if isinstance(spec['model'], str) else spec['model']['type'] if 'type' in spec['model'] else None
+              model_spec = spec['model'] if isinstance(spec['model'], dict) else {}
+              
+              if model_type: 
+                module_name, model_name = model_type.rsplit('.', maxsplit=1)            
+                robot_cls = getattr(importlib.import_module(module_name), model_name)
+                
+              if 'type' in model_spec:
+                del model_spec['type']     
+
+              del spec['model']
 
             if 'type' in spec:
                 module_name, model_name = spec['type'].rsplit('.', maxsplit=1)
                 wrapper = getattr(importlib.import_module(module_name), model_name)
                 del spec['type']
 
-            robots.append(wrapper(robot_cls(), **spec))
+            robots.append(wrapper(robot_cls(**model_spec), **spec))
 
         backend = None
         backend_args = dict()

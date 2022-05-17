@@ -1,13 +1,13 @@
 robots:
-  - model: roboticstoolbox.models.Panda
-    joint_state_topic: /joint_states # default
-    joint_velocity_topic:  /joint_group_velocity_controller/joint_velocity # default
+  - name: panda
+    model: 
+      urdf_file: franka_description/robots/panda_arm_hand.urdf.xacro
+      qr: [0, -0.3, 0, -2.2, 0, 2.0, 0.78539816339]
   - name: ur5
-    model: roboticstoolbox.models.UR5
+    model: 
+      urdf_file: ur_description/urdf/ur5_robot.urdf.xacro
+      gripper: tool0
     origin: [-1, 0, 0, 0, 0, 0] # (xyzrpy)
-    logging: 
-      frequency: true
-    # readonly: true
 publish_transforms: true
 backend:
-  - type: roboticstoolbox.backends.swift.Swift
+  type: roboticstoolbox.backends.swift.Swift

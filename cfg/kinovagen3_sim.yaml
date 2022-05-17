@@ -1,11 +1,8 @@
 robots:
   - name: arm 
-    model: roboticstoolbox.models.KinovaGen3
-    joint_state_topic: /joint_states 
-    joint_velocity_topic:  /joint_group_velocity_controller/joint_velocity 
-    gripper: "end_effector_link"
+    model:
+      urdf_file: kortex_description/robots/gen3.xacro
+      qr: [3.14159265359, -0.3, 0, -1.6, 0, -1.0, 1.57079632679]
 backend: 
   type: roboticstoolbox.backends.swift.Swift
 publish_transforms: true
-logging: 
-  frequency: false
