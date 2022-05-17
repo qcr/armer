@@ -1,5 +1,5 @@
 <launch>
-    <arg name="config" default="$(find armer)/cfg/armer_sim.yaml" />
+    <arg name="config" default="$(find armer)/cfg/armer.yaml" />
     
     <node pkg="armer" type="armer" name="armer" output="screen">
         <param name="config" value="$(arg config)" />
