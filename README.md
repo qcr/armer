@@ -5,7 +5,7 @@ Armer Driver
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Build Status](https://github.com/suddrey-qut/armer/workflows/Build/badge.svg?branch=master)](https://github.com/suddrey-qut/armer/actions?query=workflow%3ABuild)
 [![Language grade: Python](https://img.shields.io/lgtm/grade/python/g/suddrey-qut/armer.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/suddrey-qut/armer/context:python)
-[![Coverage](https://codecov.io/gh/suddrey-qut/armer/branch/master/graph/badge.svg)](https://codecov.io/gh/suddrey-qut/armer)
+[![codecov](https://codecov.io/gh/qcr/armer/branch/master/graph/badge.svg?token=GERHR5QTOF)](https://codecov.io/gh/qcr/armer)
 
 ![image](https://github.com/qcr/armer/wiki/armer_example.gif)
 
