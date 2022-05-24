@@ -78,6 +78,8 @@ terminal is opened.
 > sudo apt install python3-pip 
 > pip install git+https://github.com/petercorke/robotics-toolbox-python.git
 > pip install git+https://github.com/petercorke/spatialmath-python.git
+> pip install git+https://github.com/jhavl/spatialgeometry.git
+> pip install git+https://github.com/jhavl/swift.git
 > mkdir -p ~/armer_ws/src && cd ~/armer_ws/src 
 > git clone https://github.com/qcr/armer.git && git clone https://github.com/qcr/armer_msgs 
 > cd .. && rosdep install --from-paths src --ignore-src -r -y 
@@ -89,7 +91,7 @@ terminal is opened.
 
 Supported Arms
 ---------------
-Armer relies on the manipulator's ROS driver to communicate with the low level hardware so the the ROS drivers must be started along side Armer.
+Armer relies on the manipulator's ROS driver to communicate with the low level hardware so the the ROS drivers must be started along side Armer. ***NOTE: the below packages are required for control of a real robot - see below for simulation usage instructions***
 
 Currently Armer driver has packages that launches Armer and the target manipulator's drivers are bundled together. If your arm model has a hardware package, control should be a fairly plug and play experience. (An experience we are still working on so please let us know if it isn't.). Below are the github pages to arms with hardware packages. Install directions can be found on their respective pages.
 
@@ -108,7 +110,13 @@ For more information on setting up manipulators not listed here see the Armer do
 Usage
 -------
 
-The Armer interface can be launched with the following command:
+The Armer interface can be launched with the following command for simulation:
+
+> ``` {.sourceCode .bash}
+> roslaunch armer armer.launch config:={PATH_TO_CONFIG_YAML_FILE}
+> ```
+
+Alternatively, the Armer interface can be launched for a real robot using the following command (Note that this can also support simulation if you wish via the ***sim*** parameter):
 
 > ``` {.sourceCode .bash}
 > roslaunch armer_{ROBOT_MODEL} robot_bringup.launch config:={PATH_TO_CONFIG_YAML_FILE} sim:={true/false}
