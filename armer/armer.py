@@ -101,6 +101,8 @@ class Armer:
         if not self.is_publishing_transforms:
             return
 
+        transforms = []
+
         for robot in self.robots:
             joint_positions = getvector(robot.q, robot.n)
 
@@ -113,7 +115,7 @@ class Armer:
                 else:
                     transform = link._Ts
 
-                self.broadcaster.sendTransform(populate_transform_stamped(
+                transforms.append(populate_transform_stamped(
                     link.parent.name,
                     link.name,
                     transform
@@ -131,11 +133,13 @@ class Armer:
                     else:
                         transform = link._Ts
 
-                    self.broadcaster.sendTransform(populate_transform_stamped(
+                    transforms.append(populate_transform_stamped(
                         link.parent.name,
                         link.name,
                         transform
                     ))
+        
+        self.broadcaster.sendTransform(transforms)
 
     @staticmethod
     def load(path: str) -> Armer:
@@ -213,7 +217,7 @@ class Armer:
         Runs the driver. This is a blocking call.
         """
         self.last_tick = timeit.default_timer()
-
+        
         while not rospy.is_shutdown():
             with Timer('ROS', self.log_frequency):
                 current_time = timeit.default_timer()
@@ -222,6 +226,7 @@ class Armer:
                 for robot in self.robots:
                     robot.step(dt=dt)
 
+                # with Timer('step'):
                 self.backend.step(dt=dt)
 
                 for backend, args in self.readonly_backends:
