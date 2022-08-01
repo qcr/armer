@@ -5,15 +5,17 @@ import re
 import rospy
 import rospkg
 from io import BytesIO
-from roboticstoolbox.robot.ERobot import ERobot
+from roboticstoolbox.robot import ERobot, Link, ET, ETS
 from roboticstoolbox.tools import URDF
 import xml.etree.ElementTree as ETT
+import spatialmath
 
 class URDFRobot(ERobot):
   def __init__(self,
                qz=None,
                qr=None,
                gripper=None,
+               tool=None,
                urdf_file=None,
                *args,
                **kwargs):
@@ -26,6 +28,16 @@ class URDFRobot(ERobot):
     self.gripper = gripper if gripper else URDFRobot.resolve_gripper(links)
     gripper_link = list(filter(lambda link: link.name == self.gripper, links))
     
+    if tool:
+      ets = URDFRobot.resolve_ets(tool)
+      
+      if 'name' in tool:
+        links.append(Link(ets, name=tool['name'], parent=self.gripper))
+        self.gripper = tool['name']
+
+      gripper_link[0].tool = spatialmath.SE3(ets.compile()[0].A())
+      
+
     super().__init__(
         links,
         name=name,
@@ -81,6 +93,15 @@ class URDFRobot(ERobot):
       parents.append(link.parent.name)
     
     return links[-1].name
+
+  @staticmethod
+  def resolve_ets(tool):
+    transforms = [ET.tx(0).A()]
+    
+    if 'ets' in tool:
+      transforms = [ getattr(ET, list(et.keys())[0])(list(et.values())[0]) for et in tool['ets'] ]
+
+    return ETS(transforms)
 
 if __name__ == "__main__":  # pragma nocover
 

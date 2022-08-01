@@ -9,7 +9,7 @@ pose_cli = actionlib.SimpleActionClient('/arm/cartesian/pose', MoveToPoseAction)
 pose_cli.wait_for_server()
 
 target = PoseStamped()
-# target.header.frame_id = 'world'
+
 target.pose.position.x = 0.300
 target.pose.position.y = 0.200
 target.pose.position.z = 0.290

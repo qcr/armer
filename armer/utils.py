@@ -10,6 +10,7 @@ from spatialmath import SE3, SO3, UnitQuaternion, base
 from geometry_msgs.msg import TransformStamped
 import qpsolvers as qp
 import roboticstoolbox as rtb
+from roboticstoolbox.tools.trajectory import Trajectory
 from trac_ik_python.trac_ik import IK
 
 def ikine(robot, target, q0, end):
@@ -28,30 +29,65 @@ def ikine(robot, target, q0, end):
 
     return type('obj', (object,), {'q' : np.array(sol)})
     
+def mjtg(robot: rtb.ERobot, qd: np.ndarray, max_speed: float=0.2, max_rot: float=0.5, frequency=500):
+  # This is the average cartesian speed we want the robot to move at
+  # NOTE: divided by 2 to make the max speed the approx. peak of the speed achieved
+  ave_cart_speed = max_speed / 2
+      
+  # Calculate start and end pose linear distance to estimate the expected time
+  current_ee_mat = robot.ets(start=robot.base_link, end=robot.gripper).eval(robot.q)
+  mid_ee_mat = robot.ets(start=robot.base_link, end=robot.gripper).eval(qd - (qd - robot.q) / 2)
+  end_ee_mat = robot.ets(start=robot.base_link, end=robot.gripper).eval(qd)
+  
+  current_ee_pose = current_ee_mat[:3, 3]
+  mid_ee_pose = mid_ee_mat[:3, 3]
+  end_ee_pose = end_ee_mat[:3, 3]
+  
+  # Estimation of time taken based on linear motion from current to end cartesian pose
+  # We may require some optimisation of this given the curved nature of the actual ee trajectory
+  D1 = np.sqrt((mid_ee_pose[0] - current_ee_pose[0])**2 +
+      (mid_ee_pose[1] - current_ee_pose[1])**2 +
+      (mid_ee_pose[2] - current_ee_pose[2])**2)
+  
+  D2 = np.sqrt((end_ee_pose[0] - mid_ee_pose[0])**2 +
+      (end_ee_pose[1] - mid_ee_pose[1])**2 +
+      (end_ee_pose[2] - mid_ee_pose[2])**2)
 
+  linear_move_time = (D1 + D2) / ave_cart_speed
 
-    # Temp addition of minimum jerk trajectory calculator
-    # Reference: https://mika-s.github.io/python/control-theory/trajectory-generation/2017/12/06/trajectory-generation-with-a-minimum-jerk-trajectory.html
-def mjtg(current, setpoint, frequency, move_time):
-    q = []
-    qd = []
-    
-    timefreq = int(move_time * frequency)
+  current_ee_rot = current_ee_mat[:3,:3]
+  end_ee_rot = end_ee_mat[:3,:3]
 
-    for time in range(1, timefreq):
-        q.append(
-            current + (setpoint - current) *
-            (10.0 * (time/timefreq)**3
-            - 15.0 * (time/timefreq)**4
-            + 6.0 * (time/timefreq)**5))
+  angular_move_time = np.arccos((np.trace(np.transpose(end_ee_rot) @ current_ee_rot) - 1) / 2) / max_rot
+  move_time = max(linear_move_time, angular_move_time)
 
-        qd.append(
-            frequency * (1.0/timefreq) * (setpoint - current) *
-            (30.0 * (time/timefreq)**2.0
-            - 60.0 * (time/timefreq)**3.0
-            + 30.0 * (time/timefreq)**4.0))
+  # Move time correction [currently un-used but requires optimisation]
+  # Correction to account for error in curved motion
+  move_time = move_time * 1
 
-    return q, qd
+  # Obtain minimum jerk velocity profile of joints based on estimated end effector move time
+  dq = []
+  dqd = []
+
+  timefreq = int(move_time * frequency)
+
+  for time in range(1, timefreq):
+    dq.append(
+        robot.q + (qd - robot.q) *
+        (10.0 * (time/timefreq)**3
+        - 15.0 * (time/timefreq)**4
+        + 6.0 * (time/timefreq)**5))
+
+    dqd.append(
+        frequency * (1.0/timefreq) * (qd - robot.q) *
+        (30.0 * (time/timefreq)**2.0
+        - 60.0 * (time/timefreq)**3.0
+        + 30.0 * (time/timefreq)**4.0))
+
+  # Calculate time frequency - based on the max time required for trajectory and the frequency of operation
+  time_freq_steps = int(move_time * frequency)
+  
+  return Trajectory('minimum-jerk', move_time, dq, dqd, None, True)
 
 def populate_transform_stamped(parent_name: str, link_name: str, transform: np.array):
     """

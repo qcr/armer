@@ -12,9 +12,9 @@ print('Moving {} for {} seconds'.format('up', DESIRED_TIME))
 ts = TwistStamped()
 ts.twist.linear.z = 0.1
 
-start_time = timeit.default_timer()
+start_time = rospy.get_time()
 
-while timeit.default_timer() - start_time < DESIRED_TIME:
+while rospy.get_time() - start_time < DESIRED_TIME:
     vel_pub.publish(ts)
 
 vel_pub.publish(TwistStamped())
@@ -23,18 +23,18 @@ print('Moving {} for {} seconds'.format('down', DESIRED_TIME))
 ts = TwistStamped()
 ts.twist.linear.z = -0.1
 
-start_time = timeit.default_timer()
+start_time = rospy.get_time()
 
-while timeit.default_timer() - start_time < DESIRED_TIME:
+while rospy.get_time() - start_time < DESIRED_TIME:
     vel_pub.publish(ts)
 
 print('Moving {} for {} seconds'.format('forward', DESIRED_TIME))
 ts = TwistStamped()
 ts.twist.linear.x = 0.1
 
-start_time = timeit.default_timer()
+start_time = rospy.get_time()
 
-while timeit.default_timer() - start_time < DESIRED_TIME:
+while rospy.get_time() - start_time < DESIRED_TIME:
     vel_pub.publish(ts)
 
 vel_pub.publish(TwistStamped())
@@ -43,9 +43,9 @@ print('Moving {} for {} seconds'.format('backwards', DESIRED_TIME))
 ts = TwistStamped()
 ts.twist.linear.x = -0.1
 
-start_time = timeit.default_timer()
+start_time = rospy.get_time()
 
-while timeit.default_timer() - start_time < DESIRED_TIME:
+while rospy.get_time() - start_time < DESIRED_TIME:
     vel_pub.publish(ts)
 
 vel_pub.publish(TwistStamped())

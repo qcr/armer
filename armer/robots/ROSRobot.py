@@ -9,6 +9,7 @@ import timeit
 from typing import List, Any
 from threading import Lock, Event
 from armer.timer import Timer
+from armer.trajectory import TrajectoryExecutor
 import rospy
 import actionlib
 import tf
@@ -159,6 +160,10 @@ class ROSRobot(rtb.ERobot):
 
         self.last_update: float = 0
         self.last_tick: float = 0
+
+        self.executor = None
+        
+        self.traj_generator = mjtg
 
         self.joint_subscriber = rospy.Subscriber(
             joint_state_topic if joint_state_topic else '/joint_states',
@@ -318,7 +323,6 @@ class ROSRobot(rtb.ERobot):
         self.Ki = msg.data[1]
         self.Kd = msg.data[2]
 
-
     def close(self):
         """
         Closes the action servers associated with this robot
@@ -358,7 +362,7 @@ class ROSRobot(rtb.ERobot):
         with self.lock:
             self.preempted = False
             
-            start_time = timeit.default_timer()
+            start_time = rospy.get_time()
             triggered = 0
             
             while not self.preempted:
@@ -385,39 +389,7 @@ class ROSRobot(rtb.ERobot):
 
         with self.lock:
             self.j_v = np.array(msg.joints)
-            self.last_update = timeit.default_timer()
-
-    def pose_cb(self, goal: MoveToPoseGoal) -> None:
-        """
-        ROS Action Server callback:
-        Moves the end-effector to the
-        cartesian pose indicated by goal
-
-        :param goal: [description]
-        :type goal: MoveToPoseGoal
-        """
-        if self.moving:
-            self.preempt()
-
-        with self.lock:
-            goal_pose = goal.pose_stamped
-
-            if goal_pose.header.frame_id == '':
-                goal_pose.header.frame_id = self.base_link.name
-
-            goal_pose = self.tf_listener.transformPose(
-                self.base_link.name,
-                goal_pose,
-            )
-            
-            pose = goal_pose.pose
-            
-            solution = ikine(self, pose, q0=self.q, end=self.gripper)
-            
-            if self.__traj_move(solution.q, goal.speed if goal.speed else 0.2):
-                self.pose_server.set_succeeded(MoveToPoseResult(success=True))
-            else:
-                self.pose_server.set_aborted(MoveToPoseResult(success=False))
+            self.last_update = rospy.get_time()
 
     def servo_cb(self, msg) -> None:
         """
@@ -469,9 +441,49 @@ class ROSRobot(rtb.ERobot):
 
             self.j_v = np.linalg.pinv(
                 self.jacobe(self.q)) @ velocities
-            self.last_update = timeit.default_timer()
+            self.last_update = rospy.get_time()
 
         self.cartesian_servo_publisher.publish(arrived)
+
+    def pose_cb(self, goal: MoveToPoseGoal) -> None:
+        """
+        ROS Action Server callback:
+        Moves the end-effector to the
+        cartesian pose indicated by goal
+
+        :param goal: [description]
+        :type goal: MoveToPoseGoal
+        """
+        if self.moving:
+            self.preempt()
+
+        with self.lock:
+            goal_pose = goal.pose_stamped
+
+            if goal_pose.header.frame_id == '':
+                goal_pose.header.frame_id = self.base_link.name
+
+            goal_pose = self.tf_listener.transformPose(
+                self.base_link.name,
+                goal_pose,
+            )
+            
+            pose = goal_pose.pose
+            
+            solution = ikine(self, pose, q0=self.q, end=self.gripper)
+            
+            self.executor = TrajectoryExecutor(
+              self,
+              self.traj_generator(self, solution, goal.speed if goal.speed else 0.2)
+            )
+
+            while not self.executor.is_finished():
+              rospy.sleep(0.01)
+
+            if self.executor.is_succeeded():
+                self.pose_server.set_succeeded(MoveToPoseResult(success=True))
+            else:
+                self.pose_server.set_aborted(MoveToPoseResult(success=False))
 
     def joint_pose_cb(self, goal: MoveToJointPoseGoal) -> None:
         """
@@ -485,8 +497,17 @@ class ROSRobot(rtb.ERobot):
         if self.moving:
             self.preempt()
 
-        with self.lock:           
-            if self.__traj_move(np.array(goal.joints), goal.speed if goal.speed else 0.2):
+        with self.lock:     
+
+            self.executor = TrajectoryExecutor(
+              self,
+              self.traj_generator(self, np.array(goal.joints), goal.speed if goal.speed else 0.2)
+            )
+
+            while not self.executor.is_finished():
+              rospy.sleep(0.01)
+
+            if self.executor.is_succeeded():
                 self.joint_pose_server.set_succeeded(
                     MoveToJointPoseResult(success=True)
                 )
@@ -516,14 +537,24 @@ class ROSRobot(rtb.ERobot):
 
             qd = np.array(self.named_poses[goal.pose_name])
 
-            if self.__traj_move(qd, goal.speed if goal.speed else 0.2):
+            self.executor = TrajectoryExecutor(
+                self,
+                self.traj_generator(self, qd, goal.speed if goal.speed else 0.2)
+            )
+
+            while not self.executor.is_finished():
+                rospy.sleep(0.01)
+
+            if self.executor.is_succeeded():
                 self.named_pose_server.set_succeeded(
-                    MoveToNamedPoseResult(success=True)
+                        MoveToNamedPoseResult(success=True)
                 )
             else:
                 self.named_pose_server.set_aborted(
-                    MoveToNamedPoseResult(success=False)
+                  MoveToNamedPoseResult(success=False)
                 )
+
+            self.executor = None
 
     def home_cb(self, goal: HomeGoal) -> HomeResult:
         """[summary]
@@ -539,13 +570,21 @@ class ROSRobot(rtb.ERobot):
         with self.lock:
             qd = np.array(self.qr) if hasattr(self, 'qr') else self.q
             
-            if self.__traj_move(qd, goal.speed if goal.speed else 0.2):
+            self.executor = TrajectoryExecutor(
+                self,
+                self.traj_generator(self, qd, goal.speed if goal.speed else 0.2)
+            )
+
+            while not self.executor.is_finished():
+              rospy.sleep(0.01)
+
+            if self.executor.is_succeeded():
                 self.home_server.set_succeeded(
                     HomeResult(success=True)
                 )
             else:
                 self.home_server.set_aborted(
-                    HomeResult(success=False)
+                  HomeResult(success=False)
                 )
 
     def recover_cb(self, req: EmptyRequest) -> EmptyResponse: # pylint: disable=no-self-use
@@ -610,128 +649,7 @@ class ROSRobot(rtb.ERobot):
         self.e_v_frame = twist_stamped.header.frame_id
 
         self._controller_mode = ControlMode.CARTESIAN
-        self.last_update = timeit.default_timer()
-
-    def __traj_move(self, qd: np.array, max_speed=0.2, max_rot=0.5) -> bool:
-        """[summary]
-
-        :param traj: [description]
-        :type traj: np.array
-        :return: [description]
-        :rtype: bool
-        """
-
-        if len(self.state.joint_poses) == 0:
-          return False
-
-        self.preempted = False
-        self.moving = True
-        t = 0
-
-        # This is the average cartesian speed we want the robot to move at
-        # NOTE: divided by 2 to make the max speed the approx. peak of the speed achieved
-        ave_cart_speed = max_speed / 2
-        # Frequency of operation - set by configuration file
-        frequency = self.frequency
-           
-        # Calculate start and end pose linear distance to estimate the expected time
-        current_ee_mat = self.ets(start=self.base_link, end=self.gripper).eval(self.q)
-        mid_ee_mat = self.ets(start=self.base_link, end=self.gripper).eval(qd - (qd - self.q) / 2)
-        end_ee_mat = self.ets(start=self.base_link, end=self.gripper).eval(qd)
-        
-        current_ee_pose = current_ee_mat[:3, 3]
-        mid_ee_pose = mid_ee_mat[:3, 3]
-        end_ee_pose = end_ee_mat[:3, 3]
-        
-        # Estimation of time taken based on linear motion from current to end cartesian pose
-        # We may require some optimisation of this given the curved nature of the actual ee trajectory
-        D1 = np.sqrt((mid_ee_pose[0] - current_ee_pose[0])**2 +
-            (mid_ee_pose[1] - current_ee_pose[1])**2 +
-            (mid_ee_pose[2] - current_ee_pose[2])**2)
-        
-        D2 = np.sqrt((end_ee_pose[0] - mid_ee_pose[0])**2 +
-            (end_ee_pose[1] - mid_ee_pose[1])**2 +
-            (end_ee_pose[2] - mid_ee_pose[2])**2)
-
-        linear_move_time = (D1 + D2) / ave_cart_speed
-
-        current_ee_rot = current_ee_mat[:3,:3]
-        end_ee_rot = end_ee_mat[:3,:3]
-
-        angular_move_time = np.arccos((np.trace(np.transpose(end_ee_rot) @ current_ee_rot) - 1) / 2) / max_rot
-        move_time = max(linear_move_time, angular_move_time)
-
-        # Move time correction [currently un-used but requires optimisation]
-        # Correction to account for error in curved motion
-        move_time = move_time * 1
-
-        # Obtain minimum jerk velocity profile of joints based on estimated end effector move time
-        min_jerk_pos, min_jerk_vel = mjtg(self.q, qd, frequency, move_time)
-
-        # Calculate time frequency - based on the max time required for trajectory and the frequency of operation
-        time_freq_steps = int(move_time * frequency)
-
-        #Time step initialise for trajectory
-        time_step = 0
-        cartesian_ee_vel_vect = []
-
-        last_erro_jv = np.zeros(self.n)
-        
-        delta = 1/frequency
-        last_time = rospy.Time.now().to_sec()
-        
-        # while move_time > 0.1 and t + delta <= move_time and time_step < time_freq_steps-1 and not self.preempted:
-        while move_time > 0.1 and time_step < time_freq_steps-1 and not self.preempted:
-            # Self termination if within goal space
-            if np.all(np.fabs(qd - self.q) < 0.001):
-                rospy.loginfo('Too close to goal, quitting movement...')
-                break
-
-            # Compute current state jacobian
-            jacob0 = self.jacob0(self.q, end=self.gripper)
-
-            # Get current joint velocity and calculate current twist
-            current_jv = self.state.joint_velocities #elf.j_v
-            current_jp = self.state.joint_poses
-
-            current_twist = jacob0 @ current_jv
-            current_linear_vel = np.linalg.norm(current_twist[:3])
-            cartesian_ee_vel_vect.append(current_linear_vel)
-
-            # Calculate required joint velocity at this point in time based on minimum jerk
-            req_jv = min_jerk_vel[time_step]
-            req_jp = min_jerk_pos[time_step]
-            
-            # Calculate error in joint velocities based on current and expected
-            erro_jv = req_jv - current_jv
-            erro_jp = req_jp - current_jp
-
-            if np.any(np.max(np.fabs(erro_jp)) > 0.5):
-                rospy.logerr('Exceeded delta joint position max')
-                self.preempt()
-                break
-
-            # Calculate corrected error based on error above
-            corr_jv = req_jv + (erro_jv * self.Kp) + (erro_jp * self.Ki) + (((erro_jv - last_erro_jv) / delta) * self.Kd)
-            last_erro_jv = erro_jv
-            
-            # Update of new expected joint velocities for low level controllers
-            self.event.clear()
-            self.j_v = corr_jv
-            self.last_update = timeit.default_timer()
-            self.event.wait()
-
-            # Increment time step(s)
-            time_step += 1  #Step value from calculated trajectory (minimum jerk)
-            delta = rospy.Time.now().to_sec() - last_time
-            last_time = rospy.Time.now().to_sec()
-            t += delta  
-        
-        self.j_v = np.zeros(self.n)
-        self.moving = False
-        result = not self.preempted
-        self.preempted = False
-        return result
+        self.last_update = rospy.get_time()
 
     def get_state(self) -> ManipulatorState:
         """
@@ -802,7 +720,7 @@ class ROSRobot(rtb.ERobot):
         triggered = 0
 
         if (guards.enabled & guards.GUARD_DURATION) == guards.GUARD_DURATION:
-            triggered |= guards.GUARD_DURATION if timeit.default_timer() - start_time > guards.duration else 0
+            triggered |= guards.GUARD_DURATION if rospy.get_time() - start_time > guards.duration else 0
 
         if (guards.enabled & guards.GUARD_EFFORT) == guards.GUARD_EFFORT:
             eActual = np.fabs(np.array([
@@ -930,7 +848,7 @@ class ROSRobot(rtb.ERobot):
         if self.readonly:
             return
 
-        current_time = timeit.default_timer()
+        current_time = rospy.get_time()
         self.state = self.get_state()
 
         if self.state.errors != 0:
@@ -983,6 +901,9 @@ class ROSRobot(rtb.ERobot):
               rospy.logwarn('No valid transform found between %s and %s', self.base_link.name, self.e_v_frame)
               self.preempt()
 
+        if self.executor:
+          self.j_v = self.executor.step(dt)  
+          
         # apply desired joint velocity to robot
         if any(self.j_v):
             if current_time - self.last_update > 0.1:
@@ -1034,7 +955,7 @@ class ROSRobot(rtb.ERobot):
 
         try:
             with open(self.config_path) as handle:
-                current = yaml.load(handle.read())
+                current = yaml.load(handle.read(), Loader=yaml.SafeLoader)
 
                 if current:
                     config = current

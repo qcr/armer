@@ -4,7 +4,7 @@ Context-based Timer
 .. codeauthor:: Gavin Suddreys
 """
 
-import timeit
+import rospy
 
 
 class Timer:
@@ -25,10 +25,10 @@ class Timer:
         self.start = 0
 
     def __enter__(self):
-        self.start = timeit.default_timer()
+        self.start = rospy.get_time()
         return self
 
     def __exit__(self, *args):
         if self.enabled:
-            dt = timeit.default_timer() - self.start
+            dt = rospy.get_time() - self.start
             print('{}: {} ({} hz)'.format(self.name, dt, 1/dt))

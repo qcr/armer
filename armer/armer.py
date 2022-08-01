@@ -69,7 +69,7 @@ class Armer:
         self.frequency = min([r.frequency for r in self.robots])
         self.rate = rospy.Rate(self.frequency)
 
-        self.last_tick = timeit.default_timer()
+        self.last_tick = rospy.get_time()
 
         # Launch backend
         self.backend.launch(**(backend_args if backend_args else dict()))
@@ -216,11 +216,11 @@ class Armer:
         """
         Runs the driver. This is a blocking call.
         """
-        self.last_tick = timeit.default_timer()
+        self.last_tick = rospy.get_time()
         
         while not rospy.is_shutdown():
             with Timer('ROS', self.log_frequency):
-                current_time = timeit.default_timer()
+                current_time = rospy.get_time()
                 dt = current_time - self.last_tick
 
                 for robot in self.robots:
