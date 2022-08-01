@@ -92,8 +92,8 @@ class ROSRobot(rtb.ERobot):
                  readonly=False,
                  frequency=None,
                  modified_qr=None,
-                 Kp=None,
-                 Ki=None,
+                 Kp=1.0,
+                 Ki=10.0,
                  Kd=None,
                  * args,
                  **kwargs):  # pylint: disable=unused-argument
@@ -485,6 +485,9 @@ class ROSRobot(rtb.ERobot):
             else:
                 self.pose_server.set_aborted(MoveToPoseResult(success=False))
 
+            self.executor = None
+            self.moving = False
+
     def joint_pose_cb(self, goal: MoveToJointPoseGoal) -> None:
         """
         ROS Action Server callback:
@@ -515,6 +518,9 @@ class ROSRobot(rtb.ERobot):
                 self.joint_pose_server.set_aborted(
                     MoveToJointPoseResult(success=False)
                 )
+
+            self.executor = None
+            self.moving = False
 
     def named_pose_cb(self, goal: MoveToNamedPoseGoal) -> None:
         """
@@ -555,6 +561,7 @@ class ROSRobot(rtb.ERobot):
                 )
 
             self.executor = None
+            self.moving = False
 
     def home_cb(self, goal: HomeGoal) -> HomeResult:
         """[summary]
@@ -586,6 +593,9 @@ class ROSRobot(rtb.ERobot):
                 self.home_server.set_aborted(
                   HomeResult(success=False)
                 )
+
+            self.executor = None
+            self.moving = False
 
     def recover_cb(self, req: EmptyRequest) -> EmptyResponse: # pylint: disable=no-self-use
         """[summary]
