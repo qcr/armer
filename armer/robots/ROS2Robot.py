@@ -27,9 +27,9 @@ class ROS2Robot(BaseRobot):
     The ROSRobot class wraps the rtb.ERobot implementing basic ROS functionality
     """
 
-    def __init__(self, * args, **kwargs):  # pylint: disable=unused-argument
+    def __init__(self, nh, *args, **kwargs):  # pylint: disable=unused-argument
         
-        super().__init__(*args, **kwargs)
+        super().__init__(nh, *args, **kwargs)
         
         self.nh.create_subscription(
           JointState,

@@ -15,6 +15,8 @@ import numpy as np
 import yaml
 import time
 
+from armer.models.URDFRobot import URDFRobot
+
 from armer.trajectory import TrajectoryExecutor
 from armer.utils import ikine, mjtg
 from armer.errors import ArmerError
@@ -29,13 +31,13 @@ class ControlMode:
    JOINTS=1
    CARTESIAN=2
 
-class BaseRobot(rtb.ERobot):
+class BaseRobot(URDFRobot):
     """
     The ROSRobot class wraps the rtb.ERobot implementing basic ROS functionality
     """
 
     def __init__(self,
-                 robot: rtb.robot.Robot,
+                 nh,
                  name: str = None,
                  joint_state_topic: str = None,
                  joint_velocity_topic: str = None,
@@ -50,8 +52,7 @@ class BaseRobot(rtb.ERobot):
                  * args,
                  **kwargs):  # pylint: disable=unused-argument
         
-        super().__init__(robot)
-        self.__dict__.update(robot.__dict__)
+        super().__init__(nh, *args, **kwargs)
         
         self.name = name if name else self.name
         
@@ -729,24 +730,6 @@ class BaseRobot(rtb.ERobot):
           self.nh.declare_parameter(param_name, default_value)
         return self.nh.get_parameter(param_name).value
       return self.nh.get_param(param_name, default_value)
-
-    def logger(self, message, mode='info'):
-      if hasattr(self.nh, 'get_logger'):
-        if mode == 'error':
-          self.nh.get_logger().error(message)
-        elif mode == 'warn':
-          self.nh.get_logger().warn(message)
-        else:
-          self.nh.get_logger().info(message)
-      elif hasattr(self.nh, 'loginfo'):
-        if mode == 'error':
-          self.nh.logerror(message)
-        elif mode == 'warn':
-          self.nh.logwarn(message)
-        else:
-          self.nh.loginfo(message)
-      else:
-        print(message)
 
     def __load_config(self):
         """[summary]
