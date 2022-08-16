@@ -2,16 +2,19 @@
 
 import numpy as np
 import re
-import rospy
-import rospkg
+import time
 from io import BytesIO
 from roboticstoolbox.robot import ERobot, Link, ET, ETS
 from roboticstoolbox.tools import URDF
 import xml.etree.ElementTree as ETT
 import spatialmath
 
+import rospkg
+
+
 class URDFRobot(ERobot):
   def __init__(self,
+               nh,
                qz=None,
                qr=None,
                gripper=None,
@@ -19,6 +22,8 @@ class URDFRobot(ERobot):
                urdf_file=None,
                *args,
                **kwargs):
+
+    self.nh = nh
 
     if urdf_file:
       links, name, urdf_string, urdf_filepath = self.URDF_read(urdf_file)
@@ -33,8 +38,7 @@ class URDFRobot(ERobot):
       
       if 'name' in tool:
         links.append(Link(ets, name=tool['name'], parent=self.gripper))
-        self.gripper = tool['name']
-
+        
       gripper_link[0].tool = spatialmath.SE3(ets.compile()[0].A())
       
 
@@ -53,12 +57,12 @@ class URDFRobot(ERobot):
     self.addconfiguration("qz", self.qz)
 
   def URDF_read_description(self):
-    rospy.loginfo('Waiting for robot description')
-    while not rospy.has_param('/robot_description'):
-      rospy.sleep(0.5)
-    rospy.loginfo('Found robot description')
+    self.logger('Waiting for robot description')
+    while not self.nh.has_param('/robot_description'):
+      time.sleep(0.5)
+    self.logger('Found robot description')
 
-    urdf_string = self.URDF_resolve(rospy.get_param('/robot_description'))
+    urdf_string = self.URDF_resolve(self.get_parameter('/robot_description'))
     
     tree = ETT.parse(
       BytesIO(bytes(urdf_string, "utf-8")), 
@@ -102,6 +106,27 @@ class URDFRobot(ERobot):
       transforms = [ getattr(ET, list(et.keys())[0])(list(et.values())[0]) for et in tool['ets'] ]
 
     return ETS(transforms)
+
+  def get_parameter(self, param_name):
+    return self.nh.get_parameter(param_name) if hasattr(self.nh, 'get_parameter') else self.nh.get_param(param_name)
+
+  def logger(self, message, mode='info'):
+    if hasattr(self.nh, 'get_logger'):
+      if mode == 'error':
+        self.nh.get_logger().error(message)
+      elif mode == 'warn':
+        self.nh.get_logger().warn(message)
+      else:
+        self.nh.get_logger().info(message)
+    elif hasattr(self.nh, 'loginfo'):
+      if mode == 'error':
+        self.nh.logerror(message)
+      elif mode == 'warn':
+        self.nh.logwarn(message)
+      else:
+        self.nh.loginfo(message)
+    else:
+      print(message)
 
 if __name__ == "__main__":  # pragma nocover
 

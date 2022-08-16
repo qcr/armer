@@ -3,37 +3,43 @@ Utility functions used by Armer
 
 .. codeauthor:: Gavin Suddrey
 """
-
-import rospy
+import os
 import numpy as np
-from spatialmath import SE3, SO3, UnitQuaternion, base
-from geometry_msgs.msg import TransformStamped
+from spatialmath import base
 import qpsolvers as qp
 import roboticstoolbox as rtb
 from roboticstoolbox.tools.trajectory import Trajectory
-from trac_ik_python.trac_ik import IK
 
-def ikine(robot, target, q0, end):
-    print(robot)
-    ik_solver = IK(robot.base_link.name,
-                   end,
-                   timeout=0.1,
-                   urdf_string=robot.urdf_string,
-                   solve_type='Manipulation2')
-    
-    ik_solver.set_joint_limits(*robot.qlim)
-    
-    sol = ik_solver.get_ik(q0,
-                        target.position.x, target.position.y, target.position.z,
-                        target.orientation.x, target.orientation.y, target.orientation.z, target.orientation.w)
+from geometry_msgs.msg import TransformStamped
+import geometry_msgs
 
-    return type('obj', (object,), {'q' : np.array(sol)})
+if os.environ['ROS_VERSION'] == '2':
+  def ikine(robot, target, q0, end):
+    return type('obj', (object,), {'q' : np.array(q0)})
     
+else:
+  from trac_ik_python.trac_ik import IK
+
+  def ikine(robot, target, q0, end):
+      ik_solver = IK(robot.base_link.name,
+                    end,
+                    timeout=0.1,
+                    urdf_string=robot.urdf_string,
+                    solve_type='Manipulation2')
+      
+      ik_solver.set_joint_limits(*robot.qlim)
+      
+      sol = ik_solver.get_ik(q0,
+                          target.position.x, target.position.y, target.position.z,
+                          target.orientation.x, target.orientation.y, target.orientation.z, target.orientation.w)
+      
+      return type('obj', (object,), {'q' : np.array(sol)})
+
 def mjtg(robot: rtb.ERobot, qd: np.ndarray, max_speed: float=0.2, max_rot: float=0.5, frequency=500):
   # This is the average cartesian speed we want the robot to move at
   # NOTE: divided by 2 to make the max speed the approx. peak of the speed achieved
   ave_cart_speed = max_speed / 2
-      
+  
   # Calculate start and end pose linear distance to estimate the expected time
   current_ee_mat = robot.ets(start=robot.base_link, end=robot.gripper).eval(robot.q)
   mid_ee_mat = robot.ets(start=robot.base_link, end=robot.gripper).eval(qd - (qd - robot.q) / 2)
@@ -89,13 +95,15 @@ def mjtg(robot: rtb.ERobot, qd: np.ndarray, max_speed: float=0.2, max_rot: float
   
   return Trajectory('minimum-jerk', move_time, dq, dqd, None, True)
 
-def populate_transform_stamped(parent_name: str, link_name: str, transform: np.array):
+def populate_transform_stamped(parent_name: str, link_name: str, transform: np.array, timestamp):
     """
     Generates a geometry_msgs/TransformStamped message between
     a link and its parent based on the provided SE3 transform
     """
     transform_stamped = TransformStamped()
-    transform_stamped.header.stamp = rospy.Time.now()
+        
+    transform_stamped.header.stamp = timestamp.to_msg() if hasattr(timestamp, 'to_msg') else timestamp
+
     transform_stamped.header.frame_id = parent_name
     transform_stamped.child_frame_id = link_name
     transform_stamped.transform.translation.x = transform[0,3]

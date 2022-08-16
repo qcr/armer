@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<package format="2">
+<package format="3">
   <name>armer</name>
   <version>0.2.0</version>
   <description>Armer - The Arm drivEr</description>
@@ -9,12 +9,10 @@
   <!-- <maintainer email="jane.doe@example.com">Jane Doe</maintainer> -->
   <maintainer email="g.suddrey@qut.edu.au">Gavin Suddrey</maintainer>
 
-
   <!-- One license tag required, multiple allowed, one license per tag -->
   <!-- Commonly used license strings: -->
   <!--   BSD, MIT, Boost Software License, GPLv2, GPLv3, LGPLv2.1, LGPLv3 -->
   <license>MIT</license>
-
 
   <!-- Url tags are optional, but multiple are allowed, one per tag -->
   <!-- Optional attribute type can be: website, bugtracker, or repository -->
@@ -48,17 +46,19 @@
   <!--   <test_depend>gtest</test_depend> -->
   <!-- Use doc_depend for packages you need only for building documentation: -->
   <!--   <doc_depend>doxygen</doc_depend> -->
-  <buildtool_depend>catkin</buildtool_depend>
-  <depend>tf2_ros</depend>
-  <depend>armer_msgs</depend>
+  <buildtool_depend condition="$ROS_VERSION == 1">catkin</buildtool_depend>
 
-  <exec_depend>trac_ik</exec_depend>
+  <exec_depend condition="$ROS_VERSION == 2">rclpy</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>armer_msgs</exec_depend>
+
+  <exec_depend condition="$ROS_VERSION == 1">trac_ik</exec_depend>
   <exec_depend>python3-yaml</exec_depend>
   <exec_depend>roboticstoolbox-python</exec_depend>
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>
     <!-- Other tools can request additional information be placed here -->
-
+    <build_type condition="$ROS_VERSION == 2">ament_python</build_type>
   </export>
 </package>

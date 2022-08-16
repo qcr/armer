@@ -4,80 +4,32 @@ ROSRobot module defines the ROSRobot type
 .. codeauthor:: Gavin Suddreys
 """
 import os
-import timeit
 
 from typing import List, Any
 from threading import Lock, Event
-from armer.timer import Timer
-from armer.trajectory import TrajectoryExecutor
-import rospy
-import actionlib
-import tf
+import tf2_ros
 import roboticstoolbox as rtb
 import spatialmath as sp
-from spatialmath import SE3, SO3, UnitQuaternion, base
+from spatialmath import SE3, SO3, UnitQuaternion
 import numpy as np
 import yaml
+import time
 
+from armer.trajectory import TrajectoryExecutor
 from armer.utils import ikine, mjtg
-
-from std_msgs.msg import Header, Bool
-from sensor_msgs.msg import JointState
-from geometry_msgs.msg import PoseStamped
-
-from geometry_msgs.msg import TwistStamped, Twist, Vector3Stamped, QuaternionStamped
-from std_srvs.srv import Empty, EmptyRequest, EmptyResponse
-
-from std_msgs.msg import Float64MultiArray
-
-from armer_msgs.msg import ManipulatorState, JointVelocity, ServoStamped, Guards
-from armer_msgs.msg import GuardedVelocityAction, GuardedVelocityGoal, GuardedVelocityResult
-from armer_msgs.msg import MoveToJointPoseAction, MoveToJointPoseGoal, MoveToJointPoseResult
-from armer_msgs.msg import MoveToNamedPoseAction, MoveToNamedPoseGoal, MoveToNamedPoseResult
-from armer_msgs.msg import MoveToPoseAction, MoveToPoseGoal, MoveToPoseResult
-from armer_msgs.msg import HomeAction, HomeGoal, HomeResult
-
-from armer_msgs.srv import SetCartesianImpedance, \
-    SetCartesianImpedanceRequest, \
-    SetCartesianImpedanceResponse
-
-from armer_msgs.srv import AddNamedPose, \
-    AddNamedPoseRequest, \
-    AddNamedPoseResponse
-
-from armer_msgs.srv import AddNamedPoseConfig, \
-    AddNamedPoseConfigRequest, \
-    AddNamedPoseConfigResponse
-
-from armer_msgs.srv import GetNamedPoseConfigs, \
-    GetNamedPoseConfigsRequest, \
-    GetNamedPoseConfigsResponse
-
-from armer_msgs.srv import GetLinkName, \
-    GetLinkNameRequest, \
-    GetLinkNameResponse
-
-from armer_msgs.srv import GetNamedPoses, \
-    GetNamedPosesRequest, \
-    GetNamedPosesResponse
-
-from armer_msgs.srv import RemoveNamedPose, \
-    RemoveNamedPoseRequest, \
-    RemoveNamedPoseResponse
-
-from armer_msgs.srv import RemoveNamedPoseConfig, \
-    RemoveNamedPoseConfigRequest, \
-    RemoveNamedPoseConfigResponse
+from armer.errors import ArmerError
 
 # pylint: disable=too-many-instance-attributes
 
-import tf2_ros
+from armer_msgs.msg import ManipulatorState, JointVelocity, ServoStamped, Guards
+from geometry_msgs.msg import TwistStamped, Twist, PoseStamped
+from std_msgs.msg import Header, Float64MultiArray
 
 class ControlMode:
    JOINTS=1
    CARTESIAN=2
 
-class ROSRobot(rtb.ERobot):
+class BaseRobot(rtb.ERobot):
     """
     The ROSRobot class wraps the rtb.ERobot implementing basic ROS functionality
     """
@@ -103,6 +55,19 @@ class ROSRobot(rtb.ERobot):
         
         self.name = name if name else self.name
         
+        self.joint_state_topic = joint_state_topic \
+                if joint_state_topic \
+                else '/joint_states'
+
+        self.joint_velocity_topic = joint_velocity_topic \
+                if joint_velocity_topic \
+                else '/joint_group_velocity_controller/command'
+
+        self.config_path = config_path if config_path else os.path.join(
+            os.getenv('HOME', '/root'),
+            '.ros/configs/armer.yaml'
+        )
+
         if not hasattr(self, 'gripper'):
           self.gripper = self.grippers[0].name
           
@@ -120,8 +85,8 @@ class ROSRobot(rtb.ERobot):
         if origin:
             self.base = SE3(origin[:3]) @ SE3.RPY(origin[3:])
 
-        self.frequency = frequency if frequency else rospy.get_param((
-          joint_state_topic if joint_state_topic else '/joint_states') + '/frequency', 500
+        self.frequency = frequency if frequency else self.get_parameter(
+          f'{self.joint_state_topic}/frequency', 500
         )
         
         self.q = self.qr if hasattr(self, 'qr') else self.q # pylint: disable=no-member
@@ -164,159 +129,19 @@ class ROSRobot(rtb.ERobot):
         self.executor = None
         
         self.traj_generator = mjtg
+        self.ik_solver = ikine
 
-        self.joint_subscriber = rospy.Subscriber(
-            joint_state_topic if joint_state_topic else '/joint_states',
-            JointState,
-            self._state_cb
-        )
+        self.tf_buffer = tf2_ros.buffer.Buffer()
+        
+        if hasattr(self.nh, 'get_clock'):
+          self.tf_listener = tf2_ros.transform_listener.TransformListener(self.tf_buffer, self.nh)
+        else:
+          self.tf_listener = tf2_ros.transform_listener.TransformListener(self.tf_buffer)
 
         self.readonly = readonly
 
-        self.joint_velocity_topic = joint_velocity_topic \
-                if joint_velocity_topic \
-                else '/joint_group_velocity_controller/command'
-
-        if not self.readonly:
-            self.joint_publisher = rospy.Publisher(
-                self.joint_velocity_topic,
-                Float64MultiArray,
-                queue_size=1
-            )
-
-            # Create Transform Listener
-            self.tf_listener = tf.TransformListener()
-
-            self.config_path = config_path if config_path else os.path.join(
-                os.getenv('HOME', '/root'),
-                '.ros/configs/armer.yaml'
-            )
-
-            self.custom_configs: List[str] = []
-            self.__load_config()
-
-            # Services
-            rospy.Service('{}/recover'.format(self.name.lower()),
-                          Empty, self.recover_cb)
-            rospy.Service('{}/stop'.format(self.name.lower()),
-                          Empty, self.preempt)
-
-            # Publishers
-            self.state_publisher: rospy.Publisher = rospy.Publisher(
-                '{}/state'.format(self.name.lower()), ManipulatorState, queue_size=1
-            )
-            self.cartesian_servo_publisher: rospy.Publisher = rospy.Publisher(
-                '{}/cartesian/servo/arrived'.format(self.name.lower()
-                    ), Bool, queue_size=1
-            )
-
-            # Subscribers
-            self.cartesian_velocity_subscriber: rospy.Subscriber = rospy.Subscriber(
-                '{}/cartesian/velocity'.format(self.name.lower()
-                                               ), TwistStamped, self.velocity_cb
-            )
-            self.joint_velocity_subscriber: rospy.Subscriber = rospy.Subscriber(
-                '{}/joint/velocity'.format(self.name.lower()
-                                           ), JointVelocity, self.joint_velocity_cb
-            )
-            self.cartesian_servo_subscriber: rospy.Subscriber = rospy.Subscriber(
-                '{}/cartesian/servo'.format(self.name.lower()
-                                            ), ServoStamped, self.servo_cb
-            )
-
-            # Action Servers
-            self.velocity_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
-                '{}/cartesian/guarded_velocity'.format(self.name.lower()),
-                GuardedVelocityAction,
-                execute_cb=self.guarded_velocity_cb,
-                auto_start=False
-            )
-            self.velocity_server.register_preempt_callback(self.preempt)
-            self.velocity_server.start()
-
-            self.pose_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
-                '{}/cartesian/pose'.format(self.name.lower()),
-                MoveToPoseAction,
-                execute_cb=self.pose_cb,
-                auto_start=False
-            )
-            self.pose_server.register_preempt_callback(self.preempt)
-            self.pose_server.start()
-
-            self.joint_pose_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
-                '{}/joint/pose'.format(self.name.lower()),
-                MoveToJointPoseAction,
-                execute_cb=self.joint_pose_cb,
-                auto_start=False
-            )
-            self.joint_pose_server.register_preempt_callback(self.preempt)
-            self.joint_pose_server.start()
-
-            self.named_pose_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
-                '{}/joint/named'.format(self.name.lower()),
-                MoveToNamedPoseAction,
-                execute_cb=self.named_pose_cb,
-                auto_start=False
-            )
-            self.named_pose_server.register_preempt_callback(self.preempt)
-            self.named_pose_server.start()
-
-            self.home_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
-                '{}/home'.format(self.name.lower()),
-                HomeAction,
-                execute_cb=self.home_cb,
-                auto_start=False
-            )
-            self.home_server.register_preempt_callback(self.preempt)
-            self.home_server.start()
-
-            rospy.Service(
-                '{}/set_cartesian_impedance'.format(self.name.lower()),
-                SetCartesianImpedance,
-                self.set_cartesian_impedance_cb
-            )
-
-            rospy.Service(
-                '{}/get_ee_link_name'.format(self.name.lower()),
-                GetLinkName,
-                lambda req: GetLinkNameResponse(name=self.gripper)
-            )
-            
-            rospy.Service(
-                '{}/get_base_link_name'.format(self.name.lower()),
-                GetLinkName,
-                lambda req: GetLinkNameResponse(name=self.base_link.name)
-            )
-            
-            rospy.Service('{}/get_named_poses'.format(self.name.lower()), GetNamedPoses,
-                          self.get_named_poses_cb)
-
-            rospy.Service('{}/set_named_pose'.format(self.name.lower()), AddNamedPose,
-                          self.add_named_pose_cb)
-            rospy.Service('{}/remove_named_pose'.format(self.name.lower()), RemoveNamedPose,
-                          self.remove_named_pose_cb)
-
-            rospy.Service(
-                '{}/add_named_pose_config'.format(self.name.lower()),
-                AddNamedPoseConfig,
-                self.add_named_pose_config_cb
-            )
-            rospy.Service(
-                '{}/remove_named_pose_config'.format(self.name.lower()),
-                RemoveNamedPoseConfig,
-                self.remove_named_pose_config_cb
-            )
-            rospy.Service(
-                '{}/get_named_pose_configs'.format(self.name.lower()),
-                GetNamedPoseConfigs,
-                self.get_named_pose_configs_cb
-            )
-
-            rospy.Subscriber(
-                '{}/set_pid'.format(self.name.lower()),
-                Float64MultiArray,
-                self.set_pid
-            )
+        self.custom_configs: List[str] = []
+        self.__load_config()
 
     def set_pid(self, msg):
         self.Kp = msg.data[0]
@@ -325,11 +150,9 @@ class ROSRobot(rtb.ERobot):
 
     def close(self):
         """
-        Closes the action servers associated with this robot
+        Closes any resources associated with this robot
         """
-        self.pose_server.need_to_terminate = True
-        self.joint_pose_server.need_to_terminate = True
-        self.named_pose_server.need_to_terminate = True
+        pass
 
     def _state_cb(self, msg):
         if not self.joint_indexes:
@@ -355,14 +178,14 @@ class ROSRobot(rtb.ERobot):
             self.preempted = False
             self.__vel_move(msg)
 
-    def guarded_velocity_cb(self, msg: GuardedVelocityGoal) -> None:
+    def guarded_velocity_cb(self, msg) -> None:
         if self.moving:
             self.preempt()
         
         with self.lock:
             self.preempted = False
             
-            start_time = rospy.get_time()
+            start_time = self.get_time()
             triggered = 0
             
             while not self.preempted:
@@ -372,9 +195,9 @@ class ROSRobot(rtb.ERobot):
                     break
 
                 self.__vel_move(msg.twist_stamped)
-                rospy.sleep(0.01)
+                time.sleep(0.01)
 
-            self.velocity_server.set_succeeded(GuardedVelocityResult(triggered=triggered))
+        return True
 
     def joint_velocity_cb(self, msg: JointVelocity) -> None:
         """
@@ -389,9 +212,9 @@ class ROSRobot(rtb.ERobot):
 
         with self.lock:
             self.j_v = np.array(msg.joints)
-            self.last_update = rospy.get_time()
+            self.last_update = self.get_time()
 
-    def servo_cb(self, msg) -> None:
+    def servo_cb(self, msg: ServoStamped) -> None:
         """
         ROS Servoing Subscriber Callback:
         Servos the end-effector to the cartesian pose given by msg
@@ -414,10 +237,11 @@ class ROSRobot(rtb.ERobot):
             if msg.header.frame_id == '':
                 msg.header.frame_id = self.base_link.name
             
-            goal_pose_stamped = self.tf_listener.transformPose(
-                self.base_link.name,
-                PoseStamped(header=msg.header, pose=goal_pose)
+            goal_pose_stamped = self.transform(
+                PoseStamped(header=msg.header, pose=goal_pose),
+                self.base_link.name
             )
+            
             pose = goal_pose_stamped.pose
 
             target = SE3(pose.position.x, pose.position.y, pose.position.z) * UnitQuaternion([
@@ -441,11 +265,11 @@ class ROSRobot(rtb.ERobot):
 
             self.j_v = np.linalg.pinv(
                 self.jacobe(self.q)) @ velocities
-            self.last_update = rospy.get_time()
+            self.last_update = self.get_time()
 
         self.cartesian_servo_publisher.publish(arrived)
 
-    def pose_cb(self, goal: MoveToPoseGoal) -> None:
+    def pose_cb(self, goal):
         """
         ROS Action Server callback:
         Moves the end-effector to the
@@ -463,10 +287,7 @@ class ROSRobot(rtb.ERobot):
             if goal_pose.header.frame_id == '':
                 goal_pose.header.frame_id = self.base_link.name
 
-            goal_pose = self.tf_listener.transformPose(
-                self.base_link.name,
-                goal_pose,
-            )
+            goal_pose = self.transform(goal_pose, self.base_link.name)
             
             pose = goal_pose.pose
             
@@ -474,21 +295,20 @@ class ROSRobot(rtb.ERobot):
             
             self.executor = TrajectoryExecutor(
               self,
-              self.traj_generator(self, solution, goal.speed if goal.speed else 0.2)
+              self.traj_generator(self, solution.q, goal.speed if goal.speed else 0.2)
             )
 
             while not self.executor.is_finished():
-              rospy.sleep(0.01)
+              time.sleep(0.01)
 
-            if self.executor.is_succeeded():
-                self.pose_server.set_succeeded(MoveToPoseResult(success=True))
-            else:
-                self.pose_server.set_aborted(MoveToPoseResult(success=False))
+            result = self.executor.is_succeeded()
 
             self.executor = None
             self.moving = False
 
-    def joint_pose_cb(self, goal: MoveToJointPoseGoal) -> None:
+        return result
+
+    def joint_pose_cb(self, goal) -> None:
         """
         ROS Action Server callback:
         Moves the arm the named pose indicated by goal
@@ -508,21 +328,16 @@ class ROSRobot(rtb.ERobot):
             )
 
             while not self.executor.is_finished():
-              rospy.sleep(0.01)
+              time.sleep(0.01)
 
-            if self.executor.is_succeeded():
-                self.joint_pose_server.set_succeeded(
-                    MoveToJointPoseResult(success=True)
-                )
-            else:
-                self.joint_pose_server.set_aborted(
-                    MoveToJointPoseResult(success=False)
-                )
-
+            result = self.executor.is_succeeded()
+            
             self.executor = None
             self.moving = False
 
-    def named_pose_cb(self, goal: MoveToNamedPoseGoal) -> None:
+        return result
+
+    def named_pose_cb(self, goal, result) -> None:
         """
         ROS Action Server callback:
         Moves the arm the named pose indicated by goal
@@ -536,10 +351,7 @@ class ROSRobot(rtb.ERobot):
 
         with self.lock:
             if not goal.pose_name in self.named_poses:
-                self.named_pose_server.set_aborted(
-                    MoveToNamedPoseResult(success=False),
-                    'Unknown named pose'
-                )
+              raise ArmerError('Unknown named pose')
 
             qd = np.array(self.named_poses[goal.pose_name])
 
@@ -549,21 +361,16 @@ class ROSRobot(rtb.ERobot):
             )
 
             while not self.executor.is_finished():
-                rospy.sleep(0.01)
+                self.sleep(0.01)
 
-            if self.executor.is_succeeded():
-                self.named_pose_server.set_succeeded(
-                        MoveToNamedPoseResult(success=True)
-                )
-            else:
-                self.named_pose_server.set_aborted(
-                  MoveToNamedPoseResult(success=False)
-                )
-
+            result = self.executor.is_succeeded()
+            
             self.executor = None
             self.moving = False
 
-    def home_cb(self, goal: HomeGoal) -> HomeResult:
+        return result
+
+    def home_cb(self, goal) -> None:
         """[summary]
 
         :param req: Empty request
@@ -583,21 +390,16 @@ class ROSRobot(rtb.ERobot):
             )
 
             while not self.executor.is_finished():
-              rospy.sleep(0.01)
+              time.sleep(0.01)
 
-            if self.executor.is_succeeded():
-                self.home_server.set_succeeded(
-                    HomeResult(success=True)
-                )
-            else:
-                self.home_server.set_aborted(
-                  HomeResult(success=False)
-                )
-
+            result = self.executor.is_succeeded()
+                
             self.executor = None
             self.moving = False
 
-    def recover_cb(self, req: EmptyRequest) -> EmptyResponse: # pylint: disable=no-self-use
+        return result
+
+    def recover_cb(self, req): # pylint: disable=no-self-use
         """[summary]
         ROS Service callback:
         Invoke any available error recovery functions on the robot when an error occurs
@@ -607,12 +409,9 @@ class ROSRobot(rtb.ERobot):
         :return: an empty response
         :rtype: EmptyResponse
         """
-        rospy.logwarn('Recovery not implemented for this arm')
-        return EmptyResponse()
+        return NotImplementedError()
 
-    def set_cartesian_impedance_cb(  # pylint: disable=no-self-use
-            self,
-            request: SetCartesianImpedanceRequest) -> SetCartesianImpedanceResponse:
+    def set_cartesian_impedance_cb(self, request): # pylint: disable=no-self-use
         """
         ROS Service Callback
         Set the 6-DOF impedance of the end-effector. Higher values should increase the stiffness
@@ -624,9 +423,7 @@ class ROSRobot(rtb.ERobot):
         :return: True if the impedence values were updated successfully
         :rtype: GetNamedPoseConfigsResponse
         """
-        rospy.logwarn(
-            'Setting cartesian impedance not implemented for this arm')
-        return SetCartesianImpedanceResponse(True)
+        return NotImplementedError()
 
     def preempt(self, *args: list) -> None:
         """
@@ -659,7 +456,7 @@ class ROSRobot(rtb.ERobot):
         self.e_v_frame = twist_stamped.header.frame_id
 
         self._controller_mode = ControlMode.CARTESIAN
-        self.last_update = rospy.get_time()
+        self.last_update = self.get_time()
 
     def get_state(self) -> ManipulatorState:
         """
@@ -674,7 +471,7 @@ class ROSRobot(rtb.ERobot):
         ee_pose = self.ets(start=self.base_link, end=self.gripper).eval(self.q)
         header = Header()
         header.frame_id = self.base_link.name
-        header.stamp = rospy.Time.now()
+        header.stamp = self.get_stamp()
 
         pose_stamped = PoseStamped()
         pose_stamped.header = header
@@ -718,7 +515,7 @@ class ROSRobot(rtb.ERobot):
         else:
             state.joint_poses = list(self.q)
             state.joint_velocities = list(self.qd)
-            state.joint_torques = np.zeros(self.n)
+            state.joint_torques = np.zeros(self.n, dtype=np.float).tolist()
         
         return state
 
@@ -730,7 +527,7 @@ class ROSRobot(rtb.ERobot):
         triggered = 0
 
         if (guards.enabled & guards.GUARD_DURATION) == guards.GUARD_DURATION:
-            triggered |= guards.GUARD_DURATION if rospy.get_time() - start_time > guards.duration else 0
+            triggered |= guards.GUARD_DURATION if self.get_time() - start_time > guards.duration else 0
 
         if (guards.enabled & guards.GUARD_EFFORT) == guards.GUARD_EFFORT:
             eActual = np.fabs(np.array([
@@ -755,7 +552,7 @@ class ROSRobot(rtb.ERobot):
             
         return triggered
 
-    def get_named_poses_cb(self, req: GetNamedPosesRequest) -> GetNamedPosesResponse:
+    def get_named_poses_cb(self, req):
         """
         ROS Service callback:
         Retrieves the list of named poses available to the arm
@@ -765,9 +562,9 @@ class ROSRobot(rtb.ERobot):
         :return: The list of named poses available for the arm
         :rtype: GetNamesListResponse
         """
-        return GetNamedPosesResponse(list(self.named_poses.keys()))
-
-    def add_named_pose_cb(self, req: AddNamedPoseRequest) -> AddNamedPoseResponse:
+        raise NotImplementedError()
+        
+    def add_named_pose_cb(self, req):
         """
         ROS Service callback:
         Adds the current arm pose as a named pose and saves it to the host config
@@ -777,16 +574,9 @@ class ROSRobot(rtb.ERobot):
         :return: True if the named pose was written successfully otherwise false
         :rtype: AddNamedPoseResponse
         """
-        if req.pose_name in self.named_poses and not req.overwrite:
-            rospy.logerr('Named pose already exists.')
-            return AddNamedPoseResponse(success=False)
+        raise NotImplementedError()
 
-        self.named_poses[req.pose_name] = self.q.tolist()
-        self.__write_config('named_poses', self.named_poses)
-
-        return AddNamedPoseResponse(success=True)
-
-    def remove_named_pose_cb(self, req: RemoveNamedPoseRequest) -> RemoveNamedPoseResponse:
+    def remove_named_pose_cb(self, req):
         """
         ROS Service callback:
         Adds the current arm pose as a named pose and saves it to the host config
@@ -796,18 +586,9 @@ class ROSRobot(rtb.ERobot):
         :return: True if the named pose was written successfully otherwise false
         :rtype: AddNamedPoseResponse
         """
-        if req.pose_name not in self.named_poses and not req.overwrite:
-            rospy.logerr('Named pose does not exists.')
-            return AddNamedPoseResponse(success=False)
+        raise NotImplementedError()
 
-        del self.named_poses[req.pose_name]
-        self.__write_config('named_poses', self.named_poses)
-
-        return AddNamedPoseResponse(success=True)
-
-    def add_named_pose_config_cb(
-            self,
-            request: AddNamedPoseConfigRequest) -> AddNamedPoseConfigResponse:
+    def add_named_pose_config_cb(self, request):
         """[summary]
 
         :param request: [description]
@@ -815,13 +596,9 @@ class ROSRobot(rtb.ERobot):
         :return: [description]
         :rtype: AddNamedPoseConfigResponse
         """
-        self.custom_configs.append(request.config_path)
-        self.__load_config()
-        return True
+        raise NotImplementedError()
 
-    def remove_named_pose_config_cb(
-            self,
-            request: RemoveNamedPoseConfigRequest) -> RemoveNamedPoseConfigResponse:
+    def remove_named_pose_config_cb(self, request):
         """[summary]
 
         :param request: [description]
@@ -829,14 +606,9 @@ class ROSRobot(rtb.ERobot):
         :return: [description]
         :rtype: [type]
         """
-        if request.config_path in self.custom_configs:
-            self.custom_configs.remove(request.config_path)
-            self.__load_config()
-        return True
+        raise NotImplementedError()
 
-    def get_named_pose_configs_cb(
-            self,
-            request: GetNamedPoseConfigsRequest) -> GetNamedPoseConfigsResponse:
+    def get_named_pose_configs_cb(self, request):
         """[summary]
 
         :param request: [description]
@@ -858,7 +630,7 @@ class ROSRobot(rtb.ERobot):
         if self.readonly:
             return
 
-        current_time = rospy.get_time()
+        current_time = self.get_time()
         self.state = self.get_state()
 
         if self.state.errors != 0:
@@ -874,10 +646,10 @@ class ROSRobot(rtb.ERobot):
                     self._controller_mode = ControlMode.JOINTS
 
             try:
-              _, orientation = self.tf_listener.lookupTransform(
+              _, orientation = self.tf_buffer.lookup_transform(
                   self.base_link.name,
                   self.e_v_frame,
-                  rospy.Time(0)
+                  self.get_time(False)
               )
               
               U = UnitQuaternion([
@@ -907,8 +679,8 @@ class ROSRobot(rtb.ERobot):
               self.j_v = np.linalg.pinv(
                 self.jacob0(self.q, end=self.gripper)) @ e_v
               
-            except (tf.LookupException, tf2_ros.ExtrapolationException):
-              rospy.logwarn('No valid transform found between %s and %s', self.base_link.name, self.e_v_frame)
+            except (tf2_ros.LookupException, tf2_ros.ExtrapolationException):
+              self.logger('No valid transform found between {} and {}'.format(self.base_link.name, self.e_v_frame), 'warn')
               self.preempt()
 
         if self.executor:
@@ -927,6 +699,55 @@ class ROSRobot(rtb.ERobot):
 
         self.event.set()
 
+    def transform(self, stamped_message, target_frame_id):
+      T = self.tf_buffer.lookup_transform(
+        target_frame_id, 
+        stamped_message.header.frame_id,
+        self.get_time(False)
+      )
+      
+      return stamped_message
+
+    def get_time(self, as_float=True):
+      if hasattr(self.nh, 'get_clock'):
+        if as_float:
+          return self.nh.get_clock().now().nanoseconds / 1e9
+        return self.nh.get_clock().now()
+      else:
+        if as_float:
+          return self.nh.get_time()
+        return self.nh.Time().now()
+
+    def get_stamp(self):
+      if hasattr(self.nh, 'get_clock'):
+        return self.nh.get_clock().now().to_msg()
+      return self.nh.Time.now()
+
+    def get_parameter(self, param_name, default_value=None):
+      if hasattr(self.nh, 'get_parameter'):
+        if not self.nh.has_parameter(param_name):
+          self.nh.declare_parameter(param_name, default_value)
+        return self.nh.get_parameter(param_name).value
+      return self.nh.get_param(param_name, default_value)
+
+    def logger(self, message, mode='info'):
+      if hasattr(self.nh, 'get_logger'):
+        if mode == 'error':
+          self.nh.get_logger().error(message)
+        elif mode == 'warn':
+          self.nh.get_logger().warn(message)
+        else:
+          self.nh.get_logger().info(message)
+      elif hasattr(self.nh, 'loginfo'):
+        if mode == 'error':
+          self.nh.logerror(message)
+        elif mode == 'warn':
+          self.nh.logwarn(message)
+        else:
+          self.nh.loginfo(message)
+      else:
+        print(message)
+
     def __load_config(self):
         """[summary]
         """
@@ -937,8 +758,9 @@ class ROSRobot(rtb.ERobot):
                 if config and 'named_poses' in config:
                     self.named_poses.update(config['named_poses'])
             except IOError:
-                rospy.logwarn(
-                    'Unable to locate configuration file: {}'.format(config_name))
+                self.logger(
+                    'Unable to locate configuration file: {}'.format(config_name), 'warn'
+                )
 
         if os.path.exists(self.config_path):
             try:

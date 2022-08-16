@@ -6,10 +6,8 @@ Armer Class
 from __future__ import annotations
 from typing import List, Dict, Any, Tuple
 
-import timeit
 import importlib
 
-import rospy
 import tf2_ros
 import yaml
 
@@ -20,9 +18,8 @@ from spatialmath.base.argcheck import getvector
 
 from armer.utils import populate_transform_stamped
 from armer.models import URDFRobot
-from armer.robots import ROSRobot
-from armer.timer import Timer
 
+from armer.robots import ROSRobot
 
 class Armer:
     """
@@ -41,6 +38,7 @@ class Armer:
 
     def __init__(
             self,
+            nh,
             robots: List[rtb.robot.Robot] = None,
             backend: rtb.backends.Connector = None,
             backend_args: Dict[str, Any] = None,
@@ -64,12 +62,12 @@ class Armer:
         self.broadcaster: tf2_ros.TransformBroadcaster = None
 
         if self.is_publishing_transforms:
-            self.broadcaster = tf2_ros.TransformBroadcaster()
+            try:
+              self.broadcaster = tf2_ros.TransformBroadcaster(nh)
+            except TypeError:
+              self.broadcaster = tf2_ros.TransformBroadcaster()
 
         self.frequency = min([r.frequency for r in self.robots])
-        self.rate = rospy.Rate(self.frequency)
-
-        self.last_tick = rospy.get_time()
 
         # Launch backend
         self.backend.launch(**(backend_args if backend_args else dict()))
@@ -95,7 +93,7 @@ class Armer:
         for robot in self.robots:
             robot.close()
 
-    def publish_transforms(self) -> None:
+    def publish_transforms(self, timestamp) -> None:
         """[summary]
         """
         if not self.is_publishing_transforms:
@@ -118,7 +116,8 @@ class Armer:
                 transforms.append(populate_transform_stamped(
                     link.parent.name,
                     link.name,
-                    transform
+                    transform,
+                    timestamp
                 ))
 
             for gripper in robot.grippers:
@@ -136,13 +135,14 @@ class Armer:
                     transforms.append(populate_transform_stamped(
                         link.parent.name,
                         link.name,
-                        transform
+                        transform,
+                        timestamp
                     ))
         
         self.broadcaster.sendTransform(transforms)
 
     @staticmethod
-    def load(path: str) -> Armer:
+    def load(nh, path: str) -> Armer:
         """
         Generates an Armer Driver instance from the configuration file at path
 
@@ -180,7 +180,7 @@ class Armer:
                 wrapper = getattr(importlib.import_module(module_name), model_name)
                 del spec['type']
 
-            robots.append(wrapper(robot_cls(**model_spec), **spec))
+            robots.append(wrapper(robot_cls(nh, **model_spec), **spec))
 
         backend = None
         backend_args = dict()
@@ -204,6 +204,7 @@ class Armer:
         logging = config['logging'] if 'logging' in config else {}
         publish_transforms = config['publish_transforms'] if 'publish_transforms' in config else False
         return Armer(
+            nh,
             robots=robots,
             backend=backend,
             backend_args=backend_args,
@@ -212,34 +213,14 @@ class Armer:
             logging=logging
         )
 
-    def run(self) -> None:
-        """
-        Runs the driver. This is a blocking call.
-        """
-        self.last_tick = rospy.get_time()
-        
-        while not rospy.is_shutdown():
-            with Timer('ROS', self.log_frequency):
-                current_time = rospy.get_time()
-                dt = current_time - self.last_tick
+    def step(self, dt: float, current_time: float) -> None:
+      for robot in self.robots:
+          robot.step(dt=dt)
 
-                for robot in self.robots:
-                    robot.step(dt=dt)
+      # with Timer('step'):
+      self.backend.step(dt=dt)
 
-                # with Timer('step'):
-                self.backend.step(dt=dt)
+      for backend, args in self.readonly_backends:
+          backend.step(dt=dt)
 
-                for backend, args in self.readonly_backends:
-                    backend.step(dt=dt)
-
-                self.publish_transforms()
-
-                self.rate.sleep()
-
-                self.last_tick = current_time
-
-
-if __name__ == '__main__':
-    rospy.init_node('manipulator')
-    manipulator = Armer(publish_transforms=False)
-    manipulator.run()
+      self.publish_transforms(current_time)

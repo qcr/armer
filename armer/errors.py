@@ -1,0 +1,3 @@
+
+class ArmerError(Exception):
+  pass

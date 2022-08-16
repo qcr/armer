@@ -3,13 +3,16 @@
 .. codeauthor:: Gavin Suddreys
 """
 import os
+from glob import glob
 from typing import List
 from setuptools import setup, find_packages
+
+package_name = 'armer'
 
 here = os.path.abspath(os.path.dirname(__file__))
 
 req = [
-    'numpy>=1.18.0',
+    'numpy>=1.17.0',
     'spatialmath-python>=0.8.7',
     'roboticstoolbox-python>=0.8',
     'pyyaml'
@@ -116,5 +119,18 @@ setup(
     extras_require={
         'dev': dev_req,
         'docs': docs_req
-    }
+    },
+
+    entry_points={
+        'console_scripts': [
+          'armer = armer.entry_point:main'
+        ],
+    },
+
+    data_files=[
+        (os.path.join('share', package_name), ['package.xml']),
+        (os.path.join('share', package_name, 'cfg'), glob(os.path.join('cfg', '*'))),
+        ('share/ament_index/resource_index/packages',
+            ['resource/' + package_name]),
+    ],
 )
