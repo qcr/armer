@@ -474,7 +474,7 @@ class ROSRobot(rtb.ERobot):
             
             self.executor = TrajectoryExecutor(
               self,
-              self.traj_generator(self, solution, goal.speed if goal.speed else 0.2)
+              self.traj_generator(self, solution.q, goal.speed if goal.speed else 0.2)
             )
 
             while not self.executor.is_finished():
