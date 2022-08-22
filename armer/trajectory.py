@@ -10,7 +10,7 @@ class TrajectoryExecutor:
     self.robot: rtb.ERobot = robot
     self.traj: Trajectory = traj
     
-    self.last_req_jv = np.zeros(self.robot.n)
+    self.last_jp = np.zeros(self.robot.n)
 
     self.time_step = 0
     
@@ -29,7 +29,7 @@ class TrajectoryExecutor:
 
   def step(self, dt: float):
     # Self termination if within goal space
-    if self.is_finished():
+    if self.is_finished(cutoff=0.01):
       return np.zeros(self.robot.n)
 
     # Compute current state jacobian
@@ -52,13 +52,16 @@ class TrajectoryExecutor:
       req_jv = self.traj.sd[self.time_step]
 
     # Calculate error in joint velocities based on current and expected
+    current_jv = current_jp - self.last_jp
     erro_jv = req_jv - current_jv
     erro_jp = req_jp - current_jp
+
+    self.last_jp = np.array(current_jp)
     
     # Calculate corrected error based on error above
-    corr_jv = req_jv + (erro_jv * self.robot.Kp) + (erro_jp * self.robot.Ki) + ((req_jv - self.last_req_jv) * self.robot.Kd)
-    self.last_req_jv = req_jv
+    corr_jv = current_jv + (erro_jv * self.robot.Kp) + (erro_jp * self.robot.Ki) + (((req_jv - current_jv) / self.robot.frequency) * self.robot.Kd)
     
+    # corr_jv = np.zeros(self.robot.n)
     if np.any(np.max(np.fabs(erro_jp)) > 0.5):
         rospy.logerr('Exceeded delta joint position max')
         self._finished = True
@@ -67,17 +70,21 @@ class TrajectoryExecutor:
     self.time_step += dt if self.traj.istime else 1
     return corr_jv
 
-  def is_finished(self):
+  def is_finished(self, cutoff=0.01):
     if self._finished:
       return True
 
-    if len(self.traj.s) == 0 or np.all(np.fabs(self.traj.s[-1] - self.robot.q) < 0.001):
-      rospy.loginfo('Too close to goal, quitting movement...')
+
+
+    if len(self.traj.s) == 0 or np.all(np.fabs(self.traj.s[-1] - self.robot.q) < cutoff):
+      rospy.loginfo('Too close to goal, quitting movement {}...'.format(self.time_step / self.traj.t))
       self._finished = True
       self._success = True
     
-    if self.time_step >= self.traj.t - (1 if not self.traj.istime else 0):
+    if (self.time_step) >= self.traj.t - (1 if not self.traj.istime else 0):
+      
       rospy.loginfo('Timed out')
+      print(np.fabs(self.traj.s[-1] - self.robot.q))
       self._finished = True
       self._success = True
       

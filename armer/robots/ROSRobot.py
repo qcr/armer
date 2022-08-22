@@ -93,7 +93,7 @@ class ROSRobot(rtb.ERobot):
                  frequency=None,
                  modified_qr=None,
                  Kp=1.0,
-                 Ki=10.0,
+                 Ki=None,
                  Kd=None,
                  * args,
                  **kwargs):  # pylint: disable=unused-argument
