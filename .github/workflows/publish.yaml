@@ -20,7 +20,8 @@ jobs:
           python3 -m pip install sphinx-markdown-tables
           python3 -m pip install sphinx-rtd-theme
           python3 -m pip install recommonmark
-          python3 -m pip install sphinxcontrib-openapi          
+          python3 -m pip install sphinxcontrib-openapi
+          python3 -m pip install mistune==0.8.4
       - name: Build
         run: |
           echo "TODO"
