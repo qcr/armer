@@ -22,7 +22,7 @@ class TrajectoryExecutor:
     self._success = False
     
 
-    if self.traj.istime and len(self.traj.s) != 0:
+    if self.traj.istime and len(self.traj.s) >= 2:
       s = np.linspace(0, 1, len(self.traj.s))
       self.qfunc = scipy.interpolate.interp1d(s, np.array(self.traj.s), axis=0)
       self.qdfunc = scipy.interpolate.interp1d(s, np.array(self.traj.sd), axis=0)
@@ -74,9 +74,7 @@ class TrajectoryExecutor:
     if self._finished:
       return True
 
-
-
-    if len(self.traj.s) == 0 or np.all(np.fabs(self.traj.s[-1] - self.robot.q) < cutoff):
+    if len(self.traj.s) < 2 or np.all(np.fabs(self.traj.s[-1] - self.robot.q) < cutoff):
       rospy.loginfo('Too close to goal, quitting movement {}...'.format(self.time_step / self.traj.t))
       self._finished = True
       self._success = True
