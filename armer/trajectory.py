@@ -70,6 +70,10 @@ class TrajectoryExecutor:
     self.time_step += dt if self.traj.istime else 1
     return corr_jv
 
+  def abort(self):
+    self._finished = True
+    self._success = False
+
   def is_finished(self, cutoff=0.01):
     if self._finished:
       return True

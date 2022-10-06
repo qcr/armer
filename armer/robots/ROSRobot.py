@@ -374,7 +374,10 @@ class ROSRobot(rtb.ERobot):
                 self.__vel_move(msg.twist_stamped)
                 rospy.sleep(0.01)
 
-            self.velocity_server.set_succeeded(GuardedVelocityResult(triggered=triggered))
+            if not self.preempted:
+                self.velocity_server.set_succeeded(GuardedVelocityResult(triggered=triggered))
+            else:
+                self.velocity_server.set_aborted(GuardedVelocityResult())
 
     def joint_velocity_cb(self, msg: JointVelocity) -> None:
         """
@@ -633,6 +636,9 @@ class ROSRobot(rtb.ERobot):
         Stops any current motion
         """
         # pylint: disable=unused-argument
+        if self.executor:
+            self.executor.abort()
+
         self.preempted = True
         self._controller_mode = ControlMode.JOINTS
         self.last_update = 0
