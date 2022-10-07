@@ -84,9 +84,7 @@ class TrajectoryExecutor:
       self._success = True
     
     if (self.time_step) >= self.traj.t - (1 if not self.traj.istime else 0):
-      
       rospy.loginfo('Timed out')
-      print(np.fabs(self.traj.s[-1] - self.robot.q))
       self._finished = True
       self._success = True
       

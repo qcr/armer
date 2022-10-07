@@ -11,23 +11,23 @@ from geometry_msgs.msg import TransformStamped
 import qpsolvers as qp
 import roboticstoolbox as rtb
 from roboticstoolbox.tools.trajectory import Trajectory
-from trac_ik_python.trac_ik import IK
 
 def ikine(robot, target, q0, end):
-    print(robot)
-    ik_solver = IK(robot.base_link.name,
-                   end,
-                   timeout=0.1,
-                   urdf_string=robot.urdf_string,
-                   solve_type='Manipulation2')
+    Tep = SE3(target.position.x, target.position.y, target.position.z) * \
+            UnitQuaternion(target.orientation.w, [target.orientation.x, target.orientation.y, target.orientation.z]).SE3()
+            
     
-    ik_solver.set_joint_limits(*robot.qlim)
+    result = robot.ik_lm_chan(
+        Tep,
+        end=end,
+        q0=np.array(q0)
+    )
     
-    sol = ik_solver.get_ik(q0,
-                        target.position.x, target.position.y, target.position.z,
-                        target.orientation.x, target.orientation.y, target.orientation.z, target.orientation.w)
+    if not (result[1]):
+        rospy.logerr('Unable to generate inverse kinematic solution')
+        return type('obj', (object,), {'q' : q0})
 
-    return type('obj', (object,), {'q' : np.array(sol)})
+    return type('obj', (object,), {'q' : np.array(result[0])})
     
 def mjtg(robot: rtb.ERobot, qd: np.ndarray, max_speed: float=0.2, max_rot: float=0.5, frequency=500):
   # This is the average cartesian speed we want the robot to move at
