@@ -26,7 +26,7 @@ jobs:
     #     pip install -e .[dev]
     #     pylint `find .| grep .py$ | xargs`
     # - name: Install ROS
-    #   uses: suddrey-qut/setup-ros@master
+    #   uses: qcr/setup-ros@master
     #   with:
     #     required-ros-distributions: ${{ matrix.ros-distro }}
     # - name: ROSDep Install

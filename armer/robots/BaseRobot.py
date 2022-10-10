@@ -47,7 +47,7 @@ class BaseRobot(URDFRobot):
                  frequency=None,
                  modified_qr=None,
                  Kp=1.0,
-                 Ki=10.0,
+                 Ki=None,
                  Kd=None,
                  * args,
                  **kwargs):  # pylint: disable=unused-argument
@@ -431,6 +431,9 @@ class BaseRobot(URDFRobot):
         Stops any current motion
         """
         # pylint: disable=unused-argument
+        if self.executor:
+            self.executor.abort()
+
         self.preempted = True
         self._controller_mode = ControlMode.JOINTS
         self.last_update = 0

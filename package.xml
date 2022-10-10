@@ -48,11 +48,14 @@
   <!--   <doc_depend>doxygen</doc_depend> -->
   <buildtool_depend condition="$ROS_VERSION == 1">catkin</buildtool_depend>
 
+<<<<<<< HEAD
   <exec_depend condition="$ROS_VERSION == 2">rclpy</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
   <exec_depend>armer_msgs</exec_depend>
 
   <exec_depend condition="$ROS_VERSION == 1">trac_ik</exec_depend>
+=======
+>>>>>>> master
   <exec_depend>python3-yaml</exec_depend>
   <exec_depend>roboticstoolbox-python</exec_depend>
 
