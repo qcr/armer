@@ -8,7 +8,6 @@ import rospy
 import numpy as np
 from spatialmath import SE3, SO3, UnitQuaternion, base
 from geometry_msgs.msg import TransformStamped
-import qpsolvers as qp
 import roboticstoolbox as rtb
 from roboticstoolbox.tools.trajectory import Trajectory
 
