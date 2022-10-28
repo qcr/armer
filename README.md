@@ -79,7 +79,7 @@ terminal is opened.
 > pip install git+https://github.com/petercorke/spatialmath-python.git
 > pip install git+https://github.com/jhavl/spatialgeometry.git
 > pip install git+https://github.com/jhavl/swift.git
-> pip install git+https://github.com/petercorke/robotics-toolbox-python.git
+> pip install git+https://github.com/petercorke/robotics-toolbox-python.git@v1.0.2
 > mkdir -p ~/armer_ws/src && cd ~/armer_ws/src 
 > git clone https://github.com/qcr/armer.git && git clone https://github.com/qcr/armer_msgs 
 > cd .. && rosdep install --from-paths src --ignore-src -r -y 
