@@ -53,7 +53,7 @@
   <depend>armer_msgs</depend>
 
   <exec_depend>python3-yaml</exec_depend>
-  <exec_depend>roboticstoolbox-python</exec_depend>
+  <!--<exec_depend>roboticstoolbox-python</exec_depend> -->
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>
