@@ -21,7 +21,7 @@
 
   <exec_depend condition="$ROS_VERSION == 1">trac_ik</exec_depend>
   <exec_depend>python3-yaml</exec_depend>
-  <exec_depend>roboticstoolbox-python</exec_depend>
+  <!--<exec_depend>roboticstoolbox-python</exec_depend> -->
 
   <!-- Tests -->
   <!-- <test_depend>ament_armer</test_depend> -->

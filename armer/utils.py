@@ -5,11 +5,9 @@ Utility functions used by Armer
 """
 import os
 import numpy as np
-from spatialmath import base
-import qpsolvers as qp
 import roboticstoolbox as rtb
 from roboticstoolbox.tools.trajectory import Trajectory
-from spatialmath import SE3, UnitQuaternion
+from spatialmath import base, SE3, UnitQuaternion
 
 from geometry_msgs.msg import TransformStamped
 
