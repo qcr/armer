@@ -129,8 +129,8 @@ class BaseRobot(URDFRobot):
         self.traj_generator = mjtg
         self.ik_solver = ikine
 
-        self.tf_buffer = tf2_ros.Buffer()
-        
+        # Initialise tf2 ros lookup buffer and listener
+        self.tf_buffer = tf2_ros.Buffer()        
         if hasattr(self.nh, 'get_clock'):
           self.tf_listener = tf2_ros.transform_listener.TransformListener(self.tf_buffer, self.nh)
         else:
@@ -647,40 +647,43 @@ class BaseRobot(URDFRobot):
                     self._controller_mode = ControlMode.JOINTS
 
             try:
-              print(f"base_link name: {self.base_link.name}")
-              print(f"e_v_frame name: {self.e_v_frame}")
-              print(f"get_time: {self.get_time(False)}")
-              _, orientation = self.tf_buffer.lookup_transform(
-                  self.base_link.name,
-                  self.e_v_frame,
-                  self.get_time(False)
-              )
+                # perform lookup to retrieve transform stamped object (tf2_ros)
+                tfs = self.tf_buffer.lookup_transform(
+                    self.base_link.name, 
+                    self.e_v_frame, 
+                    self.get_time(False)
+                )
+
+                # convert rotation from sm.Quaternion to list
+                tf_quaternion = tfs.transform.rotation
+                orientation = [tf_quaternion.x, tf_quaternion.y, tf_quaternion.z, tf_quaternion.w]
               
-              U = sm.UnitQuaternion([
-                  orientation[-1],
-                  *orientation[:3]
-              ], norm=True, check=False).sm.SE3()
-              
-              e_v = np.concatenate((
+                # create unit quaternion as an SE3 type
+                U = sm.UnitQuaternion([
+                    orientation[-1],
+                    *orientation[:3]
+                ], norm=True, check=False).SE3()
+                
+                e_v = np.concatenate((
                 (U.A @ np.concatenate((self.e_v[:3], [1]), axis=0))[:3],
                 (U.A @ np.concatenate((self.e_v[3:], [1]), axis=0))[:3]
-              ), axis=0)
-              
-              # Calculate error in base frame
-              p = self.e_p.A[:3, 3] + e_v[:3] * dt                     # expected position
-              Rq = sm.UnitQuaternion.RPY(e_v[3:] * dt) * sm.UnitQuaternion(self.e_p.R)
-              
-              T = sm.SE3.Rt(sm.SO3(Rq.R), p, check=False)   # expected pose
-              Tactual = self.fkine(self.q, start=self.base_link, end=self.gripper) # actual pose
-              
-              e_rot = (sm.SO3(T.R @ np.linalg.pinv(Tactual.R), check=False).rpy() + np.pi) % (2*np.pi) - np.pi
-              error = np.concatenate((p - Tactual.t, e_rot), axis=0)
-              
-              e_v = e_v + error
-              
-              self.e_p = T
+                ), axis=0)
+                
+                # Calculate error in base frame
+                p = self.e_p.A[:3, 3] + e_v[:3] * dt                     # expected position
+                Rq = sm.UnitQuaternion.RPY(e_v[3:] * dt) * sm.UnitQuaternion(self.e_p.R)
+                
+                T = sm.SE3.Rt(sm.SO3(Rq.R), p, check=False)   # expected pose
+                Tactual = self.fkine(self.q, start=self.base_link, end=self.gripper) # actual pose
+                
+                e_rot = (sm.SO3(T.R @ np.linalg.pinv(Tactual.R), check=False).rpy() + np.pi) % (2*np.pi) - np.pi
+                error = np.concatenate((p - Tactual.t, e_rot), axis=0)
+                
+                e_v = e_v + error
+                
+                self.e_p = T
                             
-              self.j_v = np.linalg.pinv(
+                self.j_v = np.linalg.pinv(
                 self.jacob0(self.q, end=self.gripper)) @ e_v
               
             except (tf2_ros.LookupException, tf2_ros.ExtrapolationException):
