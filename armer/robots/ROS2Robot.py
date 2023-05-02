@@ -5,14 +5,14 @@ ROSRobot module defines the ROSRobot type
 """
 from armer.errors import ArmerError
 import rclpy
-
 from armer.robots import BaseRobot
 
+# General ROS Messages
 from std_msgs.msg import Bool
 from sensor_msgs.msg import JointState
-
+from geometry_msgs.msg import TwistStamped
 from std_msgs.msg import Float64MultiArray
-
+# ARMer ROS Messages
 from armer_msgs.msg import ManipulatorState, JointVelocity, ServoStamped, Guards
 from armer_msgs.action import GuardedVelocity, Home, MoveToJointPose, MoveToNamedPose, MoveToPose
 
@@ -60,29 +60,32 @@ class ROS2Robot(BaseRobot):
               '{}/cartesian/pose'.format(self.name.lower()),
               self.pose_cb
             )
+
+            # Subscribers
+            self.cartesian_velocity_subscriber = self.nh.create_subscription(
+              TwistStamped,
+              '{}/cartesian/velocity'.format(self.name.lower()),
+              self.velocity_cb,
+              10
+            )
+          
             
+            # self.joint_velocity_subscriber: rospy.Subscriber = rospy.Subscriber(
+            #     '{}/joint/velocity'.format(self.name.lower()
+            #                                ), JointVelocity, self.joint_velocity_cb
+            # )
+            # self.cartesian_servo_subscriber: rospy.Subscriber = rospy.Subscriber(
+            #     '{}/cartesian/servo'.format(self.name.lower()
+            #                                 ), ServoStamped, self.servo_cb
+            # )
+
             return
-            
+        
             # Services
             rospy.Service('{}/recover'.format(self.name.lower()),
                           Empty, self.recover_cb)
             rospy.Service('{}/stop'.format(self.name.lower()),
                           Empty, self.preempt)
-
-
-            # Subscribers
-            self.cartesian_velocity_subscriber: rospy.Subscriber = rospy.Subscriber(
-                '{}/cartesian/velocity'.format(self.name.lower()
-                                               ), TwistStamped, self.velocity_cb
-            )
-            self.joint_velocity_subscriber: rospy.Subscriber = rospy.Subscriber(
-                '{}/joint/velocity'.format(self.name.lower()
-                                           ), JointVelocity, self.joint_velocity_cb
-            )
-            self.cartesian_servo_subscriber: rospy.Subscriber = rospy.Subscriber(
-                '{}/cartesian/servo'.format(self.name.lower()
-                                            ), ServoStamped, self.servo_cb
-            )
 
             # Action Servers
             self.velocity_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(

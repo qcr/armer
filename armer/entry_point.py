@@ -10,9 +10,9 @@ class ArmerNode(Node):
   def __init__(self):
     super().__init__('armer')
     self.declare_parameter('config')
-    
+
     self.armer = Armer.load(
-      self, 
+      self,
       self.get_parameter_or('config').get_parameter_value().string_value or os.path.join(__path__, 'cfg/panda_sim.yaml')
     )
 

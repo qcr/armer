@@ -187,6 +187,7 @@ class Armer:
         logging = config['logging'] if 'logging' in config else {}
         publish_transforms = config['publish_transforms'] if 'publish_transforms' in config else False
         
+        print(f"Here in armer.py finishing")
         return Armer(
             nh,
             robots=robots,

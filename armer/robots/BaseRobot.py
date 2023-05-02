@@ -83,6 +83,7 @@ class BaseRobot(URDFRobot):
         if origin:
             self.base = sm.SE3(origin[:3]) @ sm.SE3.RPY(origin[3:])
 
+        print(f"here before frequency")
         self.frequency = frequency if frequency else self.get_parameter(
           f'{self.joint_state_topic}/frequency', 500
         )

@@ -113,7 +113,7 @@ Usage
 The Armer interface can be launched with the following command for simulation:
 
 > ``` {.sourceCode .bash}
-> roslaunch armer armer.launch config:={PATH_TO_CONFIG_YAML_FILE}
+> roslaunch armer armer_ros1_bringup.launch config:={PATH_TO_CONFIG_YAML_FILE}
 > ```
 
 Alternatively, the Armer interface can be launched for a real robot using the following command (Note that this can also support simulation if you wish via the ***sim*** parameter):

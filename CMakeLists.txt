@@ -5,6 +5,7 @@ project(armer)
 if($ENV{ROS_VERSION} STREQUAL "2")
   find_package(ament_cmake REQUIRED)
 
+  install(DIRECTORY launch DESTINATION share/${PROJECT_NAME}/)
 else()
   find_package(catkin REQUIRED)
 
