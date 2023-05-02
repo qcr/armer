@@ -4,19 +4,16 @@ ROSRobot module defines the ROSRobot type
 .. codeauthor:: Gavin Suddreys
 """
 import os
-
-from typing import List, Any
-from threading import Lock, Event
 import tf2_ros
 import roboticstoolbox as rtb
-import spatialmath as sp
-from spatialmath import SE3, SO3, UnitQuaternion
+import spatialmath as sm
 import numpy as np
 import yaml
 import time
 
+from typing import List, Any
+from threading import Lock, Event
 from armer.models.URDFRobot import URDFRobot
-
 from armer.trajectory import TrajectoryExecutor
 from armer.utils import ikine, mjtg
 from armer.errors import ArmerError
@@ -84,7 +81,7 @@ class BaseRobot(URDFRobot):
         self.joint_names = list(map(lambda link: link._joint_name, filter(lambda link: link.isjoint, sorted_links)))
         
         if origin:
-            self.base = SE3(origin[:3]) @ SE3.RPY(origin[3:])
+            self.base = sm.SE3(origin[:3]) @ sm.SE3.RPY(origin[3:])
 
         self.frequency = frequency if frequency else self.get_parameter(
           f'{self.joint_state_topic}/frequency', 500
@@ -132,7 +129,7 @@ class BaseRobot(URDFRobot):
         self.traj_generator = mjtg
         self.ik_solver = ikine
 
-        self.tf_buffer = tf2_ros.buffer.Buffer()
+        self.tf_buffer = tf2_ros.Buffer()
         
         if hasattr(self.nh, 'get_clock'):
           self.tf_listener = tf2_ros.transform_listener.TransformListener(self.tf_buffer, self.nh)
@@ -245,12 +242,12 @@ class BaseRobot(URDFRobot):
             
             pose = goal_pose_stamped.pose
 
-            target = SE3(pose.position.x, pose.position.y, pose.position.z) * UnitQuaternion([
+            target = sm.SE3(pose.position.x, pose.position.y, pose.position.z) * sm.UnitQuaternion([
                 pose.orientation.w,
                 pose.orientation.x,
                 pose.orientation.y,
                 pose.orientation.z
-            ]).SE3()
+            ]).sm.SE3()
 
             arrived = False
 
@@ -486,7 +483,7 @@ class BaseRobot(URDFRobot):
         pose_stamped.pose.position.z = translation[2]
 
         rotation = ee_pose[:3, :3]
-        ee_rot = sp.UnitQuaternion(rotation)
+        ee_rot = sm.UnitQuaternion(rotation)
 
         pose_stamped.pose.orientation.w = ee_rot.A[0]
         pose_stamped.pose.orientation.x = ee_rot.A[1]
@@ -650,16 +647,19 @@ class BaseRobot(URDFRobot):
                     self._controller_mode = ControlMode.JOINTS
 
             try:
+              print(f"base_link name: {self.base_link.name}")
+              print(f"e_v_frame name: {self.e_v_frame}")
+              print(f"get_time: {self.get_time(False)}")
               _, orientation = self.tf_buffer.lookup_transform(
                   self.base_link.name,
                   self.e_v_frame,
                   self.get_time(False)
               )
               
-              U = UnitQuaternion([
+              U = sm.UnitQuaternion([
                   orientation[-1],
                   *orientation[:3]
-              ], norm=True, check=False).SE3()
+              ], norm=True, check=False).sm.SE3()
               
               e_v = np.concatenate((
                 (U.A @ np.concatenate((self.e_v[:3], [1]), axis=0))[:3],
@@ -668,12 +668,12 @@ class BaseRobot(URDFRobot):
               
               # Calculate error in base frame
               p = self.e_p.A[:3, 3] + e_v[:3] * dt                     # expected position
-              Rq = UnitQuaternion.RPY(e_v[3:] * dt) * UnitQuaternion(self.e_p.R)
+              Rq = sm.UnitQuaternion.RPY(e_v[3:] * dt) * sm.UnitQuaternion(self.e_p.R)
               
-              T = SE3.Rt(SO3(Rq.R), p, check=False)   # expected pose
+              T = sm.SE3.Rt(sm.SO3(Rq.R), p, check=False)   # expected pose
               Tactual = self.fkine(self.q, start=self.base_link, end=self.gripper) # actual pose
               
-              e_rot = (SO3(T.R @ np.linalg.pinv(Tactual.R), check=False).rpy() + np.pi) % (2*np.pi) - np.pi
+              e_rot = (sm.SO3(T.R @ np.linalg.pinv(Tactual.R), check=False).rpy() + np.pi) % (2*np.pi) - np.pi
               error = np.concatenate((p - Tactual.t, e_rot), axis=0)
               
               e_v = e_v + error

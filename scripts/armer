@@ -21,12 +21,12 @@ def main():
   last_tick = rospy.Time.now()
   
   while not rospy.is_shutdown():
-      with Timer('ROS', armer.log_frequency):
-          current_time = rospy.Time.now()
-          armer.step((current_time - last_tick).to_sec(), current_time)
-          last_tick = current_time
+    with Timer('ROS', armer.log_frequency):
+      current_time = rospy.Time.now()
+      armer.step((current_time - last_tick).to_sec(), current_time)
+      last_tick = current_time
 
-      rate.sleep()
+    rate.sleep()
 
 if __name__ == '__main__':
   main()    

@@ -7,17 +7,13 @@ from __future__ import annotations
 from typing import List, Dict, Any, Tuple
 
 import importlib
-
 import tf2_ros
 import yaml
-
 import roboticstoolbox as rtb
+
 from roboticstoolbox.backends.swift import Swift
-
 from spatialmath.base.argcheck import getvector
-
 from armer.utils import populate_transform_stamped
-
 from armer.robots import ROSRobot
 
 class Armer:
@@ -45,6 +41,7 @@ class Armer:
             publish_transforms: bool = False,
             logging: dict[str, bool] = None) -> None:
 
+        # Note that ROSRobot is configured as either a ROS1 or ROS2 robot prior to initialising
         self.robots: List[ROSRobot] = robots
         self.backend: rtb.backends.Connector = backend
         self.readonly_backends : List[rtb.backends.Connector] = readonly_backends \
