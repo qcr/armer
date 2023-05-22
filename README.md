@@ -94,7 +94,7 @@ echo "Installation complete!"
 ```
 
 ###  macOS and Windows (10/11)
-To enable easy use of ROS on these operating systems, it is recommended to use [RoboStack](https://robostack.github.io/); note that ROS 1 (noetic) is recommended at this stage. Please ensure you have [mamba](https://mamba.readthedocs.io/en/latest/installation.html) installed before proceeding.
+To enable easy use of ROS on these operating systems, it is recommended to use [RoboStack](https://robostack.github.io/); note that ROS 1 (noetic) is recommended at this stage. Please ensure you have [mamba](https://mamba.readthedocs.io/en/latest/installation.html) installed before proceeding. Please follow all required steps for the [RoboStack](https://robostack.github.io/) install (as per their instructions) to enable the smoothest setup on your particular OS.
 ```bash
 # Create and activate a new robostack environment
 mamba create -n robostackenv ros-noetic-desktop python=3.9 -c robostack-staging -c conda-forge --no-channel-priority --override-channels
