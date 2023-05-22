@@ -2,6 +2,7 @@
 ROSRobot module defines the ROSRobot type
 
 .. codeauthor:: Gavin Suddreys
+.. codeauthor:: Dasun Gunasinghe
 """
 import os
 import timeit
@@ -77,7 +78,7 @@ class ControlMode:
    JOINTS=1
    CARTESIAN=2
 
-class ROSRobot(rtb.ERobot):
+class ROSRobot(rtb.Robot):
     """
     The ROSRobot class wraps the rtb.ERobot implementing basic ROS functionality
     """

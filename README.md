@@ -55,7 +55,7 @@ require several requirements:
 ### Software requirements
 
 -   [Python](https://www.python.org/) \>= 3.6
--   [ROS Noetic](http://wiki.ros.org/noetic)
+-   [ROS Noetic](http://wiki.ros.org/noetic) - [RoboStack](https://robostack.github.io/) can also be used (see below)
 -   [Robotics Toolbox for
     Python](https://pypi.org/project/roboticstoolbox-python/)
 -   [QCR repos](https://qcr.github.io/armer/add_qcr_repos.html)
@@ -63,31 +63,61 @@ require several requirements:
 
 ### Robot specific requirements
 
--   ROS drivers with joint velocity controllers
--   Robotics Toolbox model
+-   ROS drivers with joint group velocity controllers (ros_control)
+-   Robotics Toolbox model or URDF (loaded as a robot_description parameter)
 
 Installation
 ------------
-
+### Linux (Ubuntu 20.04)
 Copy and paste the following code snippet into a terminal to create a
 new catkin workspace and install Armer to it. Note this
 script will also add the workspace to be sourced every time a bash
-terminal is opened.
+terminal is opened. If [RoboStack](https://robostack.github.io/) is preferred, please follow the steps in the next section
 
-> ```sh
-> sudo apt install python3-pip 
-> pip install git+https://github.com/petercorke/spatialmath-python.git
-> pip install git+https://github.com/jhavl/spatialgeometry.git
-> pip install git+https://github.com/jhavl/swift.git
-> pip install git+https://github.com/petercorke/robotics-toolbox-python.git@v1.0.2
-> mkdir -p ~/armer_ws/src && cd ~/armer_ws/src 
-> git clone https://github.com/qcr/armer.git && git clone https://github.com/qcr/armer_msgs 
-> cd .. && rosdep install --from-paths src --ignore-src -r -y 
-> catkin_make 
-> echo "source ~/armer_ws/devel/setup.bash" >> ~/.bashrc 
-> source ~/armer_ws/devel/setup.bash
-> echo "Installation complete!"
-> ```
+```bash
+# Install pip 
+sudo apt install python3-pip
+
+# Make the workspace and clone armer and armer_msgs packages
+mkdir -p ~/armer_ws/src && cd ~/armer_ws/src 
+git clone https://github.com/qcr/armer.git && git clone https://github.com/qcr/armer_msgs 
+
+# Install all required packages
+pip install -r ~/armer_ws/src/armer/requirements.txt
+cd .. && rosdep install --from-paths src --ignore-src -r -y 
+
+# Make and source the workspace 
+catkin_make 
+echo "source ~/armer_ws/devel/setup.bash" >> ~/.bashrc 
+source ~/armer_ws/devel/setup.bash
+echo "Installation complete!"
+```
+
+###  macOS and Windows (10/11)
+To enable easy use of ROS on these operating systems, it is recommended to use [RoboStack](https://robostack.github.io/); note that ROS 1 (noetic) is recommended at this stage. Please ensure you have [mamba](https://mamba.readthedocs.io/en/latest/installation.html) installed before proceeding.
+```bash
+# Create and activate a new robostack environment
+mamba create -n robostackenv ros-noetic-desktop python=3.9 -c robostack-staging -c conda-forge --no-channel-priority --override-channels
+mamba activate robostackenv
+
+# Install some compiler packages
+mamba install compilers cmake pkg-config make ninja
+
+# Make the armer workspace and clone in armer and armer_msgs packages
+mkdir -p ~/armer_ws/src && cd ~/armer_ws/src 
+git clone https://github.com/qcr/armer.git && git clone https://github.com/qcr/armer_msgs 
+
+# Install all required packages (into robostackenv)
+pip install -r ~/armer_ws/src/armer/requirements.txt
+cd .. && rosdep install --from-paths src --ignore-src -r -y 
+
+# Make and source the workspace (including environment)
+catkin_make 
+echo "mamba activate robostackenv" >> ~/.bashrc
+echo "source ~/armer_ws/devel/setup.bash" >> ~/.bashrc 
+source ~/armer_ws/devel/setup.bash
+```
+
 
 Supported Arms
 ---------------

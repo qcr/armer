@@ -1,4 +1,6 @@
-numpy>=1.18.0
-spatialmath-python>=0.8.7
-roboticstoolbox-python>=0.8
+numpy>=1.22.3
+spatialgeometry>=1.1.0
+spatialmath-python>=1.1.8
+roboticstoolbox-python>=1.1.0
+swift-sim>=1.1.0
 pyyaml
