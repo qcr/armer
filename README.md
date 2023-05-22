@@ -125,15 +125,13 @@ Armer relies on the manipulator's ROS driver to communicate with the low level h
 
 Currently Armer driver has packages that launches Armer and the target manipulator's drivers are bundled together. If your arm model has a hardware package, control should be a fairly plug and play experience. (An experience we are still working on so please let us know if it isn't.). Below are the github pages to arms with hardware packages. Install directions can be found on their respective pages.
 
-* Franka Panda: [https://github.com/qcr/armer_panda](https://github.com/qcr/armer_panda)
+* [Available] Franka Panda: [https://github.com/qcr/armer_panda](https://github.com/qcr/armer_panda)
 
-* Universal Robot UR3: [https://github.com/qcr/armer_ur](https://github.com/qcr/armer_ur)
+* [Available] Universal Robot (UR3/UR5/UR10/UR10e): [https://github.com/qcr/armer_ur](https://github.com/qcr/armer_ur)
 
-* Universal Robot UR5: [https://github.com/qcr/armer_ur](https://github.com/qcr/armer_ur)
+* [In Progress] UFactory XArm (6): [https://github.com/qcr/armer_xarm](https://github.com/qcr/armer_xarm)
 
-* Universal Robot UR10: [https://github.com/qcr/armer_ur](https://github.com/qcr/armer_ur)
-
-* ABB IRB6700: [https://github.com/qcr/armer_abb](https://github.com/qcr/armer_abb)
+* [In Progress] ABB IRB6700: [https://github.com/qcr/armer_abb](https://github.com/qcr/armer_abb)
 
 For more information on setting up manipulators not listed here see the Armer documentation, [Supported Arms](https://qcr.github.io/armer/supported_arms.html).
 
