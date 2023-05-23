@@ -105,7 +105,7 @@ class ROSRobot(rtb.Robot):
         self.name = name if name else self.name
         
         if not hasattr(self, 'gripper'):
-          self.gripper = self.grippers[0].name
+          self.gripper = self.grippers[0].name if len(self.grippers) > 0 else 'tool0'
           
         sorted_links=[]
         #sort links by parents starting from gripper
