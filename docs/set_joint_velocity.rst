@@ -20,14 +20,24 @@ The following code example shows the setting of joint velocities on a robot with
 
     import rospy
     from armer_msgs.msg import JointVelocity
-
+    
+    # Initialise node
     rospy.init_node('armer_example', disable_signals=True)
+    
+    # Setup publisher
     vel_pub = rospy.Publisher('/arm/joint/velocity', JointVelocity, queue_size=1)
+    
+    # Create message type and populate
     vel_msg = JointVelocity()
     vel_msg.joints = [0.0, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0]
     
-    while True:
+    # Define rate (100 Hz recommended)
+    rate = rospy.Rate(100) #hz
+    while not rospy.is_shutdown():
+        # Publish velocity
         vel_pub.publish(vel_msg)
+        # Tick the node
+        rate.sleep()
 
 
 The length of the vel_msg.joints array will be dependent on the number of joints in the target manipulator. This example shows a 7 jointed arm.
