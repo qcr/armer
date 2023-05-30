@@ -9,10 +9,6 @@ Requirements
 * `Robotics Toolbox for Python <https://pypi.org/project/roboticstoolbox-python/>`_
 * `QCR repos <https://qcr.github.io/armer/add_qcr_repos.html>`_
 
-.. note::
-
-        Please refer to the requirements.txt (in the armer package) for easy dependency install
-
 Robot Specific Requirements
 -------------
 
