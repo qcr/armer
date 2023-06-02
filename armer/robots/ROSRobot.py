@@ -103,6 +103,10 @@ class ROSRobot(rtb.Robot):
         self.__dict__.update(robot.__dict__)
         
         self.name = name if name else self.name
+
+        # Singularity index threshold (0 is a sigularity)
+        # NOTE: this is a tested value and may require configuration (i.e., speed of robot)
+        self.singularity_thresh = 0.02 
         
         if not hasattr(self, 'gripper'):
           self.gripper = self.grippers[0].name
@@ -868,7 +872,16 @@ class ROSRobot(rtb.Robot):
         current_time = rospy.get_time()
         self.state = self.get_state()
 
-        if self.state.errors != 0:
+        # Check for manipulbility threshold
+        # NOTE: this is a scalar index for the robot at its current joint config
+        #       It indicates dexterity (how well conditioned the robot is for motion)
+        #       Value approaches 0 if robot is at singularity
+        manip = self.manipulability(self.q)
+        # rospy.loginfo(f"Manipulability: {manip} | --> 0 is singularity")
+
+        # NOTE: the manip thresh is not fully tuned (but approximate cuttoff for best use at this point in time)
+        if self.state.errors != 0 or (manip <= self.singularity_thresh and self.preempted == False):
+            if manip <= self.singularity_thresh: rospy.logwarn(f"PREEMPTED: Approaching singularity (index: {manip}) --> please home to fix")
             self.preempt()
 
         # calculate joint velocities from desired cartesian velocity
