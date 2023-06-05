@@ -109,6 +109,8 @@ class ROSRobot(rtb.Robot):
         # NOTE: this is a tested value and may require configuration (i.e., speed of robot)
         rospy.loginfo(f"[INIT] Singularity Scalar Threshold set to: {singularity_thresh}")
         self.singularity_thresh = singularity_thresh 
+        self.manip_scalar = None
+        self.singularity_approached = False
         
         if not hasattr(self, 'gripper'):
           self.gripper = self.grippers[0].name
@@ -469,6 +471,11 @@ class ROSRobot(rtb.Robot):
             pose = goal_pose.pose
             
             solution = ikine(self, pose, q0=self.q, end=self.gripper)
+
+            # Check for singularity on end solution:
+            # TODO: prevent motion on this bool? Needs to be thought about
+            if self.check_singularity(solution.q):
+                rospy.logwarn(f"IK solution within singularity threshold [{self.singularity_thresh}] -> ill-advised motion")
             
             self.executor = TrajectoryExecutor(
               self,
@@ -499,6 +506,11 @@ class ROSRobot(rtb.Robot):
             self.preempt()
 
         with self.lock:     
+
+            # Check for singularity on end solution:
+            # TODO: prevent motion on this bool? Needs to be thought about
+            if self.check_singularity(goal.joints):
+                rospy.logwarn(f"IK solution within singularity threshold [{self.singularity_thresh}] -> ill-advised motion")
 
             self.executor = TrajectoryExecutor(
               self,
@@ -716,12 +728,42 @@ class ROSRobot(rtb.Robot):
         :rtype: GetNamedPoseConfigsResponse
         """
         return self.custom_configs
-
-    # --- Standard Methods --- #
+    
     def set_pid(self, msg):
+        """
+        Sets the pid value from a callback
+        """
         self.Kp = msg.data[0]
         self.Ki = msg.data[1]
         self.Kd = msg.data[2]
+
+    # --- Standard Methods --- #
+    def check_singularity(self, q=None) -> bool:
+        """
+        Checks the manipulability as a scalar manipulability index
+        for the robot at the joint configuration to indicate singularity approach. 
+        - It indicates dexterity (how well conditioned the robot is for motion)
+        - Value approaches 0 if robot is at singularity
+        - Returns True if close to singularity (based on threshold) or False otherwise
+        - See rtb.robots.Robot.py for details
+
+        :param q: The robot state to check for manipulability.
+        :type q: numpy array of joints (float)
+        :return: True (if within singularity) or False (otherwise)
+        :rtype: bool
+        """
+        # Get the robot state manipulability
+        self.manip_scalar = self.manipulability(q)
+
+        # Debugging
+        # rospy.loginfo(f"Manipulability: {manip_scalar} | --> 0 is singularity")
+
+        if (np.fabs(self.manip_scalar) <= self.singularity_thresh and self.preempted == False):
+            self.singularity_approached = True
+            return True
+        else:
+            self.singularity_approached = False
+            return False
 
     def close(self):
         """
@@ -738,6 +780,11 @@ class ROSRobot(rtb.Robot):
         # pylint: disable=unused-argument
         if self.executor:
             self.executor.abort()
+
+        # Warn and Reset
+        if self.singularity_approached:
+            rospy.logwarn(f"PREEMPTED: Approaching singularity (index: {self.manip_scalar}) --> please home to fix")
+            self.singularity_approached = False
 
         self.preempted = True
         self._controller_mode = ControlMode.JOINTS
@@ -876,17 +923,8 @@ class ROSRobot(rtb.Robot):
         current_time = rospy.get_time()
         self.state = self.get_state()
 
-        # Check for manipulbility threshold
-        # NOTE: this is a scalar index for the robot at its current joint config
-        #       It indicates dexterity (how well conditioned the robot is for motion)
-        #       Value approaches 0 if robot is at singularity
-        manip = self.manipulability(self.q)
-        # rospy.loginfo(f"Manipulability: {manip} | --> 0 is singularity")
-
-        # NOTE: the manip thresh is not fully tuned (but approximate cuttoff for best use at this point in time)
-        if self.state.errors != 0 or (np.fabs(manip) <= self.singularity_thresh and self.preempted == False):
-            if np.fabs(manip) <= self.singularity_thresh: 
-                rospy.logwarn(f"PREEMPTED: Approaching singularity (index: {manip}) --> please home to fix")
+        # PREEMPT motion on any detected state errors or singularity approach
+        if self.state.errors != 0 or self.check_singularity(self.q):
             self.preempt()
 
         # calculate joint velocities from desired cartesian velocity
