@@ -1,8 +1,9 @@
 robots:
-  - name: arm
+  - name: arm # default namespace
     model: 
       urdf_file: franka_description/robots/panda_arm_hand.urdf.xacro
       qr: [0, -0.3, 0, -2.2, 0, 2.0, 0.78539816339]
+    singularity_thresh: 0.02
 backend: 
   type: roboticstoolbox.backends.swift.Swift
 publish_transforms: true

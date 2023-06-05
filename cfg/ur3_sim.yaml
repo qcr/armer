@@ -1,8 +1,10 @@
 robots:
-  - name: arm # default is panda model roboticstoolbox.models.Panda
+  - name: arm # default namespace
     model: 
       urdf_file: ur_description/urdf/ur3_robot.urdf.xacro
       gripper: tool0
+      qr: [-1.57, -0.96, -2.18, -1.57, 1.57, 3.14]
+    singularity_thresh: 0.02
 backend: 
   type: roboticstoolbox.backends.swift.Swift
 publish_transforms: true
