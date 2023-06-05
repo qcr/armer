@@ -96,6 +96,7 @@ class ROSRobot(rtb.Robot):
                  Kp=1.0,
                  Ki=None,
                  Kd=None,
+                 singularity_thresh=0.02,
                  * args,
                  **kwargs):  # pylint: disable=unused-argument
         
@@ -106,7 +107,8 @@ class ROSRobot(rtb.Robot):
 
         # Singularity index threshold (0 is a sigularity)
         # NOTE: this is a tested value and may require configuration (i.e., speed of robot)
-        self.singularity_thresh = 0.02 
+        rospy.loginfo(f"[INIT] Singularity Scalar Threshold set to: {singularity_thresh}")
+        self.singularity_thresh = singularity_thresh 
         
         if not hasattr(self, 'gripper'):
           self.gripper = self.grippers[0].name
@@ -323,19 +325,7 @@ class ROSRobot(rtb.Robot):
                 self.set_pid
             )
 
-    def set_pid(self, msg):
-        self.Kp = msg.data[0]
-        self.Ki = msg.data[1]
-        self.Kd = msg.data[2]
-
-    def close(self):
-        """
-        Closes the action servers associated with this robot
-        """
-        self.pose_server.need_to_terminate = True
-        self.joint_pose_server.need_to_terminate = True
-        self.named_pose_server.need_to_terminate = True
-
+    # --- ROS Callbacks --- #
     def _state_cb(self, msg):
         if not self.joint_indexes:
             for joint_name in self.joint_names:
@@ -635,6 +625,111 @@ class ROSRobot(rtb.Robot):
         rospy.logwarn(
             'Setting cartesian impedance not implemented for this arm')
         return SetCartesianImpedanceResponse(True)
+    
+    def get_named_poses_cb(self, req: GetNamedPosesRequest) -> GetNamedPosesResponse:
+        """
+        ROS Service callback:
+        Retrieves the list of named poses available to the arm
+
+        :param req: An empty request
+        :type req: GetNamesListRequest
+        :return: The list of named poses available for the arm
+        :rtype: GetNamesListResponse
+        """
+        return GetNamedPosesResponse(list(self.named_poses.keys()))
+
+    def add_named_pose_cb(self, req: AddNamedPoseRequest) -> AddNamedPoseResponse:
+        """
+        ROS Service callback:
+        Adds the current arm pose as a named pose and saves it to the host config
+
+        :param req: The name of the pose as well as whether to overwrite if the pose already exists
+        :type req: AddNamedPoseRequest
+        :return: True if the named pose was written successfully otherwise false
+        :rtype: AddNamedPoseResponse
+        """
+        if req.pose_name in self.named_poses and not req.overwrite:
+            rospy.logerr('Named pose already exists.')
+            return AddNamedPoseResponse(success=False)
+
+        self.named_poses[req.pose_name] = self.q.tolist()
+        self.__write_config('named_poses', self.named_poses)
+
+        return AddNamedPoseResponse(success=True)
+
+    def remove_named_pose_cb(self, req: RemoveNamedPoseRequest) -> RemoveNamedPoseResponse:
+        """
+        ROS Service callback:
+        Adds the current arm pose as a named pose and saves it to the host config
+
+        :param req: The name of the pose as well as whether to overwrite if the pose already exists
+        :type req: AddNamedPoseRequest
+        :return: True if the named pose was written successfully otherwise false
+        :rtype: AddNamedPoseResponse
+        """
+        if req.pose_name not in self.named_poses and not req.overwrite:
+            rospy.logerr('Named pose does not exists.')
+            return AddNamedPoseResponse(success=False)
+
+        del self.named_poses[req.pose_name]
+        self.__write_config('named_poses', self.named_poses)
+
+        return AddNamedPoseResponse(success=True)
+
+    def add_named_pose_config_cb(
+            self,
+            request: AddNamedPoseConfigRequest) -> AddNamedPoseConfigResponse:
+        """[summary]
+
+        :param request: [description]
+        :type request: AddNamedPoseConfigRequest
+        :return: [description]
+        :rtype: AddNamedPoseConfigResponse
+        """
+        self.custom_configs.append(request.config_path)
+        self.__load_config()
+        return True
+
+    def remove_named_pose_config_cb(
+            self,
+            request: RemoveNamedPoseConfigRequest) -> RemoveNamedPoseConfigResponse:
+        """[summary]
+
+        :param request: [description]
+        :type request: AddNamedPoseRequest
+        :return: [description]
+        :rtype: [type]
+        """
+        if request.config_path in self.custom_configs:
+            self.custom_configs.remove(request.config_path)
+            self.__load_config()
+        return True
+
+    def get_named_pose_configs_cb(
+            self,
+            request: GetNamedPoseConfigsRequest) -> GetNamedPoseConfigsResponse:
+        """[summary]
+
+        :param request: [description]
+        :type request: GetNamedPoseConfigsRequest
+        :return: [description]
+        :rtype: GetNamedPoseConfigsResponse
+        """
+        return self.custom_configs
+
+    # --- Standard Methods --- #
+    def set_pid(self, msg):
+        self.Kp = msg.data[0]
+        self.Ki = msg.data[1]
+        self.Kd = msg.data[2]
+
+    def close(self):
+        """
+        Closes the action servers associated with this robot
+        """
+        self.pose_server.need_to_terminate = True
+        self.joint_pose_server.need_to_terminate = True
+        self.named_pose_server.need_to_terminate = True
 
     def preempt(self, *args: list) -> None:
         """
@@ -766,97 +861,6 @@ class ROSRobot(rtb.Robot):
             
         return triggered
 
-    def get_named_poses_cb(self, req: GetNamedPosesRequest) -> GetNamedPosesResponse:
-        """
-        ROS Service callback:
-        Retrieves the list of named poses available to the arm
-
-        :param req: An empty request
-        :type req: GetNamesListRequest
-        :return: The list of named poses available for the arm
-        :rtype: GetNamesListResponse
-        """
-        return GetNamedPosesResponse(list(self.named_poses.keys()))
-
-    def add_named_pose_cb(self, req: AddNamedPoseRequest) -> AddNamedPoseResponse:
-        """
-        ROS Service callback:
-        Adds the current arm pose as a named pose and saves it to the host config
-
-        :param req: The name of the pose as well as whether to overwrite if the pose already exists
-        :type req: AddNamedPoseRequest
-        :return: True if the named pose was written successfully otherwise false
-        :rtype: AddNamedPoseResponse
-        """
-        if req.pose_name in self.named_poses and not req.overwrite:
-            rospy.logerr('Named pose already exists.')
-            return AddNamedPoseResponse(success=False)
-
-        self.named_poses[req.pose_name] = self.q.tolist()
-        self.__write_config('named_poses', self.named_poses)
-
-        return AddNamedPoseResponse(success=True)
-
-    def remove_named_pose_cb(self, req: RemoveNamedPoseRequest) -> RemoveNamedPoseResponse:
-        """
-        ROS Service callback:
-        Adds the current arm pose as a named pose and saves it to the host config
-
-        :param req: The name of the pose as well as whether to overwrite if the pose already exists
-        :type req: AddNamedPoseRequest
-        :return: True if the named pose was written successfully otherwise false
-        :rtype: AddNamedPoseResponse
-        """
-        if req.pose_name not in self.named_poses and not req.overwrite:
-            rospy.logerr('Named pose does not exists.')
-            return AddNamedPoseResponse(success=False)
-
-        del self.named_poses[req.pose_name]
-        self.__write_config('named_poses', self.named_poses)
-
-        return AddNamedPoseResponse(success=True)
-
-    def add_named_pose_config_cb(
-            self,
-            request: AddNamedPoseConfigRequest) -> AddNamedPoseConfigResponse:
-        """[summary]
-
-        :param request: [description]
-        :type request: AddNamedPoseConfigRequest
-        :return: [description]
-        :rtype: AddNamedPoseConfigResponse
-        """
-        self.custom_configs.append(request.config_path)
-        self.__load_config()
-        return True
-
-    def remove_named_pose_config_cb(
-            self,
-            request: RemoveNamedPoseConfigRequest) -> RemoveNamedPoseConfigResponse:
-        """[summary]
-
-        :param request: [description]
-        :type request: AddNamedPoseRequest
-        :return: [description]
-        :rtype: [type]
-        """
-        if request.config_path in self.custom_configs:
-            self.custom_configs.remove(request.config_path)
-            self.__load_config()
-        return True
-
-    def get_named_pose_configs_cb(
-            self,
-            request: GetNamedPoseConfigsRequest) -> GetNamedPoseConfigsResponse:
-        """[summary]
-
-        :param request: [description]
-        :type request: GetNamedPoseConfigsRequest
-        :return: [description]
-        :rtype: GetNamedPoseConfigsResponse
-        """
-        return self.custom_configs
-
     def publish(self):
         self.joint_publisher.publish(Float64MultiArray(data=self.qd))
 
@@ -880,8 +884,9 @@ class ROSRobot(rtb.Robot):
         # rospy.loginfo(f"Manipulability: {manip} | --> 0 is singularity")
 
         # NOTE: the manip thresh is not fully tuned (but approximate cuttoff for best use at this point in time)
-        if self.state.errors != 0 or (manip <= self.singularity_thresh and self.preempted == False):
-            if manip <= self.singularity_thresh: rospy.logwarn(f"PREEMPTED: Approaching singularity (index: {manip}) --> please home to fix")
+        if self.state.errors != 0 or (np.fabs(manip) <= self.singularity_thresh and self.preempted == False):
+            if np.fabs(manip) <= self.singularity_thresh: 
+                rospy.logwarn(f"PREEMPTED: Approaching singularity (index: {manip}) --> please home to fix")
             self.preempt()
 
         # calculate joint velocities from desired cartesian velocity

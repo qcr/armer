@@ -53,10 +53,10 @@ class URDFRobot(ERobot):
     self.addconfiguration("qz", self.qz)
 
   def URDF_read_description(self):
-    rospy.loginfo('Waiting for robot description')
+    rospy.loginfo('[INIT] Waiting for robot description')
     while not rospy.has_param('/robot_description'):
       rospy.sleep(0.5)
-    rospy.loginfo('Found robot description')
+    rospy.loginfo('[INIT] Found robot description')
 
     urdf_string = self.URDF_resolve(rospy.get_param('/robot_description'))
     
