@@ -15,8 +15,8 @@ def ikine(robot, target, q0, end):
     Tep = SE3(target.position.x, target.position.y, target.position.z) * \
             UnitQuaternion(target.orientation.w, [target.orientation.x, target.orientation.y, target.orientation.z]).SE3()
             
-    
-    result = robot.ik_lm_chan(
+    # Using the roboticstoolbox Levemberg-Marquadt (LM) Numerical inverse kinematics solver
+    result = robot.ik_LM(
         Tep,
         end=end,
         q0=np.array(q0)
