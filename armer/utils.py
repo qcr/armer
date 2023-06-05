@@ -2,6 +2,7 @@
 Utility functions used by Armer
 
 .. codeauthor:: Gavin Suddrey
+.. codeauthor:: Dasun Gunasinghe
 """
 
 import rospy

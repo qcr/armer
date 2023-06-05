@@ -196,21 +196,15 @@ class ROSRobot(rtb.Robot):
             # Create Transform Listener
             self.tf_listener = tf.TransformListener()
 
+            # --- Setup Configuration for ARMer --- #
             self.config_path = config_path if config_path else os.path.join(
                 os.getenv('HOME', '/root'),
                 '.ros/configs/armer.yaml'
             )
-
             self.custom_configs: List[str] = []
             self.__load_config()
 
-            # Services
-            rospy.Service('{}/recover'.format(self.name.lower()),
-                          Empty, self.recover_cb)
-            rospy.Service('{}/stop'.format(self.name.lower()),
-                          Empty, self.preempt)
-
-            # Publishers
+            # --- ROS Publisher Setup --- #
             self.state_publisher: rospy.Publisher = rospy.Publisher(
                 '{}/state'.format(self.name.lower()), ManipulatorState, queue_size=1
             )
@@ -219,7 +213,7 @@ class ROSRobot(rtb.Robot):
                     ), Bool, queue_size=1
             )
 
-            # Subscribers
+            # --- ROS Subscriber Setup --- #
             self.cartesian_velocity_subscriber: rospy.Subscriber = rospy.Subscriber(
                 '{}/cartesian/velocity'.format(self.name.lower()
                                                ), TwistStamped, self.velocity_cb
@@ -232,8 +226,13 @@ class ROSRobot(rtb.Robot):
                 '{}/cartesian/servo'.format(self.name.lower()
                                             ), ServoStamped, self.servo_cb
             )
+            self.set_pid_subscriber: rospy.Subscriber = rospy.Subscriber(
+                '{}/set_pid'.format(self.name.lower()),
+                Float64MultiArray,
+                self.set_pid
+            )
 
-            # Action Servers
+            # --- ROS Action Server Setup --- #
             self.velocity_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
                 '{}/cartesian/guarded_velocity'.format(self.name.lower()),
                 GuardedVelocityAction,
@@ -279,6 +278,19 @@ class ROSRobot(rtb.Robot):
             self.home_server.register_preempt_callback(self.preempt)
             self.home_server.start()
 
+            # --- ROS Services Setup --- #            
+            rospy.Service(
+                '{}/recover'.format(self.name.lower()),
+                Empty, 
+                self.recover_cb
+            )
+            
+            rospy.Service(
+                '{}/stop'.format(self.name.lower()),
+                Empty, 
+                self.preempt
+            )
+            
             rospy.Service(
                 '{}/set_cartesian_impedance'.format(self.name.lower()),
                 SetCartesianImpedance,
@@ -290,44 +302,52 @@ class ROSRobot(rtb.Robot):
                 GetLinkName,
                 lambda req: GetLinkNameResponse(name=self.gripper)
             )
-            
+
             rospy.Service(
                 '{}/get_base_link_name'.format(self.name.lower()),
                 GetLinkName,
                 lambda req: GetLinkNameResponse(name=self.base_link.name)
             )
+
+            rospy.Service(
+                '{}/get_named_poses'.format(self.name.lower()), 
+                GetNamedPoses,
+                self.get_named_poses_cb
+            )
             
-            rospy.Service('{}/get_named_poses'.format(self.name.lower()), GetNamedPoses,
-                          self.get_named_poses_cb)
-
-            rospy.Service('{}/set_named_pose'.format(self.name.lower()), AddNamedPose,
-                          self.add_named_pose_cb)
-            rospy.Service('{}/remove_named_pose'.format(self.name.lower()), RemoveNamedPose,
-                          self.remove_named_pose_cb)
-
+            rospy.Service(
+                '{}/set_named_pose'.format(self.name.lower()), 
+                AddNamedPose,
+                self.add_named_pose_cb
+            )
+            
+            rospy.Service(
+                '{}/remove_named_pose'.format(self.name.lower()), 
+                RemoveNamedPose,
+                self.remove_named_pose_cb
+            )
+            
             rospy.Service(
                 '{}/add_named_pose_config'.format(self.name.lower()),
                 AddNamedPoseConfig,
                 self.add_named_pose_config_cb
             )
+
             rospy.Service(
                 '{}/remove_named_pose_config'.format(self.name.lower()),
                 RemoveNamedPoseConfig,
                 self.remove_named_pose_config_cb
             )
+            
             rospy.Service(
                 '{}/get_named_pose_configs'.format(self.name.lower()),
                 GetNamedPoseConfigs,
                 self.get_named_pose_configs_cb
             )
 
-            rospy.Subscriber(
-                '{}/set_pid'.format(self.name.lower()),
-                Float64MultiArray,
-                self.set_pid
-            )
-
-    # --- ROS Callbacks --- #
+    # --------------------------------------------------------------------- #
+    # --------- ROS Callback Methods -------------------------------------- #
+    # --------------------------------------------------------------------- #
     def _state_cb(self, msg):
         if not self.joint_indexes:
             for joint_name in self.joint_names:
@@ -737,7 +757,9 @@ class ROSRobot(rtb.Robot):
         self.Ki = msg.data[1]
         self.Kd = msg.data[2]
 
-    # --- Standard Methods --- #
+    # --------------------------------------------------------------------- #
+    # --------- Standard Methods ------------------------------------------ #
+    # --------------------------------------------------------------------- #
     def check_singularity(self, q=None) -> bool:
         """
         Checks the manipulability as a scalar manipulability index

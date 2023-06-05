@@ -1,3 +1,10 @@
+"""
+Trajectory Executor class used by Armer
+
+.. codeauthor:: Gavin Suddrey
+.. codeauthor:: Dasun Gunasinghe
+"""
+
 import numpy as np
 import rospy
 import scipy
