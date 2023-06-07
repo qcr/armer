@@ -170,8 +170,8 @@ class ROSRobot(rtb.Robot):
         self.last_update: float = 0
         self.last_tick: float = 0
 
+        # Trajectory Generation (designed to expect a Trajectory class obj)
         self.executor = None
-        
         self.traj_generator = mjtg
 
         self.joint_subscriber = rospy.Subscriber(
@@ -959,51 +959,50 @@ class ROSRobot(rtb.Robot):
                     self._controller_mode = ControlMode.JOINTS
 
             try:
-              _, orientation = self.tf_listener.lookupTransform(
-                  self.base_link.name,
-                  self.e_v_frame,
-                  rospy.Time(0)
-              )
-              
-              U = UnitQuaternion([
-                  orientation[-1],
-                  *orientation[:3]
-              ], norm=True, check=False).SE3()
-              
-              e_v = np.concatenate((
+                _, orientation = self.tf_listener.lookupTransform(
+                    self.base_link.name,
+                    self.e_v_frame,
+                    rospy.Time(0)
+                )
+                
+                U = UnitQuaternion([
+                    orientation[-1],
+                    *orientation[:3]
+                ], norm=True, check=False).SE3()
+                
+                e_v = np.concatenate((
                 (U.A @ np.concatenate((self.e_v[:3], [1]), axis=0))[:3],
                 (U.A @ np.concatenate((self.e_v[3:], [1]), axis=0))[:3]
-              ), axis=0)
-              
-              # Calculate error in base frame
-              p = self.e_p.A[:3, 3] + e_v[:3] * dt                     # expected position
-              Rq = UnitQuaternion.RPY(e_v[3:] * dt) * UnitQuaternion(self.e_p.R)
-              
-              T = SE3.Rt(SO3(Rq.R), p, check=False)   # expected pose
-              Tactual = self.fkine(self.q, start=self.base_link, end=self.gripper) # actual pose
-              
-              e_rot = (SO3(T.R @ np.linalg.pinv(Tactual.R), check=False).rpy() + np.pi) % (2*np.pi) - np.pi
-              error = np.concatenate((p - Tactual.t, e_rot), axis=0)
-              
-              e_v = e_v + error
-              
-              self.e_p = T
+                ), axis=0)
+                
+                # Calculate error in base frame
+                p = self.e_p.A[:3, 3] + e_v[:3] * dt                     # expected position
+                Rq = UnitQuaternion.RPY(e_v[3:] * dt) * UnitQuaternion(self.e_p.R)
+                
+                T = SE3.Rt(SO3(Rq.R), p, check=False)   # expected pose
+                Tactual = self.fkine(self.q, start=self.base_link, end=self.gripper) # actual pose
+                
+                e_rot = (SO3(T.R @ np.linalg.pinv(Tactual.R), check=False).rpy() + np.pi) % (2*np.pi) - np.pi
+                error = np.concatenate((p - Tactual.t, e_rot), axis=0)
+                
+                e_v = e_v + error
+                
+                self.e_p = T
                             
-              self.j_v = np.linalg.pinv(
+                self.j_v = np.linalg.pinv(
                 self.jacob0(self.q, end=self.gripper)) @ e_v
               
             except (tf.LookupException, tf2_ros.ExtrapolationException):
               rospy.logwarn('No valid transform found between %s and %s', self.base_link.name, self.e_v_frame)
               self.preempt()
 
+        # apply desired joint velocity to robot
         if self.executor:
           self.j_v = self.executor.step(dt)  
-          
-        # apply desired joint velocity to robot
-        if any(self.j_v):
-            if current_time - self.last_update > 0.1:
-                self.j_v *= 0.9 if np.sum(np.absolute(self.j_v)
-                                          ) >= 0.0001 else 0
+        else:
+            # Needed for preempting joint velocity control
+            if any(self.j_v) and current_time - self.last_update > 0.1:
+                self.j_v *= 0.9 if np.sum(np.absolute(self.j_v)) >= 0.0001 else 0
             
         self.qd = self.j_v
         self.last_tick = current_time
