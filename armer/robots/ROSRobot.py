@@ -19,6 +19,9 @@ import spatialmath as sp
 from spatialmath import SE3, SO3, UnitQuaternion, base
 import numpy as np
 import yaml
+# Required for NEO
+import qpsolvers as qp
+import spatialgeometry as sg
 
 from armer.utils import ikine, mjtg
 
@@ -104,6 +107,10 @@ class ROSRobot(rtb.Robot):
         self.__dict__.update(robot.__dict__)
         
         self.name = name if name else self.name
+        self.readonly = readonly
+
+        # TESTING
+        self.collision_obj_list: List[sg.Shape] = list()
 
         # Singularity index threshold (0 is a sigularity)
         # NOTE: this is a tested value and may require configuration (i.e., speed of robot)
@@ -138,28 +145,32 @@ class ROSRobot(rtb.Robot):
             self.qr = modified_qr
             self.q = modified_qr
 
-        self.joint_states = None # Joint state message
+        # Joint state message
+        self.joint_states = None
 
         # Guards used to prevent multiple motion requests conflicting
         self._controller_mode = ControlMode.JOINTS
 
         self.moving: bool = False
         self.last_moving: bool = False
-
         self.preempted: bool = False
 
+        # Thread variables
         self.lock: Lock = Lock()
         self.event: Event = Event()
 
         # Arm state property
         self.state: ManipulatorState = ManipulatorState()
 
-        self.e_v_frame: str = None # Expected cartesian velocity
+        # Expected cartesian velocity
+        self.e_v_frame: str = None 
 
-        self.e_v: np.array = np.zeros(shape=(6,))  # cartesian motion
+        # cartesian motion
+        self.e_v: np.array = np.zeros(shape=(6,)) 
+        # expected joint velocity
         self.j_v: np.array = np.zeros(
             shape=(len(self.q),)
-        )  # expected joint velocity
+        ) 
 
         self.e_p = self.fkine(self.q, start=self.base_link, end=self.gripper)
 
@@ -180,19 +191,14 @@ class ROSRobot(rtb.Robot):
             self._state_cb
         )
 
-        self.readonly = readonly
-
         self.joint_velocity_topic = joint_velocity_topic \
                 if joint_velocity_topic \
                 else '/joint_group_velocity_controller/command'
+        
+        # Dummy collision objects for testing NEO
+
 
         if not self.readonly:
-            self.joint_publisher = rospy.Publisher(
-                self.joint_velocity_topic,
-                Float64MultiArray,
-                queue_size=1
-            )
-
             # Create Transform Listener
             self.tf_listener = tf.TransformListener()
 
@@ -205,26 +211,37 @@ class ROSRobot(rtb.Robot):
             self.__load_config()
 
             # --- ROS Publisher Setup --- #
+            self.joint_publisher: rospy.Publisher = rospy.Publisher(
+                self.joint_velocity_topic,
+                Float64MultiArray,
+                queue_size=1
+            )
             self.state_publisher: rospy.Publisher = rospy.Publisher(
-                '{}/state'.format(self.name.lower()), ManipulatorState, queue_size=1
+                '{}/state'.format(self.name.lower()), 
+                ManipulatorState, 
+                queue_size=1
             )
             self.cartesian_servo_publisher: rospy.Publisher = rospy.Publisher(
-                '{}/cartesian/servo/arrived'.format(self.name.lower()
-                    ), Bool, queue_size=1
+                '{}/cartesian/servo/arrived'.format(self.name.lower()), 
+                Bool, 
+                queue_size=1
             )
 
             # --- ROS Subscriber Setup --- #
             self.cartesian_velocity_subscriber: rospy.Subscriber = rospy.Subscriber(
-                '{}/cartesian/velocity'.format(self.name.lower()
-                                               ), TwistStamped, self.velocity_cb
+                '{}/cartesian/velocity'.format(self.name.lower()), 
+                TwistStamped, 
+                self.velocity_cb
             )
             self.joint_velocity_subscriber: rospy.Subscriber = rospy.Subscriber(
-                '{}/joint/velocity'.format(self.name.lower()
-                                           ), JointVelocity, self.joint_velocity_cb
+                '{}/joint/velocity'.format(self.name.lower()), 
+                JointVelocity, 
+                self.joint_velocity_cb
             )
             self.cartesian_servo_subscriber: rospy.Subscriber = rospy.Subscriber(
-                '{}/cartesian/servo'.format(self.name.lower()
-                                            ), ServoStamped, self.servo_cb
+                '{}/cartesian/servo'.format(self.name.lower()), 
+                ServoStamped, 
+                self.servo_cb
             )
             self.set_pid_subscriber: rospy.Subscriber = rospy.Subscriber(
                 '{}/set_pid'.format(self.name.lower()),
@@ -345,9 +362,14 @@ class ROSRobot(rtb.Robot):
                 self.get_named_pose_configs_cb
             )
 
+            print(f"scene children: {self._scene_children}")
+
     # --------------------------------------------------------------------- #
     # --------- ROS Callback Methods -------------------------------------- #
     # --------------------------------------------------------------------- #
+    def add_collision_obj(self, obj: sg.Shape):
+        self.collision_obj_list.append(obj)
+
     def _state_cb(self, msg):
         if not self.joint_indexes:
             for joint_name in self.joint_names:
@@ -373,6 +395,13 @@ class ROSRobot(rtb.Robot):
             self.__vel_move(msg)
 
     def guarded_velocity_cb(self, msg: GuardedVelocityGoal) -> None:
+        """
+        ROS Guarded velocity callback
+        Moves the end-effector in cartesian space with respect to guards (time or force)
+        
+        :param msg: [description]
+        :type msg: GuardedVelocityGoal
+        """
         if self.moving:
             self.preempt()
         
@@ -417,7 +446,7 @@ class ROSRobot(rtb.Robot):
         Servos the end-effector to the cartesian pose given by msg
         
         :param msg: [description]
-        :type msg: PoseStamped
+        :type msg: ServoStamped
 
         This callback makes use of the roboticstoolbox p_servo function
         to generate velocities at each timestep.
@@ -427,10 +456,18 @@ class ROSRobot(rtb.Robot):
             self.preempt()
         
         with self.lock:
+            # Handle variables for servo
             goal_pose = msg.pose
             goal_gain = msg.gain if msg.gain else 3
             goal_thresh = msg.threshold if msg.threshold else 0.005
+            arrived = False
+            self.moving = True
+            self.preempted = False
 
+            # Current end-effector pose
+            Te = self.ets(start=self.base_link, end=self.gripper).eval(self.q)
+
+            # Handle frame id of servo request
             if msg.header.frame_id == '':
                 msg.header.frame_id = self.base_link.name
             
@@ -440,6 +477,7 @@ class ROSRobot(rtb.Robot):
             )
             pose = goal_pose_stamped.pose
 
+            # Convert target to SE3 (from pose)
             target = SE3(pose.position.x, pose.position.y, pose.position.z) * UnitQuaternion([
                 pose.orientation.w,
                 pose.orientation.x,
@@ -447,20 +485,24 @@ class ROSRobot(rtb.Robot):
                 pose.orientation.z
             ]).SE3()
 
-            arrived = False
-
-            self.moving = True
-            self.preempted = False
-
+            # Calculate the required end-effector spatial velocity for the robot
+            # to approach the goal.
             velocities, arrived = rtb.p_servo(
-                self.ets(start=self.base_link, end=self.gripper).eval(self.q),
+                Te,
                 target,
                 min(20, goal_gain),
                 threshold=goal_thresh
             )
 
-            self.j_v = np.linalg.pinv(
-                self.jacobe(self.q)) @ velocities
+            ##### TESTING NEO IMPLEMENTATION #####
+            neo_jv = self.neo(Tep=target, velocities=velocities)
+
+            if np.any(neo_jv):
+                self.j_v = neo_jv[:len(self.q)]
+            else:
+                self.j_v = np.linalg.pinv(self.jacobe(self.q)) @ velocities
+
+            # print(f"current jv: {self.j_v} | updated neo jv: {neo_jv}")
             self.last_update = rospy.get_time()
 
         self.cartesian_servo_publisher.publish(arrived)
@@ -760,6 +802,91 @@ class ROSRobot(rtb.Robot):
     # --------------------------------------------------------------------- #
     # --------- Standard Methods ------------------------------------------ #
     # --------------------------------------------------------------------- #
+    def neo(self, Tep, velocities):
+        """
+        Runs a version of Jesse H.'s NEO controller
+        <IN DEVELOPMENT
+        """
+        ##### Determine Slack #####
+        # Transform from the end-effector to desired pose
+        Te = self.fkine(self.q)
+        eTep = Te.inv() * Tep
+        # Spatial error
+        e = np.sum(np.abs(np.r_[eTep.t, eTep.rpy() * np.pi / 180]))
+
+        # Gain term (lambda) for control minimisation
+        Y = 0.01
+
+        # Quadratic component of objective function
+        Q = np.eye(len(self.q) + 6)
+
+        # Joint velocity component of Q
+        Q[:len(self.q), :len(self.q)] *= Y
+
+        # Slack component of Q
+        Q[len(self.q):, len(self.q):] = (1 / e) * np.eye(6)
+
+        ##### Determine the equality/inequality constraints #####
+        # The equality contraints
+        Aeq = np.c_[self.jacobe(self.q), np.eye(6)]
+        beq = velocities.reshape((6,))
+
+        # The inequality constraints for joint limit avoidance
+        Ain = np.zeros((len(self.q) + 6, len(self.q) + 6))
+        bin = np.zeros(len(self.q) + 6)
+
+        # The minimum angle (in radians) in which the joint is allowed to approach
+        # to its limit
+        ps = 0.05
+
+        # The influence angle (in radians) in which the velocity damper
+        # becomes active
+        pi = 0.9
+
+        # Form the joint limit velocity damper
+        Ain[:len(self.q), :len(self.q)], bin[:len(self.q)] = self.joint_velocity_damper(ps, pi, len(self.q))
+
+        ###### TODO: look for collision objects and form velocity damper constraints #####
+        for collision in self.collision_obj_list:
+            # print(f"collision obj: {collision}")
+            # Form the velocity damper inequality contraint for each collision
+            # object on the robot to the collision in the scene
+            c_Ain, c_bin = self.link_collision_damper(
+                collision,
+                self.q[:len(self.q)],
+                0.3,
+                0.05,
+                1.0,
+                start=self.link_dict["link1"],
+                end=self.link_dict["link_eef"],
+            )
+
+            # print(f"c_Ain: {np.shape(c_Ain)} | Ain: {np.shape(Ain)}")
+            # If there are any parts of the robot within the influence distance
+            # to the collision in the scene
+            if c_Ain is not None and c_bin is not None:
+                c_Ain = np.c_[c_Ain, np.zeros((c_Ain.shape[0], 5))]
+
+                # print(f"c_Ain (in prob area): {np.shape(c_Ain)} | Ain: {np.shape(Ain)}")
+                # Stack the inequality constraints
+                Ain = np.r_[Ain, c_Ain]
+                bin = np.r_[bin, c_bin]
+
+        # Linear component of objective function: the manipulability Jacobian
+        c = np.r_[-self.jacobm(self.q).reshape((len(self.q),)), np.zeros(6)]
+
+        # The lower and upper bounds on the joint velocity and slack variable
+        if np.any(self.qdlim):
+            lb = -np.r_[self.qdlim[:len(self.q)], 10 * np.ones(6)]
+            ub = np.r_[self.qdlim[:len(self.q)], 10 * np.ones(6)]
+
+            # Solve for the joint velocities dq
+            qd = qp.solve_qp(Q, c, Ain, bin, Aeq, beq, lb=lb, ub=ub, solver='daqp')
+        else:
+            qd = None
+
+        return qd
+
     def check_singularity(self, q=None) -> bool:
         """
         Checks the manipulability as a scalar manipulability index

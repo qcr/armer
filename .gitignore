@@ -143,5 +143,5 @@ cython_debug/
 #Docs
 docs/build
 
-#Third-Party (TEMP)
-armer/third_party/*
+#tests
+tests/*

@@ -3,4 +3,5 @@ spatialgeometry>=1.1.0
 spatialmath-python>=1.1.8
 roboticstoolbox-python>=1.1.0
 swift-sim>=1.1.0
+qpsolvers>=3.4.0
 pyyaml

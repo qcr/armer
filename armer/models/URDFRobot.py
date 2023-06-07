@@ -1,16 +1,22 @@
 #!/usr/bin/env python
+"""
+URDFRobot module defines the URDFRobot type
+
+.. codeauthor:: Gavin Suddreys
+.. codeauthor:: Dasun Gunasinghe
+"""
 
 import numpy as np
 import re
 import rospy
 import rospkg
 from io import BytesIO
-from roboticstoolbox.robot import ERobot, Link, ET, ETS
+from roboticstoolbox.robot import Robot, Link, ET, ETS
 from roboticstoolbox.tools import URDF
 import xml.etree.ElementTree as ETT
 import spatialmath
 
-class URDFRobot(ERobot):
+class URDFRobot(Robot):
   def __init__(self,
                qz=None,
                qr=None,
@@ -37,6 +43,10 @@ class URDFRobot(ERobot):
 
       gripper_link[0].tool = spatialmath.SE3(ets.compile()[0].A())
       
+    # DEBUGGING
+    # print(f"links:")
+    # for link in links:
+    #   print(link)
 
     super().__init__(
         links,
