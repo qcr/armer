@@ -194,9 +194,6 @@ class ROSRobot(rtb.Robot):
         self.joint_velocity_topic = joint_velocity_topic \
                 if joint_velocity_topic \
                 else '/joint_group_velocity_controller/command'
-        
-        # Dummy collision objects for testing NEO
-
 
         if not self.readonly:
             # Create Transform Listener
@@ -327,6 +324,12 @@ class ROSRobot(rtb.Robot):
             )
 
             rospy.Service(
+                '{}/update_tf'.format(self.name.lower()),
+                Empty,
+                self.update_tf_cb
+            )
+
+            rospy.Service(
                 '{}/get_named_poses'.format(self.name.lower()), 
                 GetNamedPoses,
                 self.get_named_poses_cb
@@ -365,11 +368,8 @@ class ROSRobot(rtb.Robot):
             print(f"scene children: {self._scene_children}")
 
     # --------------------------------------------------------------------- #
-    # --------- ROS Callback Methods -------------------------------------- #
+    # --------- ROS Topic Callback Methods -------------------------------- #
     # --------------------------------------------------------------------- #
-    def add_collision_obj(self, obj: sg.Shape):
-        self.collision_obj_list.append(obj)
-
     def _state_cb(self, msg):
         if not self.joint_indexes:
             for joint_name in self.joint_names:
@@ -380,7 +380,7 @@ class ROSRobot(rtb.Robot):
         
     def velocity_cb(self, msg: TwistStamped) -> None:
         """
-        ROS Service callback:
+        ROS velocity callback:
         Moves the arm at the specified cartesian velocity
         w.r.t. a target frame
 
@@ -394,6 +394,24 @@ class ROSRobot(rtb.Robot):
             self.preempted = False
             self.__vel_move(msg)
 
+    def joint_velocity_cb(self, msg: JointVelocity) -> None:
+        """
+        ROS joint velocity callback:
+        Moves the joints of the arm at the specified velocities
+
+        :param msg: [description]
+        :type msg: JointVelocity
+        """
+        if self.moving:
+            self.preempt()
+
+        with self.lock:
+            self.j_v = np.array(msg.joints)
+            self.last_update = rospy.get_time()
+
+    # --------------------------------------------------------------------- #
+    # --------- ROS Action Callback Methods ------------------------------- #
+    # --------------------------------------------------------------------- #
     def guarded_velocity_cb(self, msg: GuardedVelocityGoal) -> None:
         """
         ROS Guarded velocity callback
@@ -425,24 +443,9 @@ class ROSRobot(rtb.Robot):
             else:
                 self.velocity_server.set_aborted(GuardedVelocityResult())
 
-    def joint_velocity_cb(self, msg: JointVelocity) -> None:
-        """
-        ROS Service callback:
-        Moves the joints of the arm at the specified velocities
-
-        :param msg: [description]
-        :type msg: JointVelocity
-        """
-        if self.moving:
-            self.preempt()
-
-        with self.lock:
-            self.j_v = np.array(msg.joints)
-            self.last_update = rospy.get_time()
-
     def servo_cb(self, msg) -> None:
         """
-        ROS Servoing Subscriber Callback:
+        ROS Servoing Action Callback:
         Servos the end-effector to the cartesian pose given by msg
         
         :param msg: [description]
@@ -669,6 +672,9 @@ class ROSRobot(rtb.Robot):
             self.executor = None
             self.moving = False
 
+    # --------------------------------------------------------------------- #
+    # --------- ROS Service Callback Methods ------------------------------- #
+    # --------------------------------------------------------------------- #
     def recover_cb(self, req: EmptyRequest) -> EmptyResponse: # pylint: disable=no-self-use
         """[summary]
         ROS Service callback:
@@ -680,6 +686,25 @@ class ROSRobot(rtb.Robot):
         :rtype: EmptyResponse
         """
         rospy.logwarn('Recovery not implemented for this arm')
+        return EmptyResponse()
+    
+    def update_tf_cb(self, req: EmptyRequest) -> EmptyResponse: # pylint: disable=no-self-use
+        """[summary]
+        ROS Service callback:
+        Updates a link's transform if it exists
+
+        :param req: an empty request
+        :type req: EmptyRequest
+        :return: an empty response
+        :rtype: EmptyResponse
+        """
+        rospy.logwarn('TF update not implemented for this arm <IN DEV>')
+        test_offset = SE3(0.3,0,0)
+        for link in self.links:
+            if link.name == 'conveyor_tag_calibration_link':
+                rospy.loginfo(f"LINK -> {link.name} | POSE: {link._Ts}")
+                link._Ts = test_offset.A
+                rospy.loginfo(f"UPDATED LINK -> {link.name} | POSE: {link._Ts}")
         return EmptyResponse()
 
     def set_cartesian_impedance_cb(  # pylint: disable=no-self-use
@@ -802,6 +827,9 @@ class ROSRobot(rtb.Robot):
     # --------------------------------------------------------------------- #
     # --------- Standard Methods ------------------------------------------ #
     # --------------------------------------------------------------------- #
+    def add_collision_obj(self, obj: sg.Shape):
+        self.collision_obj_list.append(obj)
+
     def neo(self, Tep, velocities):
         """
         Runs a version of Jesse H.'s NEO controller
