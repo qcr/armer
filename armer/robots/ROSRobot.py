@@ -4,6 +4,7 @@ ROSRobot module defines the ROSRobot type
 .. codeauthor:: Gavin Suddreys
 .. codeauthor:: Dasun Gunasinghe
 """
+import copy
 import os
 import timeit
 
@@ -11,6 +12,7 @@ from typing import List, Any
 from threading import Lock, Event
 from armer.timer import Timer
 from armer.trajectory import TrajectoryExecutor
+from armer.models import URDFRobot
 import rospy
 import actionlib
 import tf
@@ -108,6 +110,7 @@ class ROSRobot(rtb.Robot):
 
         # TESTING
         self.collision_obj_list: List[sg.Shape] = list()
+        # self.urdf_robot = URDFRobot()
 
         # Singularity index threshold (0 is a sigularity)
         # NOTE: this is a tested value and may require configuration (i.e., speed of robot)
@@ -170,10 +173,6 @@ class ROSRobot(rtb.Robot):
         ) 
 
         self.e_p = self.fkine(self.q, start=self.base_link, end=self.gripper)
-
-        # self.Kp: float = Kp if Kp else 0.0
-        # self.Ki: float = Ki if Ki else 0.0
-        # self.Kd: float = Kd if Kd else 0.0
 
         self.last_update: float = 0
         self.last_tick: float = 0
@@ -321,9 +320,9 @@ class ROSRobot(rtb.Robot):
             )
 
             rospy.Service(
-                '{}/update_tf'.format(self.name.lower()),
+                '{}/update_description'.format(self.name.lower()),
                 Empty,
-                self.update_tf_cb
+                self.update_description_cb
             )
 
             rospy.Service(
@@ -684,10 +683,10 @@ class ROSRobot(rtb.Robot):
         rospy.logwarn('Recovery not implemented for this arm')
         return EmptyResponse()
     
-    def update_tf_cb(self, req: EmptyRequest) -> EmptyResponse: # pylint: disable=no-self-use
+    def update_description_cb(self, req: EmptyRequest) -> EmptyResponse: # pylint: disable=no-self-use
         """[summary]
         ROS Service callback:
-        Updates a link's transform if it exists
+        Updates the robot description if loaded into param
 
         :param req: an empty request
         :type req: EmptyRequest
@@ -695,12 +694,51 @@ class ROSRobot(rtb.Robot):
         :rtype: EmptyResponse
         """
         rospy.logwarn('TF update not implemented for this arm <IN DEV>')
+        # Preempt any motion prior to changing link structure
+        if self.moving:
+            self.preempt()
+
+        # Read robot description param and only proceed if successful
+        links, _, _, _ = URDFRobot.URDF_read_description(wait=False)
+
+        # TODO: this should be a request (service)
+        # Using requested gripper, update control point
+        gripper = 'custom_tool_link'
+        gripper_link = list(filter(lambda link: link.name == gripper, links))
+
+        # DEBUGGING
+        # rospy.loginfo(f"requested gripper: {gripper} | requested gripper link: {gripper_link}")
+        # rospy.loginfo(f"Updated links:")
+        # for link in links:
+        #     rospy.loginfo(f"{link}")
+
+        # Update robot tree if successful
+        if np.any(links) and gripper_link != []: 
+            # Remove the old dict of links
+            self.link_dict.clear()
+
+            # Clear current base link
+            self._base_link = None
+
+            # Sort and update new links and gripper links
+            self._sort_links(links, gripper_link, True) 
+
+            # Update control point
+            self.gripper = gripper
+
+            rospy.loginfo(f"Updated Links! New Control: {self.gripper}")
+        else:
+            if gripper_link == []: rospy.logwarn(f"Requested control tf [{gripper}] not found in tree")
+            if links == None: rospy.logerr(f"No links found in description. Make sure robot_description param is loaded correctly")
+        
+        # OFFSET UPDATING (IN PROGRESS)
         test_offset = SE3(0.3,0,0)
         for link in self.links:
             if link.name == 'conveyor_tag_calibration_link':
                 rospy.loginfo(f"LINK -> {link.name} | POSE: {link._Ts}")
                 link._Ts = test_offset.A
                 rospy.loginfo(f"UPDATED LINK -> {link.name} | POSE: {link._Ts}")
+
         return EmptyResponse()
 
     def set_cartesian_impedance_cb(  # pylint: disable=no-self-use

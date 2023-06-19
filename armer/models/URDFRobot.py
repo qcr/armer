@@ -29,7 +29,7 @@ class URDFRobot(Robot):
     if urdf_file:
       links, name, urdf_string, urdf_filepath = self.URDF_read(urdf_file)
     else:
-      links, name, urdf_string, urdf_filepath = self.URDF_read_description()
+      links, name, urdf_string, urdf_filepath = URDFRobot.URDF_read_description()
     
     self.gripper = gripper if gripper else URDFRobot.resolve_gripper(links)
     gripper_link = list(filter(lambda link: link.name == self.gripper, links))
@@ -47,6 +47,7 @@ class URDFRobot(Robot):
     # print(f"links:")
     # for link in links:
     #   print(link)
+    # print(f"gripper: {self.gripper} | gripper link: {gripper_link}")
 
     super().__init__(
         links,
@@ -61,14 +62,31 @@ class URDFRobot(Robot):
 
     self.addconfiguration("qr", self.qr)
     self.addconfiguration("qz", self.qz)
+  
+  @staticmethod
+  def URDF_resolve(urdf_string):
+    rospack = rospkg.RosPack()
+    packages = list(set(re.findall(r'(package:\/\/([^\/]*))', urdf_string)))
+    
+    for package in packages:
+      urdf_string = urdf_string.replace(package[0], rospack.get_path(package[1]))
+    
+    return urdf_string
+  
+  @staticmethod
+  def URDF_read_description(wait=True):
+    if wait:
+      rospy.loginfo('[INIT] Waiting for robot description')
+      while not rospy.has_param('/robot_description'):
+        rospy.sleep(0.5)
+      rospy.loginfo('[INIT] Found robot description')
+    else:
+      # Check if robot param exists and handle as error if need be
+      param = rospy.has_param('/robot_description')
+      if not param: return None, None, None, None
+      rospy.loginfo(f"[INIT] Found robot description NEW")
 
-  def URDF_read_description(self):
-    rospy.loginfo('[INIT] Waiting for robot description')
-    while not rospy.has_param('/robot_description'):
-      rospy.sleep(0.5)
-    rospy.loginfo('[INIT] Found robot description')
-
-    urdf_string = self.URDF_resolve(rospy.get_param('/robot_description'))
+    urdf_string = URDFRobot.URDF_resolve(rospy.get_param('/robot_description'))
     
     tree = ETT.parse(
       BytesIO(bytes(urdf_string, "utf-8")), 
@@ -79,15 +97,6 @@ class URDFRobot(Robot):
     urdf = URDF._from_xml(node, '/')
 
     return urdf.elinks, urdf.name, urdf_string, '/'
-    
-  def URDF_resolve(self, urdf_string):
-    rospack = rospkg.RosPack()
-    packages = list(set(re.findall(r'(package:\/\/([^\/]*))', urdf_string)))
-    
-    for package in packages:
-      urdf_string = urdf_string.replace(package[0], rospack.get_path(package[1]))
-    
-    return urdf_string
 
   @staticmethod
   def resolve_gripper(links):

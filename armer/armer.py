@@ -251,9 +251,3 @@ class Armer:
                 self.rate.sleep()
 
                 self.last_tick = current_time
-
-
-# if __name__ == '__main__':
-#     rospy.init_node('manipulator')
-#     manipulator = Armer(publish_transforms=False)
-#     manipulator.run()
