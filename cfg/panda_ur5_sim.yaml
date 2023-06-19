@@ -3,10 +3,13 @@ robots:
     model: 
       urdf_file: franka_description/robots/panda_arm_hand.urdf.xacro
       qr: [0, -0.3, 0, -2.2, 0, 2.0, 0.78539816339]
+    singularity_thresh: 0.02
   - name: ur5
     model: 
       urdf_file: ur_description/urdf/ur5_robot.urdf.xacro
+      qr: [-1.57, -0.96, -2.18, -1.57, 1.57, 3.14]
       gripper: tool0
+    singularity_thresh: 0.02
     origin: [-1, 0, 0, 0, 0, 0] # (xyzrpy)
 publish_transforms: true
 backend:

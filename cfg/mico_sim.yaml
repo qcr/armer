@@ -2,8 +2,9 @@ robots:
   - name: arm 
     model: 
       type: roboticstoolbox.models.Mico
+    singularity_thresh: 0.02
 backend: 
   type: roboticstoolbox.backends.swift.Swift
-publish_transforms: true
+publish_transforms: false
 logging: 
   frequency: false

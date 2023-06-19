@@ -2,6 +2,7 @@
 Armer Class
 
 .. codeauthor:: Gavin Suddreys
+.. codeauthor:: Dasun Gunasinghe
 """
 from __future__ import annotations
 from typing import List, Dict, Any, Tuple
@@ -100,7 +101,7 @@ class Armer:
         for robot in self.robots:
             joint_positions = getvector(robot.q, robot.n)
 
-            for link in robot.elinks:
+            for link in robot.links:
                 if link.parent is None:
                     continue
 
@@ -112,8 +113,7 @@ class Armer:
                 transforms.append(populate_transform_stamped(
                     link.parent.name,
                     link.name,
-                    transform,
-                    timestamp
+                    transform
                 ))
 
             for gripper in robot.grippers:
@@ -131,8 +131,7 @@ class Armer:
                     transforms.append(populate_transform_stamped(
                         link.parent.name,
                         link.name,
-                        transform,
-                        timestamp
+                        transform
                     ))
         
         self.broadcaster.sendTransform(transforms)
