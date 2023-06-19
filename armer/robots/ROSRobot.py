@@ -96,9 +96,6 @@ class ROSRobot(rtb.Robot):
                  readonly=False,
                  frequency=None,
                  modified_qr=None,
-                 Kp=1.0,
-                 Ki=None,
-                 Kd=None,
                  singularity_thresh=0.02,
                  * args,
                  **kwargs):  # pylint: disable=unused-argument
@@ -174,9 +171,9 @@ class ROSRobot(rtb.Robot):
 
         self.e_p = self.fkine(self.q, start=self.base_link, end=self.gripper)
 
-        self.Kp: float = Kp if Kp else 0.0
-        self.Ki: float = Ki if Ki else 0.0
-        self.Kd: float = Kd if Kd else 0.0
+        # self.Kp: float = Kp if Kp else 0.0
+        # self.Ki: float = Ki if Ki else 0.0
+        # self.Kd: float = Kd if Kd else 0.0
 
         self.last_update: float = 0
         self.last_tick: float = 0
@@ -365,8 +362,6 @@ class ROSRobot(rtb.Robot):
                 self.get_named_pose_configs_cb
             )
 
-            print(f"scene children: {self._scene_children}")
-
     # --------------------------------------------------------------------- #
     # --------- ROS Topic Callback Methods -------------------------------- #
     # --------------------------------------------------------------------- #
@@ -498,7 +493,8 @@ class ROSRobot(rtb.Robot):
             )
 
             ##### TESTING NEO IMPLEMENTATION #####
-            neo_jv = self.neo(Tep=target, velocities=velocities)
+            # neo_jv = self.neo(Tep=target, velocities=velocities)
+            neo_jv = None
 
             if np.any(neo_jv):
                 self.j_v = neo_jv[:len(self.q)]
@@ -819,10 +815,11 @@ class ROSRobot(rtb.Robot):
     def set_pid(self, msg):
         """
         Sets the pid value from a callback
+        Deprecated 2023-06-19.
         """
-        self.Kp = msg.data[0]
-        self.Ki = msg.data[1]
-        self.Kd = msg.data[2]
+        self.Kp = None
+        self.Ki = None
+        self.Kd = None
 
     # --------------------------------------------------------------------- #
     # --------- Standard Methods ------------------------------------------ #

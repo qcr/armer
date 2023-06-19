@@ -65,10 +65,6 @@ class TrajectoryExecutor:
     self.last_jp = np.array(current_jp)
     
     # Calculate corrected error based on error above
-    # corr_jv = current_jv + (erro_jv * self.robot.Kp) \
-    #   + (erro_jp * self.robot.Ki) \
-    #   + (((req_jv - current_jv) / self.robot.frequency) * self.robot.Kd)
-    
     corr_jv = current_jv + erro_jv
     
     # corr_jv = np.zeros(self.robot.n)
@@ -98,7 +94,7 @@ class TrajectoryExecutor:
       return True
 
     if len(self.traj.s) < 2 or np.all(np.fabs(self.traj.s[-1] - self.robot.q) < cutoff):
-      rospy.loginfo(f'Too close to goal, quitting movement {(self.time_step / self.traj.t)} | End time: {self.time_step}')
+      rospy.loginfo(f'Too close to goal {(self.time_step / self.traj.t)}')
       if self.cartesian_ee_vel_vect:
         rospy.loginfo(f"Max cartesian speed: {np.max(self.cartesian_ee_vel_vect)}")
       self._finished = True
