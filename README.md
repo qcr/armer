@@ -96,28 +96,46 @@ echo "Installation complete!"
 ###  macOS and Windows (10/11)
 To enable easy use of ROS on these operating systems, it is recommended to use [RoboStack](https://robostack.github.io/); note that ROS 1 (noetic) is recommended at this stage. Please ensure you have [mamba](https://mamba.readthedocs.io/en/latest/installation.html) installed before proceeding. Please follow all required steps for the [RoboStack](https://robostack.github.io/) install (as per their instructions) to enable the smoothest setup on your particular OS.
 ```bash
-# Create and activate a new robostack environment
-mamba create -n robostackenv ros-noetic-desktop python=3.9 -c robostack-staging -c conda-forge --no-channel-priority --override-channels
-mamba activate robostackenv
+# --- Mamba Environment Setup --- #
+# Create and activate a new robostack (ros-env) environment
+mamba create -n ros-env ros-noetic-desktop python=3.9 -c robostack-staging -c conda-forge --no-channel-priority --override-channels
+mamba activate ros-env
 
 # Install some compiler packages
 mamba install compilers cmake pkg-config make ninja
 
-# Make the armer workspace and clone in armer and armer_msgs packages
-mkdir -p ~/armer_ws/src && cd ~/armer_ws/src 
-git clone https://github.com/qcr/armer.git && git clone https://github.com/qcr/armer_msgs 
+# FOR WINDOWS: Install the Visual Studio command prompt - if you use Visual Studio 2022
+mamba install vs2022_win-64
 
-# Install all required packages (into robostackenv)
-pip install -r ~/armer_ws/src/armer/requirements.txt
-cd .. && rosdep install --from-paths src --ignore-src -r -y 
+# --- ARMer Setup --- #
+# Make the armer workspace and clone in armer and armer_msgs packages
+# FOR LINUX/MACOS
+mkdir -p ~/armer_ws/src && cd ~/armer_ws/src 
+# FOR WINDOWS: Assumes you are in the home folder
+mkdir armer_ws\src && cd armer_ws\src
+# Clone in armer and armer_msgs
+git clone https://github.com/qcr/armer.git && git clone https://github.com/qcr/armer_msgs 
+# Install all required packages (into ros-env) - from current directory
+# FOR LINUX/MACOS
+pip install -r armer/requirements.txt
+# FOR WINDOWS
+pip install -r armer\requirements.txt
+# Enter armer_ws folder and run rosdep commands
+cd .. && rosdep init && rosdep update && rosdep install --from-paths src --ignore-src -r -y 
 
 # Make and source the workspace (including environment)
 catkin_make 
-echo "mamba activate robostackenv" >> ~/.bashrc
-echo "source ~/armer_ws/devel/setup.bash" >> ~/.bashrc 
+
+# --- Default Activation of Environment --- #
+# FOR LINUX 
+echo "mamba activate ros-env" >> ~/.bashrc
+
+# FOR MACOS
+echo "mamba activate ros-env" >> ~/.bash_profile
+
+# --- Workspace Source --- #
 source ~/armer_ws/devel/setup.bash
 ```
-
 
 Supported Arms
 ---------------
@@ -138,16 +156,18 @@ For more information on setting up manipulators not listed here see the Armer do
 Usage
 -------
 
-The Armer interface can be launched with the following command for simulation:
+The Armer interface can be launched with the following command for simulation (note, please replace USER with your own username):
 
 > ``` {.sourceCode .bash}
-> roslaunch armer armer.launch config:={PATH_TO_CONFIG_YAML_FILE}
+> # Example is using the panda_sim.yaml. Note, please update the below path if the install directory is different
+> roslaunch armer armer.launch config:=/home/$USER/armer_ws/src/armer/cfg/panda_sim.yaml
 > ```
 
 Alternatively, the Armer interface can be launched for a real robot using the following command (Note that this can also support simulation if you wish via the ***sim*** parameter):
 
 > ``` {.sourceCode .bash}
-> roslaunch armer_{ROBOT_MODEL} robot_bringup.launch config:={PATH_TO_CONFIG_YAML_FILE} sim:={true/false}
+> # Note this example launches the panda model in simulation mode (assumes you have this package cloned, see above)
+> roslaunch armer_panda robot_bringup.launch sim:=true
 > ```
 
 After launching, an arm can be controlled in several ways. Some quick tutorials can be referenced below:

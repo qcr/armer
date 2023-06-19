@@ -15,6 +15,8 @@ import tf2_ros
 import yaml
 
 import roboticstoolbox as rtb
+import spatialgeometry as sg
+import spatialmath as sm
 from roboticstoolbox.backends.swift import Swift
 
 from spatialmath.base.argcheck import getvector
@@ -77,6 +79,15 @@ class Armer:
 
         for robot in self.robots:
             self.backend.add(robot)
+
+            # # TESTING
+            # # Add dummy object for testing
+            # s0 = sg.Sphere(radius=0.05, pose=sm.SE3(0.5, 0, 0.5))
+            # s1 = sg.Sphere(radius=0.05, pose=sm.SE3(0.5, 0, 0.1))
+            # robot.add_collision_obj(s0)
+            # robot.add_collision_obj(s1)
+            # self.backend.add(s0)
+            # self.backend.add(s1)
 
         for readonly, args in self.readonly_backends:
             readonly.launch(**args)
@@ -204,6 +215,7 @@ class Armer:
 
         logging = config['logging'] if 'logging' in config else {}
         publish_transforms = config['publish_transforms'] if 'publish_transforms' in config else False
+
         return Armer(
             robots=robots,
             backend=backend,
@@ -218,6 +230,7 @@ class Armer:
         Runs the driver. This is a blocking call.
         """
         self.last_tick = rospy.get_time()
+        rospy.loginfo(f"ARMer Node Running...")
         
         while not rospy.is_shutdown():
             with Timer('ROS', self.log_frequency):
@@ -240,7 +253,7 @@ class Armer:
                 self.last_tick = current_time
 
 
-if __name__ == '__main__':
-    rospy.init_node('manipulator')
-    manipulator = Armer(publish_transforms=False)
-    manipulator.run()
+# if __name__ == '__main__':
+#     rospy.init_node('manipulator')
+#     manipulator = Armer(publish_transforms=False)
+#     manipulator.run()

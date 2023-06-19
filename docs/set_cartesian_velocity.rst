@@ -21,10 +21,20 @@ The following code block shows a Python3 script of setting the linear velocty in
     import rospy
     from geometry_msgs.msg import TwistStamped
 
+    # Initialise node
     rospy.init_node('armer_example', disable_signals=True)
+    
+    # Start publisher to topic
     vel_pub = rospy.Publisher('/arm/cartesian/velocity', TwistStamped, queue_size=1)
+    
+    # Create message type and populate
     vel_msg = TwistStamped()
     vel_msg.twist.linear.x = 0.1
 
-    while True:
+    # Define rate (100 Hz recommended)
+    rate = rospy.Rate(100) #hz
+    while not rospy.is_shutdown():
+        # Publish velocity
         vel_pub.publish(vel_msg)
+        # Tick the node
+        rate.sleep()
