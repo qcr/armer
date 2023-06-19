@@ -1,3 +1,10 @@
+"""
+Trajectory Executor class used by Armer
+
+.. codeauthor:: Gavin Suddrey
+.. codeauthor:: Dasun Gunasinghe
+"""
+
 import numpy as np
 import rospy
 import scipy
@@ -52,14 +59,13 @@ class TrajectoryExecutor:
       req_jv = self.traj.sd[self.time_step]
 
     # Calculate error in joint velocities based on current and expected
-    current_jv = current_jp - self.last_jp
     erro_jv = req_jv - current_jv
     erro_jp = req_jp - current_jp
 
     self.last_jp = np.array(current_jp)
     
     # Calculate corrected error based on error above
-    corr_jv = current_jv + (erro_jv * self.robot.Kp) + (erro_jp * self.robot.Ki) + (((req_jv - current_jv) / self.robot.frequency) * self.robot.Kd)
+    corr_jv = current_jv + erro_jv
     
     # corr_jv = np.zeros(self.robot.n)
     if np.any(np.max(np.fabs(erro_jp)) > 0.5):
@@ -68,6 +74,15 @@ class TrajectoryExecutor:
         
     # Increment time step(s)
     self.time_step += dt if self.traj.istime else 1
+
+    # DEBUG
+    # print(f"---")
+    # print(f"time step is: {self.time_step}")
+    # print(f"current jv is: {current_jv} | alt (self.j_v) is: {self.robot.j_v}")
+    # print(f"exp jv is: {req_jv}")
+    # print(f"error in jv is: {erro_jv}")
+    # print(f"corrected jv is: {corr_jv}")
+    # print(f"###")
     return corr_jv
 
   def abort(self):
@@ -79,12 +94,16 @@ class TrajectoryExecutor:
       return True
 
     if len(self.traj.s) < 2 or np.all(np.fabs(self.traj.s[-1] - self.robot.q) < cutoff):
-      rospy.loginfo('Too close to goal, quitting movement {}...'.format(self.time_step / self.traj.t))
+      rospy.loginfo(f'Too close to goal {(self.time_step / self.traj.t)}')
+      if self.cartesian_ee_vel_vect:
+        rospy.loginfo(f"Max cartesian speed: {np.max(self.cartesian_ee_vel_vect)}")
       self._finished = True
       self._success = True
     
     if (self.time_step) >= self.traj.t - (1 if not self.traj.istime else 0):
-      rospy.loginfo('Timed out')
+      rospy.loginfo(f'Timed out | End time: {self.time_step}')
+      if self.cartesian_ee_vel_vect:
+        rospy.loginfo(f"Max cartesian speed: {np.max(self.cartesian_ee_vel_vect)}")
       self._finished = True
       self._success = True
       

@@ -160,7 +160,7 @@ The Armer interface can be launched with the following command for simulation (n
 
 > ``` {.sourceCode .bash}
 > # Example is using the panda_sim.yaml. Note, please update the below path if the install directory is different
-> roslaunch armer armer.launch config:=/home/USER/armer_ws/src/armer/cfg/panda_sim.yaml
+> roslaunch armer armer.launch config:=/home/$USER/armer_ws/src/armer/cfg/panda_sim.yaml
 > ```
 
 Alternatively, the Armer interface can be launched for a real robot using the following command (Note that this can also support simulation if you wish via the ***sim*** parameter):
