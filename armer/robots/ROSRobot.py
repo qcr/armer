@@ -765,9 +765,9 @@ class ROSRobot(rtb.Robot):
         link_found = False
 
         rospy.logwarn(f"IN DEVELOPMENT")
-        rospy.loginfo(f"Got req for transform: {req.transform} | offset: {req.offset}")
+        rospy.loginfo(f"Got req for transform: {req.transform} | offset: {req.link_name}")
 
-        if req.transform == None or req.offset == Pose():
+        if req.transform == None or req.link_name == Pose():
             rospy.logerr(f"Input values are None or Empty")
             return CalibrateTransformResponse(success=False)
         
@@ -777,15 +777,15 @@ class ROSRobot(rtb.Robot):
         #            req.offset.orientation.x, req.offset.orientation.y,
         #            req.offset.orientation.z
         #        ]).SE3()
-        offset = SE3(req.offset.position.x, req.offset.position.y,
-               req.offset.position.z)
+        transform = SE3(req.transform.position.x, req.transform.position.y,
+               req.transform.position.z)
 
         for link in self.links:
-            if link.name == req.transform:
+            if link.name == req.link_name and not link.isjoint:
                 rospy.loginfo(f"LINK -> {link.name} | PARENT: {link.parent_name}")
                 # Update if found
                 # TODO: check if parent is base link 
-                link._Ts = offset.A
+                link._Ts = transform.A
                 link_found = True
                 # rospy.loginfo(f"UPDATED LINK -> {link.name} | POSE: {link._Ts}")
 
