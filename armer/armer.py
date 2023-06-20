@@ -78,9 +78,9 @@ class Armer:
         # Launch backend
         self.backend.launch(**(backend_args if backend_args else dict()))
 
-        print(f"init links:")
+        # print(f"init links:")
         for robot in self.robots:
-            print(f"{robot.links}")
+            # print(f"{robot.links}")
             self.backend.add(robot)
 
             # # TESTING

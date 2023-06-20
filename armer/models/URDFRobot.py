@@ -65,39 +65,46 @@ class URDFRobot(Robot):
   
   @staticmethod
   def URDF_resolve(urdf_string):
+    # TODO: any way to find packages outside of workspace with this method?
     rospack = rospkg.RosPack()
     packages = list(set(re.findall(r'(package:\/\/([^\/]*))', urdf_string)))
-    print(f"packages: {packages}")
+    # print(f"packages: {packages}")
     
     for package in packages:
-      urdf_string = urdf_string.replace(package[0], rospack.get_path(package[1]))
-    
+      # print(f"Checking for package: {package}")
+      try:
+        urdf_string = urdf_string.replace(package[0], rospack.get_path(package[1]))
+      except rospack.ResourceNotFound:
+        urdf_string = None
+      
     return urdf_string
   
   @staticmethod
-  def URDF_read_description(wait=True):
+  def URDF_read_description(wait=True, param='robot_description'):
     if wait:
       rospy.loginfo('[INIT] Waiting for robot description')
-      while not rospy.has_param('/robot_description'):
+      while not rospy.has_param('/' + param):
         rospy.sleep(0.5)
       rospy.loginfo('[INIT] Found robot description')
     else:
       # Check if robot param exists and handle as error if need be
-      param = rospy.has_param('/robot_description')
-      if not param: return None, None, None, None
+      if not rospy.has_param('/' + param): return None, None, None, None
       rospy.loginfo(f"[INIT] Found robot description NEW")
 
-    urdf_string = URDFRobot.URDF_resolve(rospy.get_param('/robot_description'))
-    
-    tree = ETT.parse(
-      BytesIO(bytes(urdf_string, "utf-8")), 
-      parser=ETT.XMLParser()
-    )
+    urdf_string = URDFRobot.URDF_resolve(rospy.get_param('/' + param))
 
-    node = tree.getroot()
-    urdf = URDF._from_xml(node, '/')
+    if urdf_string:
+      tree = ETT.parse(
+        BytesIO(bytes(urdf_string, "utf-8")), 
+        parser=ETT.XMLParser()
+      )
 
-    return urdf.elinks, urdf.name, urdf_string, '/'
+      node = tree.getroot()
+      urdf = URDF._from_xml(node, '/')
+
+      return urdf.elinks, urdf.name, urdf_string, '/'
+    else:
+      return None, None, None, None
 
   @staticmethod
   def resolve_gripper(links):

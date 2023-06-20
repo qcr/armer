@@ -29,7 +29,7 @@ from armer.utils import ikine, mjtg
 
 from std_msgs.msg import Header, Bool
 from sensor_msgs.msg import JointState
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import Pose, PoseStamped
 
 from geometry_msgs.msg import TwistStamped, Twist, Vector3Stamped, QuaternionStamped
 from std_srvs.srv import Empty, EmptyRequest, EmptyResponse
@@ -74,6 +74,14 @@ from armer_msgs.srv import RemoveNamedPose, \
 from armer_msgs.srv import RemoveNamedPoseConfig, \
     RemoveNamedPoseConfigRequest, \
     RemoveNamedPoseConfigResponse
+
+from armer_msgs.srv import UpdateDescription, \
+    UpdateDescriptionRequest, \
+    UpdateDescriptionResponse
+
+from armer_msgs.srv import CalibrateTransform, \
+    CalibrateTransformRequest, \
+    CalibrateTransformResponse
 
 # pylint: disable=too-many-instance-attributes
 
@@ -321,8 +329,14 @@ class ROSRobot(rtb.Robot):
 
             rospy.Service(
                 '{}/update_description'.format(self.name.lower()),
-                Empty,
+                UpdateDescription,
                 self.update_description_cb
+            )
+
+            rospy.Service(
+                '{}/calibrate_transform'.format(self.name.lower()),
+                CalibrateTransform,
+                self.calibrate_transform_cb
             )
 
             rospy.Service(
@@ -683,7 +697,7 @@ class ROSRobot(rtb.Robot):
         rospy.logwarn('Recovery not implemented for this arm')
         return EmptyResponse()
     
-    def update_description_cb(self, req: EmptyRequest) -> EmptyResponse: # pylint: disable=no-self-use
+    def update_description_cb(self, req: UpdateDescriptionRequest) -> UpdateDescriptionResponse: # pylint: disable=no-self-use
         """[summary]
         ROS Service callback:
         Updates the robot description if loaded into param
@@ -694,17 +708,26 @@ class ROSRobot(rtb.Robot):
         :rtype: EmptyResponse
         """
         rospy.logwarn('TF update not implemented for this arm <IN DEV>')
+        rospy.loginfo(f"req gripper: {req.gripper} | param: {req.param}")
+        if req.gripper == '' or req.param == '':
+            rospy.logerr(f"Inputs are None or Empty")
+            return UpdateDescriptionResponse(success=False)
+        
+        gripper_link = None
+        gripper = None
+
         # Preempt any motion prior to changing link structure
         if self.moving:
             self.preempt()
 
-        # Read robot description param and only proceed if successful
-        links, _, _, _ = URDFRobot.URDF_read_description(wait=False)
+        # Read req param and only proceed if successful
+        links, _, _, _ = URDFRobot.URDF_read_description(wait=False, param=req.param)
 
-        # TODO: this should be a request (service)
-        # Using requested gripper, update control point
-        gripper = 'panda_link8'
-        gripper_link = list(filter(lambda link: link.name == gripper, links))
+        if np.any(links):
+            #Do Something
+            # Using requested gripper, update control point
+            gripper = req.gripper
+            gripper_link = list(filter(lambda link: link.name == gripper, links))
 
         # DEBUGGING
         # rospy.loginfo(f"requested gripper: {gripper} | requested gripper link: {gripper_link}")
@@ -730,19 +753,43 @@ class ROSRobot(rtb.Robot):
             self.backend_reset = True
 
             rospy.loginfo(f"Updated Links! New Control: {self.gripper}")
+            return UpdateDescriptionResponse(success=True)
         else:
-            if gripper_link == []: rospy.logwarn(f"Requested control tf [{gripper}] not found in tree")
-            if links == None: rospy.logerr(f"No links found in description. Make sure robot_description param is loaded correctly")
-        
+            if gripper_link == []: rospy.logwarn(f"Requested control tf [{req.gripper}] not found in tree")
+            if links == None: rospy.logerr(f"No links found in description. Make sure {req.param} param is correct")
+            return UpdateDescriptionResponse(success=False)
+
+    def calibrate_transform_cb(self, req: CalibrateTransformRequest) -> CalibrateTransformResponse: # pylint: disable=no-self-use
         # OFFSET UPDATING (IN PROGRESS)
         test_offset = SE3(0.3,0,0)
-        for link in self.links:
-            if link.name == 'conveyor_tag_calibration_link':
-                rospy.loginfo(f"LINK -> {link.name} | POSE: {link._Ts}")
-                link._Ts = test_offset.A
-                rospy.loginfo(f"UPDATED LINK -> {link.name} | POSE: {link._Ts}")
+        link_found = False
 
-        return EmptyResponse()
+        rospy.logwarn(f"IN DEVELOPMENT")
+        rospy.loginfo(f"Got req for transform: {req.transform} | offset: {req.offset}")
+
+        if req.transform == None or req.offset == Pose():
+            rospy.logerr(f"Input values are None or Empty")
+            return CalibrateTransformResponse(success=False)
+        
+        # Convert Pose input to SE3
+        # offset = SE3(req.offset.position.x, req.offset.position.y,
+        #        req.offset.position.z) * UnitQuaternion(req.offset.orientation.w, [
+        #            req.offset.orientation.x, req.offset.orientation.y,
+        #            req.offset.orientation.z
+        #        ]).SE3()
+        offset = SE3(req.offset.position.x, req.offset.position.y,
+               req.offset.position.z)
+
+        for link in self.links:
+            if link.name == req.transform:
+                rospy.loginfo(f"LINK -> {link.name} | PARENT: {link.parent_name}")
+                # Update if found
+                # TODO: check if parent is base link 
+                link._Ts = offset.A
+                link_found = True
+                # rospy.loginfo(f"UPDATED LINK -> {link.name} | POSE: {link._Ts}")
+
+        return CalibrateTransformResponse(success=link_found)
 
     def set_cartesian_impedance_cb(  # pylint: disable=no-self-use
             self,
