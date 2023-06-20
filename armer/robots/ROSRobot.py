@@ -31,7 +31,7 @@ from std_msgs.msg import Header, Bool
 from sensor_msgs.msg import JointState
 from geometry_msgs.msg import Pose, PoseStamped
 
-from geometry_msgs.msg import TwistStamped, Twist, Vector3Stamped, QuaternionStamped
+from geometry_msgs.msg import TwistStamped, Twist, Transform
 from std_srvs.srv import Empty, EmptyRequest, EmptyResponse
 
 from std_msgs.msg import Float64MultiArray
@@ -761,28 +761,30 @@ class ROSRobot(rtb.Robot):
 
     def calibrate_transform_cb(self, req: CalibrateTransformRequest) -> CalibrateTransformResponse: # pylint: disable=no-self-use
         # OFFSET UPDATING (IN PROGRESS)
-        test_offset = SE3(0.3,0,0)
         link_found = False
 
         rospy.logwarn(f"IN DEVELOPMENT")
         rospy.loginfo(f"Got req for transform: {req.transform} | offset: {req.link_name}")
 
-        if req.transform == None or req.link_name == Pose():
+        if req.link_name == None or req.transform == Transform():
             rospy.logerr(f"Input values are None or Empty")
             return CalibrateTransformResponse(success=False)
         
         # Convert Pose input to SE3
-        # offset = SE3(req.offset.position.x, req.offset.position.y,
-        #        req.offset.position.z) * UnitQuaternion(req.offset.orientation.w, [
-        #            req.offset.orientation.x, req.offset.orientation.y,
-        #            req.offset.orientation.z
-        #        ]).SE3()
-        transform = SE3(req.transform.position.x, req.transform.position.y,
-               req.transform.position.z)
+        transform = SE3(req.transform.translation.x, req.transform.translation.y,
+               req.transform.translation.z) * UnitQuaternion(req.transform.rotation.w, [
+                   req.transform.rotation.x, req.transform.rotation.y,
+                   req.transform.rotation.z
+               ]).SE3()
+        # transform = SE3(req.transform.position.x, req.transform.position.y,
+        #        req.transform.position.z)
 
+        # Update any transforms as requested on main robot (that is not a joint)
+        # NOTE: joint tf's are to be immutable (as this is assumed the robot)
         for link in self.links:
+            # print(f"current link: {link.name} | is joint: {link.isjoint}")
             if link.name == req.link_name and not link.isjoint:
-                rospy.loginfo(f"LINK -> {link.name} | PARENT: {link.parent_name}")
+                rospy.loginfo(f"LINK -> {link.name} | PARENT: {link.parent_name} | BASE: {self.base_link}")
                 # Update if found
                 # TODO: check if parent is base link 
                 link._Ts = transform.A
