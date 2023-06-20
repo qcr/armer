@@ -55,6 +55,7 @@ class Armer:
         self.backend: rtb.backends.Connector = backend
         self.readonly_backends : List[rtb.backends.Connector] = readonly_backends \
             if readonly_backends else []
+        self.backend_args = backend_args
 
         if not self.robots:
             self.robots = [ROSRobot(self, rtb.models.URDF.UR5())]
@@ -77,7 +78,9 @@ class Armer:
         # Launch backend
         self.backend.launch(**(backend_args if backend_args else dict()))
 
+        print(f"init links:")
         for robot in self.robots:
+            print(f"{robot.links}")
             self.backend.add(robot)
 
             # # TESTING
@@ -97,6 +100,17 @@ class Armer:
 
         # Logging
         self.log_frequency = logging and 'frequency' in logging and logging['frequency']
+
+    # def reset_backend(self):
+    #     """
+    #     Resets the backend correctly
+    #     """
+    #     # Check for error
+    #     for robot in self.robots:
+    #         self.backend.remove(robot)
+
+    #     # for robot in self.robots:
+    #     #     self.backend.add(robot)
 
     def close(self):
         """
@@ -236,10 +250,22 @@ class Armer:
             with Timer('ROS', self.log_frequency):
                 current_time = rospy.get_time()
                 dt = current_time - self.last_tick
+                backend_reset = False
 
+                # Step the robot(s)
                 for robot in self.robots:
                     robot.step(dt=dt)
 
+                    # Check if requested (resets overall for all robots in scene)
+                    if robot.backend_reset: backend_reset = True
+
+                # # Do a backend reset
+                # if backend_reset:
+                #     self.reset_backend()
+
+                #     # Clear reset
+                #     robot.backend_reset = False
+                # else:
                 # with Timer('step'):
                 self.backend.step(dt=dt)
 

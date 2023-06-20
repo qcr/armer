@@ -110,7 +110,7 @@ class ROSRobot(rtb.Robot):
 
         # TESTING
         self.collision_obj_list: List[sg.Shape] = list()
-        # self.urdf_robot = URDFRobot()
+        self.backend_reset = False
 
         # Singularity index threshold (0 is a sigularity)
         # NOTE: this is a tested value and may require configuration (i.e., speed of robot)
@@ -703,7 +703,7 @@ class ROSRobot(rtb.Robot):
 
         # TODO: this should be a request (service)
         # Using requested gripper, update control point
-        gripper = 'custom_tool_link'
+        gripper = 'panda_link8'
         gripper_link = list(filter(lambda link: link.name == gripper, links))
 
         # DEBUGGING
@@ -725,6 +725,9 @@ class ROSRobot(rtb.Robot):
 
             # Update control point
             self.gripper = gripper
+
+            # Trigger backend reset
+            self.backend_reset = True
 
             rospy.loginfo(f"Updated Links! New Control: {self.gripper}")
         else:

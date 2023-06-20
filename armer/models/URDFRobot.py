@@ -67,6 +67,7 @@ class URDFRobot(Robot):
   def URDF_resolve(urdf_string):
     rospack = rospkg.RosPack()
     packages = list(set(re.findall(r'(package:\/\/([^\/]*))', urdf_string)))
+    print(f"packages: {packages}")
     
     for package in packages:
       urdf_string = urdf_string.replace(package[0], rospack.get_path(package[1]))
