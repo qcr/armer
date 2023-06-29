@@ -314,14 +314,20 @@ class ROSRobot(rtb.Robot):
             )
             
             rospy.Service(
+                '{}/export_named_pose_config'.format(self.name.lower()),
+                NamedPoseConfig,
+                self.export_named_pose_config_cb
+            )
+
+            rospy.Service(
                 '{}/add_named_pose_config'.format(self.name.lower()),
-                AddNamedPoseConfig,
+                NamedPoseConfig,
                 self.add_named_pose_config_cb
             )
 
             rospy.Service(
                 '{}/remove_named_pose_config'.format(self.name.lower()),
-                RemoveNamedPoseConfig,
+                NamedPoseConfig,
                 self.remove_named_pose_config_cb
             )
             
@@ -817,15 +823,34 @@ class ROSRobot(rtb.Robot):
 
         return AddNamedPoseResponse(success=True)
 
+    def export_named_pose_config_cb(
+            self,
+            request: NamedPoseConfigRequest) -> NamedPoseConfigResponse:
+        """[summary]
+        Creates a config file containing the currently loaded named_poses
+
+        :param request: [destination]
+        :type request: NamedPoseConfigRequest
+        :return: [bool]
+        :rtype: NamedPoseConfigRequest
+        """
+
+        # Ensure the set of named_poses is up-to-date
+        self.__load_config()
+
+        # Write to provided config_path
+        self.__write_config('named_poses', self.named_poses, request.config_path)
+        return True
+
     def add_named_pose_config_cb(
             self,
-            request: AddNamedPoseConfigRequest) -> AddNamedPoseConfigResponse:
+            request: NamedPoseConfigRequest) -> NamedPoseConfigResponse:
         """[summary]
 
         :param request: [description]
-        :type request: AddNamedPoseConfigRequest
+        :type request: NamedPoseConfigRequest
         :return: [description]
-        :rtype: AddNamedPoseConfigResponse
+        :rtype: NamedPoseConfigResponse
         """
         self.custom_configs.append(request.config_path)
         self.__load_config()
@@ -833,11 +858,11 @@ class ROSRobot(rtb.Robot):
 
     def remove_named_pose_config_cb(
             self,
-            request: RemoveNamedPoseConfigRequest) -> RemoveNamedPoseConfigResponse:
+            request: NamedPoseConfigRequest) -> NamedPoseConfigResponse:
         """[summary]
 
         :param request: [description]
-        :type request: AddNamedPoseRequest
+        :type request: NamedPoseConfigRequest
         :return: [description]
         :rtype: [type]
         """
