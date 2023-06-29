@@ -161,8 +161,8 @@ class ROSRobot(rtb.Robot):
 
             # --- Setup Configuration for ARMer --- #
             self.config_path = config_path if config_path else os.path.join(
-                os.getenv('HOME', '/root'),
-                '.ros/configs/armer.yaml'
+                os.getenv('HOME', '/home'),
+                '.ros/configs/system_named_poses.yaml'
             )
             self.custom_configs: List[str] = []
             self.__load_config()
@@ -1213,14 +1213,14 @@ class ROSRobot(rtb.Robot):
         """[summary]
         """
         self.named_poses = {}
-        for config_name in self.custom_configs:
+        for config_path in self.custom_configs:
             try:
-                config = yaml.load(open(config_name))
+                config = yaml.load(open(config_path), Loader=yaml.SafeLoader)
                 if config and 'named_poses' in config:
                     self.named_poses.update(config['named_poses'])
             except IOError:
                 rospy.logwarn(
-                    'Unable to locate configuration file: {}'.format(config_name))
+                    'Unable to locate configuration file: {}'.format(config_path))
 
         if os.path.exists(self.config_path):
             try:
@@ -1232,7 +1232,7 @@ class ROSRobot(rtb.Robot):
             except IOError:
                 pass
 
-    def __write_config(self, key: str, value: Any):
+    def __write_config(self, key: str, value: Any, config_path: str=''):
         """[summary]
 
         :param key: [description]
@@ -1240,13 +1240,18 @@ class ROSRobot(rtb.Robot):
         :param value: [description]
         :type value: Any
         """
-        if not os.path.exists(os.path.dirname(self.config_path)):
-            os.makedirs(os.path.dirname(self.config_path))
+        if config_path == '':
+            # Use default config_path
+            # NOTE: the default config_path is /home/.ros/configs/system_named_poses.yaml
+            config_path = self.config_path
+
+        if not os.path.exists(os.path.dirname(config_path)):
+            os.makedirs(os.path.dirname(config_path))
 
         config = {}
 
         try:
-            with open(self.config_path) as handle:
+            with open(config_path) as handle:
                 current = yaml.load(handle.read(), Loader=yaml.SafeLoader)
 
                 if current:
@@ -1257,5 +1262,5 @@ class ROSRobot(rtb.Robot):
 
         config.update({key: value})
 
-        with open(self.config_path, 'w') as handle:
+        with open(config_path, 'w') as handle:
             handle.write(yaml.dump(config))
