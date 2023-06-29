@@ -36,52 +36,8 @@ from std_srvs.srv import Empty, EmptyRequest, EmptyResponse
 
 from std_msgs.msg import Float64MultiArray
 
-from armer_msgs.msg import ManipulatorState, JointVelocity, ServoStamped, Guards
-from armer_msgs.msg import GuardedVelocityAction, GuardedVelocityGoal, GuardedVelocityResult
-from armer_msgs.msg import MoveToJointPoseAction, MoveToJointPoseGoal, MoveToJointPoseResult
-from armer_msgs.msg import MoveToNamedPoseAction, MoveToNamedPoseGoal, MoveToNamedPoseResult
-from armer_msgs.msg import MoveToPoseAction, MoveToPoseGoal, MoveToPoseResult
-from armer_msgs.msg import HomeAction, HomeGoal, HomeResult
-
-from armer_msgs.srv import SetCartesianImpedance, \
-    SetCartesianImpedanceRequest, \
-    SetCartesianImpedanceResponse
-
-from armer_msgs.srv import AddNamedPose, \
-    AddNamedPoseRequest, \
-    AddNamedPoseResponse
-
-from armer_msgs.srv import AddNamedPoseConfig, \
-    AddNamedPoseConfigRequest, \
-    AddNamedPoseConfigResponse
-
-from armer_msgs.srv import GetNamedPoseConfigs, \
-    GetNamedPoseConfigsRequest, \
-    GetNamedPoseConfigsResponse
-
-from armer_msgs.srv import GetLinkName, \
-    GetLinkNameRequest, \
-    GetLinkNameResponse
-
-from armer_msgs.srv import GetNamedPoses, \
-    GetNamedPosesRequest, \
-    GetNamedPosesResponse
-
-from armer_msgs.srv import RemoveNamedPose, \
-    RemoveNamedPoseRequest, \
-    RemoveNamedPoseResponse
-
-from armer_msgs.srv import RemoveNamedPoseConfig, \
-    RemoveNamedPoseConfigRequest, \
-    RemoveNamedPoseConfigResponse
-
-from armer_msgs.srv import UpdateDescription, \
-    UpdateDescriptionRequest, \
-    UpdateDescriptionResponse
-
-from armer_msgs.srv import CalibrateTransform, \
-    CalibrateTransformRequest, \
-    CalibrateTransformResponse
+from armer_msgs.msg import *
+from armer_msgs.srv import *
 
 # pylint: disable=too-many-instance-attributes
 
