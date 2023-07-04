@@ -800,7 +800,8 @@ class ROSRobot(rtb.Robot):
             return AddNamedPoseResponse(success=False)
 
         self.named_poses[req.pose_name] = self.q.tolist()
-        self.__write_config('named_poses', self.named_poses)
+        config_file = self.config_path if not self.custom_configs else self.custom_configs[-1]
+        self.__write_config('named_poses', self.named_poses, config_file)
 
         return AddNamedPoseResponse(success=True)
 
@@ -809,19 +810,20 @@ class ROSRobot(rtb.Robot):
         ROS Service callback:
         Adds the current arm pose as a named pose and saves it to the host config
 
-        :param req: The name of the pose as well as whether to overwrite if the pose already exists
-        :type req: AddNamedPoseRequest
-        :return: True if the named pose was written successfully otherwise false
-        :rtype: AddNamedPoseResponse
+        :param req: The name of the pose
+        :type req: RemoveNamedPoseRequest
+        :return: True if the named pose was removed successfully otherwise false
+        :rtype: RemoveNamedPoseResponse
         """
-        if req.pose_name not in self.named_poses and not req.overwrite:
+        if req.pose_name not in self.named_poses:
             rospy.logerr('Named pose does not exists.')
-            return AddNamedPoseResponse(success=False)
+            return RemoveNamedPoseResponse(success=False)
 
         del self.named_poses[req.pose_name]
-        self.__write_config('named_poses', self.named_poses)
+        config_file = self.config_path if not self.custom_configs else self.custom_configs[-1]
+        self.__write_config('named_poses', self.named_poses, config_file)
 
-        return AddNamedPoseResponse(success=True)
+        return RemoveNamedPoseResponse(success=True)
 
     def export_named_pose_config_cb(
             self,
