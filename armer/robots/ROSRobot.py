@@ -4,6 +4,7 @@ ROSRobot module defines the ROSRobot type
 .. codeauthor:: Gavin Suddreys
 .. codeauthor:: Dasun Gunasinghe
 """
+import copy
 import os
 import timeit
 
@@ -11,6 +12,7 @@ from typing import List, Any
 from threading import Lock, Event
 from armer.timer import Timer
 from armer.trajectory import TrajectoryExecutor
+from armer.models import URDFRobot
 import rospy
 import actionlib
 import tf
@@ -27,51 +29,15 @@ from armer.utils import ikine, mjtg
 
 from std_msgs.msg import Header, Bool
 from sensor_msgs.msg import JointState
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import Pose, PoseStamped
 
-from geometry_msgs.msg import TwistStamped, Twist, Vector3Stamped, QuaternionStamped
+from geometry_msgs.msg import TwistStamped, Twist, Transform
 from std_srvs.srv import Empty, EmptyRequest, EmptyResponse
 
 from std_msgs.msg import Float64MultiArray
 
-from armer_msgs.msg import ManipulatorState, JointVelocity, ServoStamped, Guards
-from armer_msgs.msg import GuardedVelocityAction, GuardedVelocityGoal, GuardedVelocityResult
-from armer_msgs.msg import MoveToJointPoseAction, MoveToJointPoseGoal, MoveToJointPoseResult
-from armer_msgs.msg import MoveToNamedPoseAction, MoveToNamedPoseGoal, MoveToNamedPoseResult
-from armer_msgs.msg import MoveToPoseAction, MoveToPoseGoal, MoveToPoseResult
-from armer_msgs.msg import HomeAction, HomeGoal, HomeResult
-
-from armer_msgs.srv import SetCartesianImpedance, \
-    SetCartesianImpedanceRequest, \
-    SetCartesianImpedanceResponse
-
-from armer_msgs.srv import AddNamedPose, \
-    AddNamedPoseRequest, \
-    AddNamedPoseResponse
-
-from armer_msgs.srv import AddNamedPoseConfig, \
-    AddNamedPoseConfigRequest, \
-    AddNamedPoseConfigResponse
-
-from armer_msgs.srv import GetNamedPoseConfigs, \
-    GetNamedPoseConfigsRequest, \
-    GetNamedPoseConfigsResponse
-
-from armer_msgs.srv import GetLinkName, \
-    GetLinkNameRequest, \
-    GetLinkNameResponse
-
-from armer_msgs.srv import GetNamedPoses, \
-    GetNamedPosesRequest, \
-    GetNamedPosesResponse
-
-from armer_msgs.srv import RemoveNamedPose, \
-    RemoveNamedPoseRequest, \
-    RemoveNamedPoseResponse
-
-from armer_msgs.srv import RemoveNamedPoseConfig, \
-    RemoveNamedPoseConfigRequest, \
-    RemoveNamedPoseConfigResponse
+from armer_msgs.msg import *
+from armer_msgs.srv import *
 
 # pylint: disable=too-many-instance-attributes
 
@@ -108,6 +74,7 @@ class ROSRobot(rtb.Robot):
 
         # TESTING
         self.collision_obj_list: List[sg.Shape] = list()
+        self.backend_reset = False
 
         # Singularity index threshold (0 is a sigularity)
         # NOTE: this is a tested value and may require configuration (i.e., speed of robot)
@@ -171,10 +138,6 @@ class ROSRobot(rtb.Robot):
 
         self.e_p = self.fkine(self.q, start=self.base_link, end=self.gripper)
 
-        # self.Kp: float = Kp if Kp else 0.0
-        # self.Ki: float = Ki if Ki else 0.0
-        # self.Kd: float = Kd if Kd else 0.0
-
         self.last_update: float = 0
         self.last_tick: float = 0
 
@@ -198,8 +161,8 @@ class ROSRobot(rtb.Robot):
 
             # --- Setup Configuration for ARMer --- #
             self.config_path = config_path if config_path else os.path.join(
-                os.getenv('HOME', '/root'),
-                '.ros/configs/armer.yaml'
+                os.getenv('HOME', '/home'),
+                '.ros/configs/system_named_poses.yaml'
             )
             self.custom_configs: List[str] = []
             self.__load_config()
@@ -321,9 +284,15 @@ class ROSRobot(rtb.Robot):
             )
 
             rospy.Service(
-                '{}/update_tf'.format(self.name.lower()),
-                Empty,
-                self.update_tf_cb
+                '{}/update_description'.format(self.name.lower()),
+                UpdateDescription,
+                self.update_description_cb
+            )
+
+            rospy.Service(
+                '{}/calibrate_transform'.format(self.name.lower()),
+                CalibrateTransform,
+                self.calibrate_transform_cb
             )
 
             rospy.Service(
@@ -345,14 +314,20 @@ class ROSRobot(rtb.Robot):
             )
             
             rospy.Service(
+                '{}/export_named_pose_config'.format(self.name.lower()),
+                NamedPoseConfig,
+                self.export_named_pose_config_cb
+            )
+
+            rospy.Service(
                 '{}/add_named_pose_config'.format(self.name.lower()),
-                AddNamedPoseConfig,
+                NamedPoseConfig,
                 self.add_named_pose_config_cb
             )
 
             rospy.Service(
                 '{}/remove_named_pose_config'.format(self.name.lower()),
-                RemoveNamedPoseConfig,
+                NamedPoseConfig,
                 self.remove_named_pose_config_cb
             )
             
@@ -684,10 +659,10 @@ class ROSRobot(rtb.Robot):
         rospy.logwarn('Recovery not implemented for this arm')
         return EmptyResponse()
     
-    def update_tf_cb(self, req: EmptyRequest) -> EmptyResponse: # pylint: disable=no-self-use
+    def update_description_cb(self, req: UpdateDescriptionRequest) -> UpdateDescriptionResponse: # pylint: disable=no-self-use
         """[summary]
         ROS Service callback:
-        Updates a link's transform if it exists
+        Updates the robot description if loaded into param
 
         :param req: an empty request
         :type req: EmptyRequest
@@ -695,13 +670,90 @@ class ROSRobot(rtb.Robot):
         :rtype: EmptyResponse
         """
         rospy.logwarn('TF update not implemented for this arm <IN DEV>')
-        test_offset = SE3(0.3,0,0)
+        rospy.loginfo(f"req gripper: {req.gripper} | param: {req.param}")
+        if req.gripper == '' or req.param == '':
+            rospy.logerr(f"Inputs are None or Empty")
+            return UpdateDescriptionResponse(success=False)
+        
+        gripper_link = None
+        gripper = None
+
+        # Preempt any motion prior to changing link structure
+        if self.moving:
+            self.preempt()
+
+        # Read req param and only proceed if successful
+        links, _, _, _ = URDFRobot.URDF_read_description(wait=False, param=req.param)
+
+        if np.any(links):
+            #Do Something
+            # Using requested gripper, update control point
+            gripper = req.gripper
+            gripper_link = list(filter(lambda link: link.name == gripper, links))
+
+        # DEBUGGING
+        # rospy.loginfo(f"requested gripper: {gripper} | requested gripper link: {gripper_link}")
+        # rospy.loginfo(f"Updated links:")
+        # for link in links:
+        #     rospy.loginfo(f"{link}")
+
+        # Update robot tree if successful
+        if np.any(links) and gripper_link != []: 
+            # Remove the old dict of links
+            self.link_dict.clear()
+
+            # Clear current base link
+            self._base_link = None
+
+            # Sort and update new links and gripper links
+            self._sort_links(links, gripper_link, True) 
+
+            # Update control point
+            self.gripper = gripper
+
+            # Trigger backend reset
+            self.backend_reset = True
+
+            rospy.loginfo(f"Updated Links! New Control: {self.gripper}")
+            return UpdateDescriptionResponse(success=True)
+        else:
+            if gripper_link == []: rospy.logwarn(f"Requested control tf [{req.gripper}] not found in tree")
+            if links == None: rospy.logerr(f"No links found in description. Make sure {req.param} param is correct")
+            return UpdateDescriptionResponse(success=False)
+
+    def calibrate_transform_cb(self, req: CalibrateTransformRequest) -> CalibrateTransformResponse: # pylint: disable=no-self-use
+        # OFFSET UPDATING (IN PROGRESS)
+        link_found = False
+
+        rospy.logwarn(f"IN DEVELOPMENT")
+        rospy.loginfo(f"Got req for transform: {req.transform} | offset: {req.link_name}")
+
+        if req.link_name == None or req.transform == Transform():
+            rospy.logerr(f"Input values are None or Empty")
+            return CalibrateTransformResponse(success=False)
+        
+        # Convert Pose input to SE3
+        transform = SE3(req.transform.translation.x, req.transform.translation.y,
+               req.transform.translation.z) * UnitQuaternion(req.transform.rotation.w, [
+                   req.transform.rotation.x, req.transform.rotation.y,
+                   req.transform.rotation.z
+               ]).SE3()
+        # transform = SE3(req.transform.position.x, req.transform.position.y,
+        #        req.transform.position.z)
+
+        # Update any transforms as requested on main robot (that is not a joint)
+        # NOTE: joint tf's are to be immutable (as this is assumed the robot)
         for link in self.links:
-            if link.name == 'conveyor_tag_calibration_link':
-                rospy.loginfo(f"LINK -> {link.name} | POSE: {link._Ts}")
-                link._Ts = test_offset.A
-                rospy.loginfo(f"UPDATED LINK -> {link.name} | POSE: {link._Ts}")
-        return EmptyResponse()
+            # print(f"current link: {link.name} | is joint: {link.isjoint}")
+            if link.name == req.link_name and not link.isjoint:
+                rospy.loginfo(f"LINK -> {link.name} | PARENT: {link.parent_name} | BASE: {self.base_link}")
+                # Update if found
+                # TODO: check if parent is base link 
+                link._Ts = transform.A
+                link_found = True
+                # rospy.loginfo(f"UPDATED LINK -> {link.name} | POSE: {link._Ts}")
+
+        return CalibrateTransformResponse(success=link_found)
 
     def set_cartesian_impedance_cb(  # pylint: disable=no-self-use
             self,
@@ -748,7 +800,8 @@ class ROSRobot(rtb.Robot):
             return AddNamedPoseResponse(success=False)
 
         self.named_poses[req.pose_name] = self.q.tolist()
-        self.__write_config('named_poses', self.named_poses)
+        config_file = self.config_path if not self.custom_configs else self.custom_configs[-1]
+        self.__write_config('named_poses', self.named_poses, config_file)
 
         return AddNamedPoseResponse(success=True)
 
@@ -757,29 +810,49 @@ class ROSRobot(rtb.Robot):
         ROS Service callback:
         Adds the current arm pose as a named pose and saves it to the host config
 
-        :param req: The name of the pose as well as whether to overwrite if the pose already exists
-        :type req: AddNamedPoseRequest
-        :return: True if the named pose was written successfully otherwise false
-        :rtype: AddNamedPoseResponse
+        :param req: The name of the pose
+        :type req: RemoveNamedPoseRequest
+        :return: True if the named pose was removed successfully otherwise false
+        :rtype: RemoveNamedPoseResponse
         """
-        if req.pose_name not in self.named_poses and not req.overwrite:
+        if req.pose_name not in self.named_poses:
             rospy.logerr('Named pose does not exists.')
-            return AddNamedPoseResponse(success=False)
+            return RemoveNamedPoseResponse(success=False)
 
         del self.named_poses[req.pose_name]
-        self.__write_config('named_poses', self.named_poses)
+        config_file = self.config_path if not self.custom_configs else self.custom_configs[-1]
+        self.__write_config('named_poses', self.named_poses, config_file)
 
-        return AddNamedPoseResponse(success=True)
+        return RemoveNamedPoseResponse(success=True)
+
+    def export_named_pose_config_cb(
+            self,
+            request: NamedPoseConfigRequest) -> NamedPoseConfigResponse:
+        """[summary]
+        Creates a config file containing the currently loaded named_poses
+
+        :param request: [destination]
+        :type request: NamedPoseConfigRequest
+        :return: [bool]
+        :rtype: NamedPoseConfigRequest
+        """
+
+        # Ensure the set of named_poses is up-to-date
+        self.__load_config()
+
+        # Write to provided config_path
+        self.__write_config('named_poses', self.named_poses, request.config_path)
+        return True
 
     def add_named_pose_config_cb(
             self,
-            request: AddNamedPoseConfigRequest) -> AddNamedPoseConfigResponse:
+            request: NamedPoseConfigRequest) -> NamedPoseConfigResponse:
         """[summary]
 
         :param request: [description]
-        :type request: AddNamedPoseConfigRequest
+        :type request: NamedPoseConfigRequest
         :return: [description]
-        :rtype: AddNamedPoseConfigResponse
+        :rtype: NamedPoseConfigResponse
         """
         self.custom_configs.append(request.config_path)
         self.__load_config()
@@ -787,11 +860,11 @@ class ROSRobot(rtb.Robot):
 
     def remove_named_pose_config_cb(
             self,
-            request: RemoveNamedPoseConfigRequest) -> RemoveNamedPoseConfigResponse:
+            request: NamedPoseConfigRequest) -> NamedPoseConfigResponse:
         """[summary]
 
         :param request: [description]
-        :type request: AddNamedPoseRequest
+        :type request: NamedPoseConfigRequest
         :return: [description]
         :rtype: [type]
         """
@@ -1167,14 +1240,14 @@ class ROSRobot(rtb.Robot):
         """[summary]
         """
         self.named_poses = {}
-        for config_name in self.custom_configs:
+        for config_path in self.custom_configs:
             try:
-                config = yaml.load(open(config_name))
+                config = yaml.load(open(config_path), Loader=yaml.SafeLoader)
                 if config and 'named_poses' in config:
                     self.named_poses.update(config['named_poses'])
             except IOError:
                 rospy.logwarn(
-                    'Unable to locate configuration file: {}'.format(config_name))
+                    'Unable to locate configuration file: {}'.format(config_path))
 
         if os.path.exists(self.config_path):
             try:
@@ -1186,7 +1259,7 @@ class ROSRobot(rtb.Robot):
             except IOError:
                 pass
 
-    def __write_config(self, key: str, value: Any):
+    def __write_config(self, key: str, value: Any, config_path: str=''):
         """[summary]
 
         :param key: [description]
@@ -1194,13 +1267,18 @@ class ROSRobot(rtb.Robot):
         :param value: [description]
         :type value: Any
         """
-        if not os.path.exists(os.path.dirname(self.config_path)):
-            os.makedirs(os.path.dirname(self.config_path))
+        if config_path == '':
+            # Use default config_path
+            # NOTE: the default config_path is /home/.ros/configs/system_named_poses.yaml
+            config_path = self.config_path
+
+        if not os.path.exists(os.path.dirname(config_path)):
+            os.makedirs(os.path.dirname(config_path))
 
         config = {}
 
         try:
-            with open(self.config_path) as handle:
+            with open(config_path) as handle:
                 current = yaml.load(handle.read(), Loader=yaml.SafeLoader)
 
                 if current:
@@ -1211,5 +1289,5 @@ class ROSRobot(rtb.Robot):
 
         config.update({key: value})
 
-        with open(self.config_path, 'w') as handle:
+        with open(config_path, 'w') as handle:
             handle.write(yaml.dump(config))

@@ -29,7 +29,7 @@ class URDFRobot(Robot):
     if urdf_file:
       links, name, urdf_string, urdf_filepath = self.URDF_read(urdf_file)
     else:
-      links, name, urdf_string, urdf_filepath = self.URDF_read_description()
+      links, name, urdf_string, urdf_filepath = URDFRobot.URDF_read_description()
     
     self.gripper = gripper if gripper else URDFRobot.resolve_gripper(links)
     gripper_link = list(filter(lambda link: link.name == self.gripper, links))
@@ -47,6 +47,7 @@ class URDFRobot(Robot):
     # print(f"links:")
     # for link in links:
     #   print(link)
+    # print(f"gripper: {self.gripper} | gripper link: {gripper_link}")
 
     super().__init__(
         links,
@@ -61,33 +62,49 @@ class URDFRobot(Robot):
 
     self.addconfiguration("qr", self.qr)
     self.addconfiguration("qz", self.qz)
-
-  def URDF_read_description(self):
-    rospy.loginfo('[INIT] Waiting for robot description')
-    while not rospy.has_param('/robot_description'):
-      rospy.sleep(0.5)
-    rospy.loginfo('[INIT] Found robot description')
-
-    urdf_string = self.URDF_resolve(rospy.get_param('/robot_description'))
-    
-    tree = ETT.parse(
-      BytesIO(bytes(urdf_string, "utf-8")), 
-      parser=ETT.XMLParser()
-    )
-
-    node = tree.getroot()
-    urdf = URDF._from_xml(node, '/')
-
-    return urdf.elinks, urdf.name, urdf_string, '/'
-    
-  def URDF_resolve(self, urdf_string):
+  
+  @staticmethod
+  def URDF_resolve(urdf_string):
+    # TODO: any way to find packages outside of workspace with this method?
     rospack = rospkg.RosPack()
     packages = list(set(re.findall(r'(package:\/\/([^\/]*))', urdf_string)))
+    # print(f"packages: {packages}")
     
     for package in packages:
-      urdf_string = urdf_string.replace(package[0], rospack.get_path(package[1]))
-    
+      # print(f"Checking for package: {package}")
+      try:
+        urdf_string = urdf_string.replace(package[0], rospack.get_path(package[1]))
+      except rospack.ResourceNotFound:
+        urdf_string = None
+      
     return urdf_string
+  
+  @staticmethod
+  def URDF_read_description(wait=True, param='robot_description'):
+    if wait:
+      rospy.loginfo('[INIT] Waiting for robot description')
+      while not rospy.has_param('/' + param):
+        rospy.sleep(0.5)
+      rospy.loginfo('[INIT] Found robot description')
+    else:
+      # Check if robot param exists and handle as error if need be
+      if not rospy.has_param('/' + param): return None, None, None, None
+      rospy.loginfo(f"[INIT] Found robot description NEW")
+
+    urdf_string = URDFRobot.URDF_resolve(rospy.get_param('/' + param))
+
+    if urdf_string:
+      tree = ETT.parse(
+        BytesIO(bytes(urdf_string, "utf-8")), 
+        parser=ETT.XMLParser()
+      )
+
+      node = tree.getroot()
+      urdf = URDF._from_xml(node, '/')
+
+      return urdf.elinks, urdf.name, urdf_string, '/'
+    else:
+      return None, None, None, None
 
   @staticmethod
   def resolve_gripper(links):
