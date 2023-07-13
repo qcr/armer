@@ -63,6 +63,8 @@ class ROSRobot(rtb.Robot):
                  frequency=None,
                  modified_qr=None,
                  singularity_thresh=0.02,
+                 max_joint_velocity_gain=20.0,
+                 max_cartesian_speed=2.0,
                  * args,
                  **kwargs):  # pylint: disable=unused-argument
         
@@ -71,6 +73,9 @@ class ROSRobot(rtb.Robot):
         
         self.name = name if name else self.name
         self.readonly = readonly
+
+        self.max_joint_velocity_gain = max_joint_velocity_gain
+        self.max_cartesian_speed = max_cartesian_speed
 
         # TESTING
         self.collision_obj_list: List[sg.Shape] = list()
@@ -224,6 +229,15 @@ class ROSRobot(rtb.Robot):
             )
             self.pose_server.register_preempt_callback(self.preempt)
             self.pose_server.start()
+
+            self.pose_tracking_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
+                '{}/cartesian/track_pose'.format(self.name.lower()),
+                TrackPoseAction,
+                execute_cb=self.pose_tracker_cb,
+                auto_start=False,
+            )
+            self.pose_tracking_server.register_preempt_callback(self.preempt)
+            self.pose_tracking_server.start()
 
             self.joint_pose_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
                 '{}/joint/pose'.format(self.name.lower()),
@@ -431,7 +445,7 @@ class ROSRobot(rtb.Robot):
         with self.lock:
             # Handle variables for servo
             goal_pose = msg.pose
-            goal_gain = msg.gain if msg.gain else 3
+            goal_gain = msg.gain if msg.gain else 0.2
             goal_thresh = msg.threshold if msg.threshold else 0.005
             arrived = False
             self.moving = True
@@ -480,6 +494,203 @@ class ROSRobot(rtb.Robot):
             self.last_update = rospy.get_time()
 
         self.cartesian_servo_publisher.publish(arrived)
+
+    def pose_tracker_cb(self, goal: TrackPoseGoal) -> None:
+        """
+        ROS Action Server callback:
+        Moves the end-effector to the
+        cartesian pose defined by the supplied PoseStamped topic
+        """
+        msg_pose_publish_rate = 10
+        pub_rate = rospy.Rate(msg_pose_publish_rate)
+
+        # TODO: Refactor - this should be used both for distance to goal and for new pose validation
+        msg_pose_threshold = 0.005
+
+        msg_pose_topic = goal.tracked_pose_topic
+
+        # TODO: Remove debugging
+        feedback = TrackPoseFeedback()
+        feedback.status = 0
+        self.pose_tracking_server.publish_feedback(feedback)
+
+        if self.moving:
+            self.preempt()
+
+        # self.preempted = False
+        with self.lock:
+            self.preempted = False
+
+            tracked_pose = None
+
+            while not self.preempted: # and not self.pose_listener_server.is_preempt_requested():
+            # while not self.pose_listener_server.is_preempt_requested():
+
+                # TODO: Remove debugging
+                feedback = TrackPoseFeedback()
+                feedback.status = 11
+                self.pose_tracking_server.publish_feedback(feedback)
+
+                pose_msg = None
+                try:
+                    pose_msg = rospy.wait_for_message(topic=msg_pose_topic, topic_type=PoseStamped, timeout=0.1)
+                except:
+                    pose_msg = tracked_pose
+
+                # TODO: Remove debugging
+                feedback = TrackPoseFeedback()
+                feedback.status = 1
+                self.pose_tracking_server.publish_feedback(feedback)
+
+                if pose_msg:
+                    goal_pose = pose_msg
+                elif not tracked_pose:
+                    # Not currently tracking
+                    pub_rate.sleep()
+                    continue
+
+                # TODO: Remove debugging
+                feedback = TrackPoseFeedback()
+                feedback.status = 2
+                self.pose_tracking_server.publish_feedback(feedback)
+
+                # TODO: Check if we bother processing the goal_pose given the tracked_pose distance
+                tracked_pose = goal_pose
+
+                if goal.linear_motion:
+                    # TODO: Remove debugging
+                    feedback = TrackPoseFeedback()
+                    feedback.status = 55
+                    self.pose_tracking_server.publish_feedback(feedback)
+
+                    # Method 2: Use Servo to Pose
+                    # Handle variables for servo
+                    goal_gain = goal.vel_scale * self.max_joint_velocity_gain if goal.vel_scale else 0.2
+                    goal_thresh = msg_pose_threshold if msg_pose_threshold else 0.005
+                    arrived = False
+                    self.moving = True
+
+                    # Current end-effector pose
+                    Te = self.ets(start=self.base_link, end=self.gripper).eval(self.q)
+
+                    pose = goal_pose.pose
+
+                    # Convert target to SE3 (from pose)
+                    target = SE3(pose.position.x, pose.position.y, pose.position.z) * UnitQuaternion([
+                        pose.orientation.w,
+                        pose.orientation.x,
+                        pose.orientation.y,
+                        pose.orientation.z
+                    ]).SE3()
+
+                    # Calculate the required end-effector spatial velocity for the robot
+                    # to approach the goal.
+                    velocities, arrived = rtb.p_servo(
+                        Te,
+                        target,
+                        min(20, goal_gain),
+                        threshold=goal_thresh
+                    )
+
+                    ##### TESTING NEO IMPLEMENTATION #####
+                    # neo_jv = self.neo(Tep=target, velocities=velocities)
+                    neo_jv = None
+
+                    if np.any(neo_jv):
+                        self.j_v = neo_jv[:len(self.q)]
+                    else:
+                        self.j_v = np.linalg.pinv(self.jacobe(self.q)) @ velocities
+
+                    # print(f"current jv: {self.j_v} | updated neo jv: {neo_jv}")
+                    self.last_update = rospy.get_time()
+
+                    # if arrived == True:
+                    #     break
+
+                    pub_rate.sleep()
+                    # ---- END Method 2 ---------------------------------
+                else:
+                    # TODO: Remove debugging
+                    feedback = TrackPoseFeedback()
+                    feedback.status = 66
+                    self.pose_tracking_server.publish_feedback(feedback)
+
+                    # Method 1: Use TrajectoryExecutor
+                    goal_speed = goal.vel_scale * self.max_cartesian_speed if goal.vel_scale else 0.2
+                    if goal_pose.header.frame_id == '':
+                        goal_pose.header.frame_id = self.base_link.name
+
+                    goal_pose = self.tf_listener.transformPose(
+                        self.base_link.name,
+                        goal_pose,
+                    )
+
+                    pose = goal_pose.pose
+
+                    solution = None
+                    try:
+                        solution = ikine(self, pose, q0=self.q, end=self.gripper)
+                    except:
+                        rospy.logwarn("Failed to get IK Solution...")
+
+                    if not solution:
+                        pub_rate.sleep()
+                        continue
+
+                    # Check for singularity on end solution:
+                    # TODO: prevent motion on this bool? Needs to be thought about
+                    if self.check_singularity(solution.q):
+                        rospy.logwarn(f"IK solution within singularity threshold [{self.singularity_thresh}] -> ill-advised motion")
+
+                    try:
+                        self.executor = TrajectoryExecutor(
+                        self,
+                        self.traj_generator(self, solution.q, goal_speed)
+                        )
+                    except:
+                        rospy.logwarn("TrackPose - Unable to construct TrajectoryExecutor")
+                        pub_rate.sleep()
+                        continue
+
+                    # # TODO: for later addition of pose tracking
+                    # while not self.executor.is_finished() \
+                    #     and not self.pose_listener_server.is_preempt_requested():
+
+                    #     # TODO: Remove debugging
+                    #     feedback = MoveToPoseFeedback()
+                    #     feedback.status = 7
+                    #     self.pose_listener_server.publish_feedback(feedback)
+
+                    #     new_pose_msg = PoseStamped()
+                    #     new_pose_msg = rospy.wait_for_message(topic=msg_pose_topic, topic_type=PoseStamped, timeout=0.1)
+                    #     if new_pose_msg and \
+                    #         (pose_msg.pose.position != new_pose_msg.pose.position or \
+                    #         pose_msg.pose.orientation != new_pose_msg.pose.orientation):
+                    #         break
+                    #     else:
+                    #         rospy.sleep(0.01)
+
+                    # TODO: remove...it will block receipt of new pose updates if new goals dont successfully preempt
+                    while not self.executor.is_finished(cutoff=msg_pose_threshold):
+                        rospy.sleep(0.01)
+
+                    # if self.executor.is_succeeded():
+                    #     break
+                    pub_rate.sleep()
+                    # ---- END Method 1 ---------------------------------
+
+        # TODO: Remove debugging
+        feedback = TrackPoseFeedback()
+        feedback.status = 3
+        self.pose_tracking_server.publish_feedback(feedback)
+
+        if not self.preempted:
+            self.pose_tracking_server.set_succeeded(TrackPoseResult(success=True))
+        else:
+            self.pose_tracking_server.set_aborted(TrackPoseResult(success=False))
+
+        self.executor = None
+        self.moving = False
 
     def pose_cb(self, goal: MoveToPoseGoal) -> None:
         """
