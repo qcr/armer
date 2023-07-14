@@ -236,7 +236,7 @@ class ROSRobot(rtb.Robot):
                 execute_cb=self.pose_tracker_cb,
                 auto_start=False,
             )
-            self.pose_tracking_server.register_preempt_callback(self.preempt)
+            self.pose_tracking_server.register_preempt_callback(self.preempt_tracking)
             self.pose_tracking_server.start()
 
             self.joint_pose_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
@@ -516,15 +516,20 @@ class ROSRobot(rtb.Robot):
 
         if self.moving:
             self.preempt()
+            self.moving = False
 
-        # self.preempted = False
         with self.lock:
             self.preempted = False
 
             tracked_pose = None
 
-            while not self.preempted: # and not self.pose_listener_server.is_preempt_requested():
-            # while not self.pose_listener_server.is_preempt_requested():
+            # while not self.preempted: 
+            while not self.pose_tracking_server.is_preempt_requested():
+
+                if self.preempted:
+                    # Reset the board
+                    self.preempted = False
+                    # - do some other things...like control_type
 
                 # TODO: Remove debugging
                 feedback = TrackPoseFeedback()
@@ -543,10 +548,21 @@ class ROSRobot(rtb.Robot):
                 self.pose_tracking_server.publish_feedback(feedback)
 
                 if pose_msg:
+                    # TODO: Remove debugging
+                    feedback = TrackPoseFeedback()
+                    feedback.status = 22
+                    self.pose_tracking_server.publish_feedback(feedback)
+
                     goal_pose = pose_msg
                 elif not tracked_pose:
+                    # TODO: Remove debugging
+                    feedback = TrackPoseFeedback()
+                    feedback.status = 23
+                    self.pose_tracking_server.publish_feedback(feedback)
+
                     # Not currently tracking
-                    pub_rate.sleep()
+                    # pub_rate.sleep()
+                    # rospy.sleep(0.1)
                     continue
 
                 # TODO: Remove debugging
@@ -592,23 +608,27 @@ class ROSRobot(rtb.Robot):
                         threshold=goal_thresh
                     )
 
-                    ##### TESTING NEO IMPLEMENTATION #####
-                    # neo_jv = self.neo(Tep=target, velocities=velocities)
-                    neo_jv = None
-
-                    if np.any(neo_jv):
-                        self.j_v = neo_jv[:len(self.q)]
-                    else:
-                        self.j_v = np.linalg.pinv(self.jacobe(self.q)) @ velocities
-
-                    # print(f"current jv: {self.j_v} | updated neo jv: {neo_jv}")
+                    ## TODO: Remove this or NEO Testing...
+                    self.j_v = np.linalg.pinv(self.jacobe(self.q)) @ velocities
                     self.last_update = rospy.get_time()
 
-                    # if arrived == True:
-                    #     break
+                    # ##### TESTING NEO IMPLEMENTATION #####
+                    # # neo_jv = self.neo(Tep=target, velocities=velocities)
+                    # neo_jv = None
+
+                    # if np.any(neo_jv):
+                    #     self.j_v = neo_jv[:len(self.q)]
+                    # else:
+                    #     self.j_v = np.linalg.pinv(self.jacobe(self.q)) @ velocities
+
+                    # # print(f"current jv: {self.j_v} | updated neo jv: {neo_jv}")
+                    # self.last_update = rospy.get_time()
+
+                    # # if arrived == True:
+                    # #     break
 
                     pub_rate.sleep()
-                    # ---- END Method 2 ---------------------------------
+                    # # ---- END Method 2 ---------------------------------
                 else:
                     # TODO: Remove debugging
                     feedback = TrackPoseFeedback()
@@ -627,20 +647,31 @@ class ROSRobot(rtb.Robot):
 
                     pose = goal_pose.pose
 
+                    # Test Distance to goal and for active motion
+                    # TODO: Add pose comparison
+                    if self.executor is not None:
+                        if not self.executor.is_finished(cutoff=msg_pose_threshold):
+                            pub_rate.sleep()
+                            continue
+                        # if not self.executor.is_succeeded():
+                        #     self.executor = None
+                        #     pub_rate.sleep()
+                        #     continue
+
                     solution = None
                     try:
                         solution = ikine(self, pose, q0=self.q, end=self.gripper)
                     except:
                         rospy.logwarn("Failed to get IK Solution...")
 
-                    if not solution:
+                    if solution is None:
                         pub_rate.sleep()
                         continue
 
-                    # Check for singularity on end solution:
-                    # TODO: prevent motion on this bool? Needs to be thought about
-                    if self.check_singularity(solution.q):
-                        rospy.logwarn(f"IK solution within singularity threshold [{self.singularity_thresh}] -> ill-advised motion")
+                #     # Check for singularity on end solution:
+                #     # TODO: prevent motion on this bool? Needs to be thought about
+                #     if self.check_singularity(solution.q):
+                #         rospy.logwarn(f"IK solution within singularity threshold [{self.singularity_thresh}] -> ill-advised motion")
 
                     try:
                         self.executor = TrajectoryExecutor(
@@ -652,30 +683,6 @@ class ROSRobot(rtb.Robot):
                         pub_rate.sleep()
                         continue
 
-                    # # TODO: for later addition of pose tracking
-                    # while not self.executor.is_finished() \
-                    #     and not self.pose_listener_server.is_preempt_requested():
-
-                    #     # TODO: Remove debugging
-                    #     feedback = MoveToPoseFeedback()
-                    #     feedback.status = 7
-                    #     self.pose_listener_server.publish_feedback(feedback)
-
-                    #     new_pose_msg = PoseStamped()
-                    #     new_pose_msg = rospy.wait_for_message(topic=msg_pose_topic, topic_type=PoseStamped, timeout=0.1)
-                    #     if new_pose_msg and \
-                    #         (pose_msg.pose.position != new_pose_msg.pose.position or \
-                    #         pose_msg.pose.orientation != new_pose_msg.pose.orientation):
-                    #         break
-                    #     else:
-                    #         rospy.sleep(0.01)
-
-                    # TODO: remove...it will block receipt of new pose updates if new goals dont successfully preempt
-                    while not self.executor.is_finished(cutoff=msg_pose_threshold):
-                        rospy.sleep(0.01)
-
-                    # if self.executor.is_succeeded():
-                    #     break
                     pub_rate.sleep()
                     # ---- END Method 1 ---------------------------------
 
@@ -685,9 +692,24 @@ class ROSRobot(rtb.Robot):
         self.pose_tracking_server.publish_feedback(feedback)
 
         if not self.preempted:
+            # TODO: Remove debugging
+            feedback = TrackPoseFeedback()
+            feedback.status = 33
+            self.pose_tracking_server.publish_feedback(feedback)
+
             self.pose_tracking_server.set_succeeded(TrackPoseResult(success=True))
         else:
+            # TODO: Remove debugging
+            feedback = TrackPoseFeedback()
+            feedback.status = 34
+            self.pose_tracking_server.publish_feedback(feedback)
+
             self.pose_tracking_server.set_aborted(TrackPoseResult(success=False))
+
+        # TODO: Remove debugging
+        feedback = TrackPoseFeedback()
+        feedback.status = 35
+        self.pose_tracking_server.publish_feedback(feedback)
 
         self.executor = None
         self.moving = False
@@ -1232,6 +1254,23 @@ class ROSRobot(rtb.Robot):
         self.named_pose_server.need_to_terminate = True
 
     def preempt(self, *args: list) -> None:
+        """
+        Stops any current motion
+        """
+        # pylint: disable=unused-argument
+        if self.executor:
+            self.executor.abort()
+
+        # Warn and Reset
+        if self.singularity_approached:
+            rospy.logwarn(f"PREEMPTED: Approaching singularity (index: {self.manip_scalar}) --> please home to fix")
+            self.singularity_approached = False
+
+        self.preempted = True
+        self._controller_mode = ControlMode.JOINTS
+        self.last_update = 0
+
+    def preempt_tracking(self, *args: list) -> None:
         """
         Stops any current motion
         """
