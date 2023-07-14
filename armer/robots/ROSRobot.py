@@ -17,8 +17,9 @@ import rospy
 import actionlib
 import tf
 import roboticstoolbox as rtb
-import spatialmath as sp
+import spatialmath as sm
 from spatialmath import SE3, SO3, UnitQuaternion, base
+import pointcloud_utils as pclu
 import numpy as np
 import yaml
 # Required for NEO
@@ -76,6 +77,9 @@ class ROSRobot(rtb.Robot):
 
         self.max_joint_velocity_gain = max_joint_velocity_gain
         self.max_cartesian_speed = max_cartesian_speed
+
+        self.tfBuffer = tf2_ros.Buffer()
+        self.listener = tf2_ros.TransformListener(self.tfBuffer)
 
         # TESTING
         self.collision_obj_list: List[sg.Shape] = list()
@@ -238,6 +242,16 @@ class ROSRobot(rtb.Robot):
             )
             self.pose_tracking_server.register_preempt_callback(self.preempt_tracking)
             self.pose_tracking_server.start()
+
+            # TODO: Remove this action server - just for debugging
+            self.tf_to_pose_transporter_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
+                '{}/pose_from_tf'.format(self.name.lower()),
+                TfToPoseAction,
+                execute_cb=self.tf_to_pose_transporter_cb,
+                auto_start=False,
+            )
+            self.tf_to_pose_transporter_server.register_preempt_callback(self.preempt_tracking)
+            self.tf_to_pose_transporter_server.start()
 
             self.joint_pose_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
                 '{}/joint/pose'.format(self.name.lower()),
@@ -494,6 +508,76 @@ class ROSRobot(rtb.Robot):
             self.last_update = rospy.get_time()
 
         self.cartesian_servo_publisher.publish(arrived)
+
+    def tf_to_pose_transporter_cb(self, goal: TfToPoseGoal) -> None:
+        pub_rate = rospy.Rate(goal.rate)
+        pub = rospy.Publisher(goal.pose_topic, PoseStamped, queue_size=1)
+
+        while not self.tf_to_pose_transporter_server.is_preempt_requested():
+
+            if goal.target_tf == None or goal.target_tf == "":
+                rospy.logerr(f"Provided target tf is None")
+                return None
+
+            ee_pose = pclu.ROSHelper().tf_to_pose("link_base", "ee_control_link", self.tfBuffer)
+            target_pose_offset = pclu.ROSHelper().tf_to_pose(goal.ee_frame, goal.target_tf, self.tfBuffer)
+
+            if target_pose_offset == Pose():
+                rospy.logerr(f"target vector is empty, cannot be calculated. exiting...")
+                return None
+
+            target_rotation = sm.UnitQuaternion(
+                target_pose_offset.orientation.w, [
+                target_pose_offset.orientation.x,
+                target_pose_offset.orientation.y,
+                target_pose_offset.orientation.z
+            ])
+
+            ee_rotation = sm.UnitQuaternion(
+                ee_pose.orientation.w, [
+                ee_pose.orientation.x,
+                ee_pose.orientation.y,
+                ee_pose.orientation.z
+            ])
+
+            # SO3 representations
+            target_rot_so = sm.SO3.RPY(target_rotation.rpy(order='xyz')) # Working...
+            ee_rot_so = sm.SO3.RPY(ee_rotation.rpy(order='zyx'))
+
+            goal_rotation = sm.UnitQuaternion(ee_rot_so * target_rot_so.inv()) # works perfect with neg R & P
+
+            # Hack test to negate R & P should apply rotation
+            goal_rpy = goal_rotation.rpy()
+            goal_rotation = sm.UnitQuaternion(sm.SO3.RPY(-goal_rpy[0], -goal_rpy[1], goal_rpy[2]))
+
+            goal_pose = copy.deepcopy(ee_pose)
+            goal_pose.orientation.w = goal_rotation.s
+            goal_pose.orientation.x = goal_rotation.v[0]
+            goal_pose.orientation.y = goal_rotation.v[1]
+            goal_pose.orientation.z = goal_rotation.v[2]
+
+            # This is a hack...fix it...
+            # Use SE3 and apply the above rotations
+            goal_pose.position.x += target_pose_offset.position.y
+            goal_pose.position.y += target_pose_offset.position.z
+            goal_pose.position.z += target_pose_offset.position.x
+
+            rospy.logdebug(f"TF to Pose")
+            rospy.logdebug(f"-- Current EE Pose AS RPY {ee_rot_so.rpy()}")
+            rospy.logdebug(f"-- Target AS RPY {target_rot_so.rpy()}")
+            rospy.logdebug(f"-- RESULT AS RPY {goal_rotation.rpy()}")
+            rospy.logdebug(f"-- Goal EE Pose {goal_pose}")
+
+            goal_pose_msg = PoseStamped()
+            goal_pose_msg.header.stamp = rospy.Time.now()
+            goal_pose_msg.header.frame_id = 'link_base'
+            goal_pose_msg.pose = goal_pose
+            pub.publish(goal_pose_msg)
+
+            pub_rate.sleep()
+
+        self.tf_to_pose_transporter_server.set_succeeded(
+            TfToPoseResult(success=True))
 
     def pose_tracker_cb(self, goal: TrackPoseGoal) -> None:
         """
@@ -1335,7 +1419,7 @@ class ROSRobot(rtb.Robot):
         pose_stamped.pose.position.z = translation[2]
 
         rotation = ee_pose[:3, :3]
-        ee_rot = sp.UnitQuaternion(rotation)
+        ee_rot = sm.UnitQuaternion(rotation)
 
         pose_stamped.pose.orientation.w = ee_rot.A[0]
         pose_stamped.pose.orientation.x = ee_rot.A[1]
