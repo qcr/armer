@@ -250,7 +250,7 @@ class ROSRobot(rtb.Robot):
                 execute_cb=self.tf_to_pose_transporter_cb,
                 auto_start=False,
             )
-            self.tf_to_pose_transporter_server.register_preempt_callback(self.preempt_tracking)
+            self.tf_to_pose_transporter_server.register_preempt_callback(self.preempt_other)
             self.tf_to_pose_transporter_server.start()
 
             self.joint_pose_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
@@ -512,19 +512,58 @@ class ROSRobot(rtb.Robot):
     def tf_to_pose_transporter_cb(self, goal: TfToPoseGoal) -> None:
         pub_rate = rospy.Rate(goal.rate)
         pub = rospy.Publisher(goal.pose_topic, PoseStamped, queue_size=1)
+        pub_target = rospy.Publisher("/target_target", Pose, queue_size=1)
+        pub_ee = rospy.Publisher("/target_ee", Pose, queue_size=1)
+
+        rospy.logerr("Updating TF to Pose publisher...")
+
+        previous_pose = Pose()
 
         while not self.tf_to_pose_transporter_server.is_preempt_requested():
 
             if goal.target_tf == None or goal.target_tf == "":
                 rospy.logerr(f"Provided target tf is None")
-                return None
+                # return None
+                pub_rate.sleep()
+                continue
 
-            ee_pose = pclu.ROSHelper().tf_to_pose("link_base", "ee_control_link", self.tfBuffer)
-            target_pose_offset = pclu.ROSHelper().tf_to_pose(goal.ee_frame, goal.target_tf, self.tfBuffer)
+            ee_pose = Pose()
+            target_pose_offset = Pose()
+            try:
+                self.tf_listener.waitForTransform("link_base", "ee_control_link", rospy.Time.now(), rospy.Duration(1.0))
+                ee_pose = pclu.ROSHelper().tf_to_pose("link_base", "ee_control_link", self.tfBuffer)
+                self.tf_listener.waitForTransform(goal.ee_frame, goal.target_tf, rospy.Time.now(), rospy.Duration(1.0))
+                target_pose_offset = pclu.ROSHelper().tf_to_pose(goal.ee_frame, goal.target_tf, self.tfBuffer)
+            # except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+            except:
+                rospy.logerr(f"failed to get transforms...")
+                if previous_pose != Pose():
+                    pub.publish(previous_pose)
+                    rospy.logerr(f"...previous_pose available")
+                elif ee_pose != Pose():
+                    previous_pose = PoseStamped()
+                    previous_pose.header.stamp = rospy.Time.now()
+                    previous_pose.header.frame_id = 'link_base'
+                    previous_pose.pose = ee_pose
+                    pub.publish(previous_pose)
+                    rospy.logerr(f"...ee_pose available")
+                pub_rate.sleep()
+                continue
+                    
 
             if target_pose_offset == Pose():
                 rospy.logerr(f"target vector is empty, cannot be calculated. exiting...")
-                return None
+                # return None
+                if previous_pose != Pose():
+                    pub.publish(previous_pose)
+                elif ee_pose != Pose():
+                    previous_pose = PoseStamped()
+                    previous_pose.header.stamp = rospy.Time.now()
+                    previous_pose.header.frame_id = 'link_base'
+                    previous_pose.pose = ee_pose
+                    pub.publish(previous_pose)
+                pub_rate.sleep()
+                continue
 
             target_rotation = sm.UnitQuaternion(
                 target_pose_offset.orientation.w, [
@@ -557,16 +596,20 @@ class ROSRobot(rtb.Robot):
             goal_pose.orientation.z = goal_rotation.v[2]
 
             # This is a hack...fix it...
+            # NOTE: this assumes target is in the camera frame...
             # Use SE3 and apply the above rotations
             goal_pose.position.x += target_pose_offset.position.y
             goal_pose.position.y += target_pose_offset.position.z
             goal_pose.position.z += target_pose_offset.position.x
 
-            rospy.logdebug(f"TF to Pose")
-            rospy.logdebug(f"-- Current EE Pose AS RPY {ee_rot_so.rpy()}")
-            rospy.logdebug(f"-- Target AS RPY {target_rot_so.rpy()}")
-            rospy.logdebug(f"-- RESULT AS RPY {goal_rotation.rpy()}")
-            rospy.logdebug(f"-- Goal EE Pose {goal_pose}")
+            rospy.logwarn(f"TF to Pose")
+            rospy.logwarn(f"-- Current EE Pose AS RPY {ee_rot_so.rpy()}")
+            rospy.logwarn(f"-- Target AS RPY {target_rot_so.rpy()}")
+            rospy.logwarn(f"-- RESULT AS RPY {goal_rotation.rpy()}")
+            rospy.logwarn(f"-- Goal EE Pose {goal_pose}")
+
+            pub_target.publish(target_pose_offset)
+            pub_ee.publish(ee_pose)
 
             goal_pose_msg = PoseStamped()
             goal_pose_msg.header.stamp = rospy.Time.now()
@@ -574,6 +617,9 @@ class ROSRobot(rtb.Robot):
             goal_pose_msg.pose = goal_pose
             pub.publish(goal_pose_msg)
 
+            previous_pose = copy.deepcopy(goal_pose_msg)
+
+            # break
             pub_rate.sleep()
 
         self.tf_to_pose_transporter_server.set_succeeded(
@@ -623,6 +669,7 @@ class ROSRobot(rtb.Robot):
                 pose_msg = None
                 try:
                     pose_msg = rospy.wait_for_message(topic=msg_pose_topic, topic_type=PoseStamped, timeout=0.1)
+                    tracked_pose = copy.deepcopy(pose_msg)
                 except:
                     pose_msg = tracked_pose
 
@@ -638,15 +685,14 @@ class ROSRobot(rtb.Robot):
                     self.pose_tracking_server.publish_feedback(feedback)
 
                     goal_pose = pose_msg
-                elif not tracked_pose:
+                elif tracked_pose is None:
                     # TODO: Remove debugging
                     feedback = TrackPoseFeedback()
                     feedback.status = 23
                     self.pose_tracking_server.publish_feedback(feedback)
 
                     # Not currently tracking
-                    # pub_rate.sleep()
-                    # rospy.sleep(0.1)
+                    pub_rate.sleep()
                     continue
 
                 # TODO: Remove debugging
@@ -676,9 +722,9 @@ class ROSRobot(rtb.Robot):
                     pose = goal_pose.pose
 
                     # Convert target to SE3 (from pose)
-                    target = SE3(pose.position.x, pose.position.y, pose.position.z) * UnitQuaternion([
+                    target = SE3(pose.position.x, pose.position.y, pose.position.z) * UnitQuaternion(
                         pose.orientation.w,
-                        pose.orientation.x,
+                        [pose.orientation.x,
                         pose.orientation.y,
                         pose.orientation.z
                     ]).SE3()
@@ -1371,6 +1417,23 @@ class ROSRobot(rtb.Robot):
         self._controller_mode = ControlMode.JOINTS
         self.last_update = 0
 
+    def preempt_other(self, *args: list) -> None:
+        """
+        Stops any current motion
+        """
+        # pylint: disable=unused-argument
+        if self.executor:
+            self.executor.abort()
+
+        # Warn and Reset
+        if self.singularity_approached:
+            rospy.logwarn(f"PREEMPTED: Approaching singularity (index: {self.manip_scalar}) --> please home to fix")
+            self.singularity_approached = False
+
+        self.preempted = True
+        self._controller_mode = ControlMode.JOINTS
+        self.last_update = 0
+
     def __vel_move(self, twist_stamped: TwistStamped) -> None:
         target: Twist = twist_stamped.twist
 
@@ -1429,8 +1492,12 @@ class ROSRobot(rtb.Robot):
         state = ManipulatorState()
         state.ee_pose = pose_stamped
 
-        # end-effector velocity
-        T = jacob0 @ self.qd
+        try:
+            # end-effector velocity
+            T = jacob0 @ self.qd
+        except:
+            state.ee_velocity = TwistStamped()
+            return state
 
         twist_stamped = TwistStamped()
         twist_stamped.header = header
