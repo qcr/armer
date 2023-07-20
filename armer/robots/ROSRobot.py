@@ -523,7 +523,6 @@ class ROSRobot(rtb.Robot):
 
             if goal.target_tf == None or goal.target_tf == "":
                 rospy.logerr(f"Provided target tf is None")
-                # return None
                 pub_rate.sleep()
                 continue
 
@@ -534,7 +533,6 @@ class ROSRobot(rtb.Robot):
                 ee_pose = pclu.ROSHelper().tf_to_pose("link_base", "ee_control_link", self.tfBuffer)
                 self.tf_listener.waitForTransform(goal.ee_frame, goal.target_tf, rospy.Time.now(), rospy.Duration(1.0))
                 target_pose_offset = pclu.ROSHelper().tf_to_pose(goal.ee_frame, goal.target_tf, self.tfBuffer)
-            # except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
             except:
                 rospy.logerr(f"failed to get transforms...")
                 if previous_pose != Pose():
@@ -553,7 +551,6 @@ class ROSRobot(rtb.Robot):
 
             if target_pose_offset == Pose():
                 rospy.logerr(f"target vector is empty, cannot be calculated. exiting...")
-                # return None
                 if previous_pose != Pose():
                     pub.publish(previous_pose)
                 elif ee_pose != Pose():
