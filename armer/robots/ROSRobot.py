@@ -658,11 +658,6 @@ class ROSRobot(rtb.Robot):
                     self.preempted = False
                     # - do some other things...like control_type
 
-                # TODO: Remove debugging
-                feedback = TrackPoseFeedback()
-                feedback.status = 11
-                self.pose_tracking_server.publish_feedback(feedback)
-
                 pose_msg = None
                 try:
                     pose_msg = rospy.wait_for_message(topic=msg_pose_topic, topic_type=PoseStamped, timeout=0.1)
@@ -670,24 +665,9 @@ class ROSRobot(rtb.Robot):
                 except:
                     pose_msg = tracked_pose
 
-                # TODO: Remove debugging
-                feedback = TrackPoseFeedback()
-                feedback.status = 1
-                self.pose_tracking_server.publish_feedback(feedback)
-
                 if pose_msg:
-                    # TODO: Remove debugging
-                    feedback = TrackPoseFeedback()
-                    feedback.status = 22
-                    self.pose_tracking_server.publish_feedback(feedback)
-
                     goal_pose = pose_msg
                 elif tracked_pose is None:
-                    # TODO: Remove debugging
-                    feedback = TrackPoseFeedback()
-                    feedback.status = 23
-                    self.pose_tracking_server.publish_feedback(feedback)
-
                     # Not currently tracking
                     pub_rate.sleep()
                     continue
@@ -701,11 +681,6 @@ class ROSRobot(rtb.Robot):
                 tracked_pose = goal_pose
 
                 if goal.linear_motion:
-                    # TODO: Remove debugging
-                    feedback = TrackPoseFeedback()
-                    feedback.status = 55
-                    self.pose_tracking_server.publish_feedback(feedback)
-
                     # Method 2: Use Servo to Pose
                     # Handle variables for servo
                     goal_gain = goal.vel_scale * self.max_joint_velocity_gain if goal.vel_scale else 0.2
@@ -757,11 +732,6 @@ class ROSRobot(rtb.Robot):
                     pub_rate.sleep()
                     # # ---- END Method 2 ---------------------------------
                 else:
-                    # TODO: Remove debugging
-                    feedback = TrackPoseFeedback()
-                    feedback.status = 66
-                    self.pose_tracking_server.publish_feedback(feedback)
-
                     # Method 1: Use TrajectoryExecutor
                     goal_speed = goal.vel_scale * self.max_cartesian_speed if goal.vel_scale else 0.2
                     if goal_pose.header.frame_id == '':
@@ -832,11 +802,6 @@ class ROSRobot(rtb.Robot):
             self.pose_tracking_server.publish_feedback(feedback)
 
             self.pose_tracking_server.set_aborted(TrackPoseResult(success=False))
-
-        # TODO: Remove debugging
-        feedback = TrackPoseFeedback()
-        feedback.status = 35
-        self.pose_tracking_server.publish_feedback(feedback)
 
         self.executor = None
         self.moving = False
