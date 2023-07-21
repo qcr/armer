@@ -661,6 +661,11 @@ class ROSRobot(rtb.Robot):
                 pose_msg = None
                 try:
                     pose_msg = rospy.wait_for_message(topic=msg_pose_topic, topic_type=PoseStamped, timeout=0.1)
+                    # Apply offset provided to pose_msg
+                    pose_msg.pose.position.x += goal.pose_offset_x
+                    pose_msg.pose.position.y += goal.pose_offset_y
+                    pose_msg.pose.position.z += goal.pose_offset_z
+
                     tracked_pose = copy.deepcopy(pose_msg)
                 except:
                     pose_msg = tracked_pose
@@ -692,6 +697,10 @@ class ROSRobot(rtb.Robot):
                     Te = self.ets(start=self.base_link, end=self.gripper).eval(self.q)
 
                     pose = goal_pose.pose
+
+                    # Overwrite provided pose orientation if required
+                    if goal.gripper_orientation_lock:
+                        pose.orientation = self.state.ee_pose.pose.orientation
 
                     # Convert target to SE3 (from pose)
                     target = SE3(pose.position.x, pose.position.y, pose.position.z) * UnitQuaternion(
