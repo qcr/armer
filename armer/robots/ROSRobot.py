@@ -271,6 +271,15 @@ class ROSRobot(rtb.Robot):
             self.named_pose_server.register_preempt_callback(self.preempt)
             self.named_pose_server.start()
 
+            self.named_pose_distance_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
+                '{}/measurement/named_to_gripper'.format(self.name.lower()),
+                MoveToNamedPoseAction,
+                execute_cb=self.named_pose_distance_cb,
+                auto_start=False
+            )
+            self.named_pose_distance_server.register_preempt_callback(self.preempt)
+            self.named_pose_distance_server.start()
+
             self.home_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
                 '{}/home'.format(self.name.lower()),
                 HomeAction,
@@ -942,6 +951,37 @@ class ROSRobot(rtb.Robot):
 
             self.executor = None
             self.moving = False
+
+    def named_pose_distance_cb(self, goal: MoveToNamedPoseGoal) -> None:
+        """        
+        """
+        # TODO: should use a custom message (speed should be max cart dist)
+        proximity_limit = np.array([goal.speed]*3)
+
+        if not goal.pose_name in self.named_poses:
+            self.named_pose_distance_server.set_aborted(
+                MoveToNamedPoseResult(success=False),
+                'Unknown named pose'
+            )
+
+        qd = np.array(self.named_poses[goal.pose_name])
+        start_SE3 = SE3(self.ets(start=self.base_link, end=self.gripper).eval(self.q))
+        end_SE3 = SE3(self.ets(start=self.base_link, end=self.gripper).eval(qd))
+
+        difference_XYZ = start_SE3.t - end_SE3.t
+        rospy.logdebug(f"QD is {qd}")
+        rospy.logdebug(f"Q is {self.q}")
+        rospy.logdebug(f"Links are {self.base_link} (base) and {self.gripper} (gripper)")
+        rospy.logdebug(f"Start is {start_SE3.t}")
+        rospy.logdebug(f"End is {end_SE3.t}")
+        rospy.logdebug(f"Distance to named pose {goal.pose_name} is {difference_XYZ}")
+        exceeded_limit = difference_XYZ > proximity_limit
+        if any(exceeded_limit):
+            self.named_pose_distance_server.set_succeeded(
+                    MoveToNamedPoseResult(success=True))
+        else:
+            self.named_pose_distance_server.set_succeeded(
+                    MoveToNamedPoseResult(success=False))
 
     def home_cb(self, goal: HomeGoal) -> HomeResult:
         """[summary]
