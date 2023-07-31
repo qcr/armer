@@ -7,25 +7,15 @@ Armer Class
 from __future__ import annotations
 from typing import List, Dict, Any, Tuple
 
-import timeit
 import importlib
-
-import rospy
 import tf2_ros
 import yaml
-
 import roboticstoolbox as rtb
-import spatialgeometry as sg
-import spatialmath as sm
+
 from roboticstoolbox.backends.swift import Swift
-
 from spatialmath.base.argcheck import getvector
-
 from armer.utils import populate_transform_stamped
-from armer.models import URDFRobot
 from armer.robots import ROSRobot
-from armer.timer import Timer
-
 
 class Armer:
     """
@@ -44,6 +34,7 @@ class Armer:
 
     def __init__(
             self,
+            nh,
             robots: List[rtb.robot.Robot] = None,
             backend: rtb.backends.Connector = None,
             backend_args: Dict[str, Any] = None,
@@ -51,6 +42,7 @@ class Armer:
             publish_transforms: bool = False,
             logging: dict[str, bool] = None) -> None:
 
+        # Note that ROSRobot is configured as either a ROS1 or ROS2 robot prior to initialising
         self.robots: List[ROSRobot] = robots
         self.backend: rtb.backends.Connector = backend
         self.readonly_backends : List[rtb.backends.Connector] = readonly_backends \
@@ -67,27 +59,18 @@ class Armer:
         self.broadcaster: tf2_ros.TransformBroadcaster = None
 
         if self.is_publishing_transforms:
-            self.broadcaster = tf2_ros.TransformBroadcaster()
+            try:
+              self.broadcaster = tf2_ros.TransformBroadcaster(nh)
+            except TypeError:
+              self.broadcaster = tf2_ros.TransformBroadcaster()
 
         self.frequency = min([r.frequency for r in self.robots])
-        self.rate = rospy.Rate(self.frequency)
-
-        self.last_tick = rospy.get_time()
 
         # Launch backend
         self.backend.launch(**(backend_args if backend_args else dict()))
 
         for robot in self.robots:
             self.backend.add(robot)
-
-            # # TESTING
-            # # Add dummy object for testing
-            # s0 = sg.Sphere(radius=0.05, pose=sm.SE3(0.5, 0, 0.5))
-            # s1 = sg.Sphere(radius=0.05, pose=sm.SE3(0.5, 0, 0.1))
-            # robot.add_collision_obj(s0)
-            # robot.add_collision_obj(s1)
-            # self.backend.add(s0)
-            # self.backend.add(s1)
 
         for readonly, args in self.readonly_backends:
             readonly.launch(**args)
@@ -107,7 +90,7 @@ class Armer:
         for robot in self.robots:
             robot.close()
 
-    def publish_transforms(self) -> None:
+    def publish_transforms(self, timestamp) -> None:
         """[summary]
         """
         if not self.is_publishing_transforms:
@@ -154,7 +137,7 @@ class Armer:
         self.broadcaster.sendTransform(transforms)
 
     @staticmethod
-    def load(path: str) -> Armer:
+    def load(nh, path: str) -> Armer:
         """
         Generates an Armer Driver instance from the configuration file at path
 
@@ -169,30 +152,17 @@ class Armer:
         robots: List[rtb.robot.Robot] = []
 
         for spec in config['robots']:
-            robot_cls = URDFRobot
             wrapper = ROSRobot
-
-            model_spec = {}
-            
-            if 'model' in spec:
-              model_type = spec['model'] if isinstance(spec['model'], str) else spec['model']['type'] if 'type' in spec['model'] else None
-              model_spec = spec['model'] if isinstance(spec['model'], dict) else {}
-              
-              if model_type: 
-                module_name, model_name = model_type.rsplit('.', maxsplit=1)            
-                robot_cls = getattr(importlib.import_module(module_name), model_name)
-                
-              if 'type' in model_spec:
-                del model_spec['type']     
-
-              del spec['model']
 
             if 'type' in spec:
                 module_name, model_name = spec['type'].rsplit('.', maxsplit=1)
                 wrapper = getattr(importlib.import_module(module_name), model_name)
                 del spec['type']
 
-            robots.append(wrapper(robot_cls(**model_spec), **spec))
+            if 'model' in spec:
+              spec.update(spec['model'])
+
+            robots.append(wrapper(nh, **spec))
 
         backend = None
         backend_args = dict()
@@ -215,8 +185,10 @@ class Armer:
 
         logging = config['logging'] if 'logging' in config else {}
         publish_transforms = config['publish_transforms'] if 'publish_transforms' in config else False
-
+        
+        print(f"Here in armer.py finishing")
         return Armer(
+            nh,
             robots=robots,
             backend=backend,
             backend_args=backend_args,
@@ -225,35 +197,14 @@ class Armer:
             logging=logging
         )
 
-    def run(self) -> None:
-        """
-        Runs the driver. This is a blocking call.
-        """
-        self.last_tick = rospy.get_time()
-        rospy.loginfo(f"ARMer Node Running...")
-        
-        while not rospy.is_shutdown():
-            with Timer('ROS', self.log_frequency):
-                current_time = rospy.get_time()
-                dt = current_time - self.last_tick
+    def step(self, dt: float, current_time: float) -> None:
+      for robot in self.robots:
+          robot.step(dt=dt)
 
-                for robot in self.robots:
-                    robot.step(dt=dt)
+      # with Timer('step'):
+      self.backend.step(dt=dt)
 
-                # with Timer('step'):
-                self.backend.step(dt=dt)
+      for backend, args in self.readonly_backends:
+          backend.step(dt=dt)
 
-                for backend, args in self.readonly_backends:
-                    backend.step(dt=dt)
-
-                self.publish_transforms()
-
-                self.rate.sleep()
-
-                self.last_tick = current_time
-
-
-# if __name__ == '__main__':
-#     rospy.init_node('manipulator')
-#     manipulator = Armer(publish_transforms=False)
-#     manipulator.run()
+      self.publish_transforms(current_time)

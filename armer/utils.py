@@ -5,9 +5,9 @@ Utility functions used by Armer
 .. codeauthor:: Dasun Gunasinghe
 """
 
-import rospy
+import os
 import numpy as np
-from spatialmath import SE3, SO3, UnitQuaternion, base
+from spatialmath import SE3, UnitQuaternion, base
 from geometry_msgs.msg import TransformStamped
 import roboticstoolbox as rtb
 from roboticstoolbox.tools.trajectory import Trajectory
@@ -25,7 +25,7 @@ def ikine(robot, target, q0, end):
     )
     
     if not (result[1]):
-        rospy.logerr('Unable to generate inverse kinematic solution')
+        robot.logger('Unable to generate inverse kinematic solution')
         return type('obj', (object,), {'q' : q0})
 
     return type('obj', (object,), {'q' : np.array(result[0])})
@@ -76,13 +76,13 @@ def mjtg(robot: rtb.Robot, qf: np.ndarray, max_speed: float=0.2, max_rot: float=
     
     return Trajectory('minimum-jerk', move_time, qd, qdd, None, True)
 
-def populate_transform_stamped(parent_name: str, link_name: str, transform: np.array):
+def populate_transform_stamped(parent_name: str, link_name: str, transform: np.array, timestamp):
     """
     Generates a geometry_msgs/TransformStamped message between
     a link and its parent based on the provided SE3 transform
     """
     transform_stamped = TransformStamped()
-    transform_stamped.header.stamp = rospy.Time.now()
+    transform_stamped.header.stamp = timestamp.to_msg() if hasattr(timestamp, 'to_msg') else timestamp
     transform_stamped.header.frame_id = parent_name
     transform_stamped.child_frame_id = link_name
     transform_stamped.transform.translation.x = transform[0,3]

@@ -6,7 +6,6 @@ Trajectory Executor class used by Armer
 """
 
 import numpy as np
-import rospy
 import scipy
 import roboticstoolbox as rtb
 from roboticstoolbox.tools.trajectory import Trajectory
@@ -16,18 +15,17 @@ class TrajectoryExecutor:
 
     self.robot: rtb.ERobot = robot
     self.traj: Trajectory = traj
-    
+
     self.last_jp = np.zeros(self.robot.n)
 
     self.time_step = 0
-    
+
     self.cartesian_ee_vel_vect = [] # logging
 
+    # Flags
     self.is_aborted = False
-
     self._finished = False
     self._success = False
-    
 
     if self.traj.istime and len(self.traj.s) >= 2:
       s = np.linspace(0, 1, len(self.traj.s))
@@ -69,7 +67,7 @@ class TrajectoryExecutor:
     
     # corr_jv = np.zeros(self.robot.n)
     if np.any(np.max(np.fabs(erro_jp)) > 0.5):
-        rospy.logerr('Exceeded delta joint position max')
+        self.robot.logger('Exceeded delta joint position max', 'warn')
         self._finished = True
         
     # Increment time step(s)
@@ -94,16 +92,16 @@ class TrajectoryExecutor:
       return True
 
     if len(self.traj.s) < 2 or np.all(np.fabs(self.traj.s[-1] - self.robot.q) < cutoff):
-      rospy.loginfo(f'Too close to goal {(self.time_step / self.traj.t)}')
+      self.robot.logger(f'Too close to goal {(self.time_step / self.traj.t)}')
       if self.cartesian_ee_vel_vect:
-        rospy.loginfo(f"Max cartesian speed: {np.max(self.cartesian_ee_vel_vect)}")
+        self.robot.logger(f"Max cartesian speed: {np.max(self.cartesian_ee_vel_vect)}")
       self._finished = True
       self._success = True
     
     if (self.time_step) >= self.traj.t - (1 if not self.traj.istime else 0):
-      rospy.loginfo(f'Timed out | End time: {self.time_step}')
+      self.robot.logger(f'Timed out | End time: {self.time_step}')
       if self.cartesian_ee_vel_vect:
-        rospy.loginfo(f"Max cartesian speed: {np.max(self.cartesian_ee_vel_vect)}")
+        self.robot.logger(f"Max cartesian speed: {np.max(self.cartesian_ee_vel_vect)}")
       self._finished = True
       self._success = True
       

@@ -3,11 +3,30 @@ import os
 from typing import List
 
 import rospy
+  
 from armer import Armer
+from armer.timer import Timer
 
 __path__ = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
 
+def main():
+  rospy.init_node('armer')
+
+  armer = Armer.load(
+    rospy,
+    rospy.get_param('~config', os.path.join(__path__, 'cfg/panda_sim.yaml'))
+  )
+
+  rate = rospy.Rate(armer.frequency)
+  last_tick = rospy.Time.now()
+  
+  while not rospy.is_shutdown():
+    with Timer('ROS', armer.log_frequency):
+      current_time = rospy.Time.now()
+      armer.step((current_time - last_tick).to_sec(), current_time)
+      last_tick = current_time
+
+    rate.sleep()
+
 if __name__ == '__main__':
-    rospy.init_node('manipulator')
-    armer = Armer.load(rospy.get_param('~config', os.path.join(__path__, 'cfg/panda_sim.yaml')))
-    armer.run()
+  main()    

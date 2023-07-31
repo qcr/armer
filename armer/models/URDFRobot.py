@@ -8,7 +8,7 @@ URDFRobot module defines the URDFRobot type
 
 import numpy as np
 import re
-import rospy
+import time
 import rospkg
 from io import BytesIO
 from roboticstoolbox.robot import Robot, Link, ET, ETS
@@ -18,6 +18,7 @@ import spatialmath
 
 class URDFRobot(Robot):
   def __init__(self,
+               nh,
                qz=None,
                qr=None,
                gripper=None,
@@ -25,6 +26,7 @@ class URDFRobot(Robot):
                urdf_file=None,
                *args,
                **kwargs):
+    self.nh = nh
 
     if urdf_file:
       links, name, urdf_string, urdf_filepath = self.URDF_read(urdf_file)
@@ -63,12 +65,12 @@ class URDFRobot(Robot):
     self.addconfiguration("qz", self.qz)
 
   def URDF_read_description(self):
-    rospy.loginfo('[INIT] Waiting for robot description')
-    while not rospy.has_param('/robot_description'):
-      rospy.sleep(0.5)
-    rospy.loginfo('[INIT] Found robot description')
+    self.logger('[INIT] Waiting for robot description')
+    while not self.nh.has_param('/robot_description'):
+      time.sleep(0.5)
+    self.logger('[INIT] Found robot description')
 
-    urdf_string = self.URDF_resolve(rospy.get_param('/robot_description'))
+    urdf_string = self.URDF_resolve(self.get_parameter('/robot_description'))
     
     tree = ETT.parse(
       BytesIO(bytes(urdf_string, "utf-8")), 
@@ -112,9 +114,31 @@ class URDFRobot(Robot):
       transforms = [ getattr(ET, list(et.keys())[0])(list(et.values())[0]) for et in tool['ets'] ]
 
     return ETS(transforms)
+  
+  def get_parameter(self, param_name):
+    return self.nh.get_parameter(param_name) if hasattr(self.nh, 'get_parameter') else self.nh.get_param(param_name)
+  
+  def logger(self, message, mode='info'):
+    if hasattr(self.nh, 'get_logger'):
+      if mode == 'error':
+        self.nh.get_logger().error(message)
+      elif mode == 'warn':
+        self.nh.get_logger().warn(message)
+      else:
+        self.nh.get_logger().info(message)
+    elif hasattr(self.nh, 'loginfo'):
+      if mode == 'error':
+        self.nh.logerror(message)
+      elif mode == 'warn':
+        self.nh.logwarn(message)
+      else:
+        self.nh.loginfo(message)
+    else:
+      print(message)
 
 if __name__ == "__main__":  # pragma nocover
 
+    # TODO: change this to a known, more tracable xacro
     r = URDFRobot(urdf_file='ur_description/urdf/ur5_joint_limited_robot.urdf.xacro')
     print(r)
     
