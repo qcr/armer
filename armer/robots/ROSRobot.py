@@ -47,6 +47,7 @@ class ROSRobot(URDFRobot):
                  readonly=False,
                  frequency=None,
                  modified_qr=None,
+                 singularity_thresh=0.02,
                  * args,
                  **kwargs):  # pylint: disable=unused-argument
         
@@ -136,31 +137,42 @@ class ROSRobot(URDFRobot):
         self.readonly = readonly
 
         self.custom_configs: List[str] = []
+
+        # Singularity index threshold (0 is a sigularity)
+        # NOTE: this is a tested value and may require configuration (i.e., speed of robot)
+        self.logger(f"[INIT] Singularity Scalar Threshold set to: {singularity_thresh}")
+        self.singularity_thresh = singularity_thresh 
+        self.manip_scalar = None
+        self.singularity_approached = False
+
         self.__load_config()
 
-        # #### --- ROS SETUP --- ###
-        # self.nh.create_subscription(
-        #   JointState,
-        #   self.joint_state_topic,
-        #   self._state_cb,
-        #   1
-        # )
+        #### --- ROS SETUP --- ###
+        self.nh.create_subscription(
+          JointState,
+          self.joint_state_topic,
+          self._state_cb,
+          1
+        )
         
-        # if not self.readonly:
-        #     self.joint_publisher = self.nh.create_publisher(
-        #       Float64MultiArray,
-        #       self.joint_velocity_topic,
-        #       1
-        #     )
+        if not self.readonly:
+            # Publishers
+            self.joint_publisher = self.nh.create_publisher(
+              Float64MultiArray,
+              self.joint_velocity_topic,
+              1
+            )
 
-
-        #     # Publishers
-        #     self.state_publisher = self.nh.create_publisher(
-        #         ManipulatorState, '{}/state'.format(self.name.lower()), 1
-        #     )
-        #     self.cartesian_servo_publisher: self.nh.create_publisher(
-        #         Bool, '{}/cartesian/servo/arrived'.format(self.name.lower()), 1
-        #     )
+            self.state_publisher = self.nh.create_publisher(
+                ManipulatorState, 
+                '{}/state'.format(self.name.lower()), 
+                1
+            )
+            self.cartesian_servo_publisher: self.nh.create_publisher(
+                Bool, 
+                '{}/cartesian/servo/arrived'.format(self.name.lower()), 
+                1
+            )
 
         #     rclpy.action.ActionServer(
         #       self.nh,
@@ -285,11 +297,6 @@ class ROSRobot(URDFRobot):
         #         Float64MultiArray,
         #         self.set_pid
         #     )
-
-    # def set_pid(self, msg):
-    #     self.Kp = msg.data[0]
-    #     self.Ki = msg.data[1]
-    #     self.Kd = msg.data[2]
 
     def close(self):
         """
@@ -663,7 +670,7 @@ class ROSRobot(URDFRobot):
         else:
             state.joint_poses = list(self.q)
             state.joint_velocities = list(self.qd)
-            state.joint_torques = np.zeros(self.n, dtype=np.float).tolist()
+            state.joint_torques = np.zeros(self.n, dtype=np.float64).tolist()
         
         return state
 
@@ -769,6 +776,33 @@ class ROSRobot(URDFRobot):
     def publish(self):
         self.joint_publisher.publish(Float64MultiArray(data=self.qd))
 
+    def check_singularity(self, q=None) -> bool:
+        """
+        Checks the manipulability as a scalar manipulability index
+        for the robot at the joint configuration to indicate singularity approach. 
+        - It indicates dexterity (how well conditioned the robot is for motion)
+        - Value approaches 0 if robot is at singularity
+        - Returns True if close to singularity (based on threshold) or False otherwise
+        - See rtb.robots.Robot.py for details
+
+        :param q: The robot state to check for manipulability.
+        :type q: numpy array of joints (float)
+        :return: True (if within singularity) or False (otherwise)
+        :rtype: bool
+        """
+        # Get the robot state manipulability
+        self.manip_scalar = self.manipulability(q)
+
+        # Debugging
+        # rospy.loginfo(f"Manipulability: {manip_scalar} | --> 0 is singularity")
+
+        if (np.fabs(self.manip_scalar) <= self.singularity_thresh and self.preempted == False):
+            self.singularity_approached = True
+            return True
+        else:
+            self.singularity_approached = False
+            return False
+
     def step(self, dt: float = 0.01) -> None:  # pylint: disable=unused-argument
         """
         Updates the robot joints (robot.q) used in computing kinematics
@@ -781,7 +815,8 @@ class ROSRobot(URDFRobot):
         current_time = self.get_time()
         self.state = self.get_state()
 
-        if self.state.errors != 0:
+        # PREEMPT motion on any detected state errors or singularity approach
+        if self.state.errors != 0 or self.check_singularity(self.q):
             self.preempt()
 
         # calculate joint velocities from desired cartesian velocity
@@ -834,14 +869,14 @@ class ROSRobot(URDFRobot):
               self.logger('No valid transform found between {} and {}'.format(self.base_link.name, self.e_v_frame), 'warn')
               self.preempt()
 
+        # apply desired joint velocity to robot
         if self.executor:
           self.j_v = self.executor.step(dt)  
-          
-        # apply desired joint velocity to robot
-        if any(self.j_v):
-            if current_time - self.last_update > 0.1:
-                self.j_v *= 0.9 if np.sum(np.absolute(self.j_v)
-                                          ) >= 0.0001 else 0
+        else:
+            # Needed for preempting joint velocity control
+            if any(self.j_v) and current_time - self.last_update > 0.1:
+                self.j_v *= 0.9 if np.sum(np.absolute(self.j_v)) >= 0.0001 else 0
+            
             
         self.qd = self.j_v
         self.last_tick = current_time

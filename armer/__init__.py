@@ -1,7 +1,8 @@
 """
 Armer Package
 
-.. codeauthor:: Gavin Suddreys
+.. codeauthor:: Gavin Suddrey
+.. codeauthor:: Dasun Gunasinghe
 """
 from .armer import Armer
 

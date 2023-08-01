@@ -113,7 +113,8 @@ class Armer:
                 transforms.append(populate_transform_stamped(
                     link.parent.name,
                     link.name,
-                    transform
+                    transform,
+                    timestamp
                 ))
 
             for gripper in robot.grippers:
@@ -131,7 +132,8 @@ class Armer:
                     transforms.append(populate_transform_stamped(
                         link.parent.name,
                         link.name,
-                        transform
+                        transform,
+                        timestamp
                     ))
         
         self.broadcaster.sendTransform(transforms)

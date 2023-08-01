@@ -20,7 +20,10 @@
   <exec_depend>roboticstoolbox-python</exec_depend>
 
   <!-- Tests -->
-  <!-- <test_depend>ament_armer</test_depend> -->
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>
