@@ -138,158 +138,158 @@ class ROSRobot(URDFRobot):
         self.custom_configs: List[str] = []
         self.__load_config()
 
-        #### --- ROS SETUP --- ###
-        self.nh.create_subscription(
-          JointState,
-          self.joint_state_topic,
-          self._state_cb,
-          1
-        )
+        # #### --- ROS SETUP --- ###
+        # self.nh.create_subscription(
+        #   JointState,
+        #   self.joint_state_topic,
+        #   self._state_cb,
+        #   1
+        # )
         
-        if not self.readonly:
-            self.joint_publisher = self.nh.create_publisher(
-              Float64MultiArray,
-              self.joint_velocity_topic,
-              1
-            )
+        # if not self.readonly:
+        #     self.joint_publisher = self.nh.create_publisher(
+        #       Float64MultiArray,
+        #       self.joint_velocity_topic,
+        #       1
+        #     )
 
 
-            # Publishers
-            self.state_publisher = self.nh.create_publisher(
-                ManipulatorState, '{}/state'.format(self.name.lower()), 1
-            )
-            self.cartesian_servo_publisher: self.nh.create_publisher(
-                Bool, '{}/cartesian/servo/arrived'.format(self.name.lower()), 1
-            )
+        #     # Publishers
+        #     self.state_publisher = self.nh.create_publisher(
+        #         ManipulatorState, '{}/state'.format(self.name.lower()), 1
+        #     )
+        #     self.cartesian_servo_publisher: self.nh.create_publisher(
+        #         Bool, '{}/cartesian/servo/arrived'.format(self.name.lower()), 1
+        #     )
 
-            rclpy.action.ActionServer(
-              self.nh,
-              MoveToPose,
-              '{}/cartesian/pose'.format(self.name.lower()),
-              self.pose_cb
-            )
+        #     rclpy.action.ActionServer(
+        #       self.nh,
+        #       MoveToPose,
+        #       '{}/cartesian/pose'.format(self.name.lower()),
+        #       self.pose_cb
+        #     )
             
-            return
+        #     return
             
-            # Services
-            rospy.Service('{}/recover'.format(self.name.lower()),
-                          Empty, self.recover_cb)
-            rospy.Service('{}/stop'.format(self.name.lower()),
-                          Empty, self.preempt)
+        #     # Services
+        #     rospy.Service('{}/recover'.format(self.name.lower()),
+        #                   Empty, self.recover_cb)
+        #     rospy.Service('{}/stop'.format(self.name.lower()),
+        #                   Empty, self.preempt)
 
 
-            # Subscribers
-            self.cartesian_velocity_subscriber: rospy.Subscriber = rospy.Subscriber(
-                '{}/cartesian/velocity'.format(self.name.lower()
-                                               ), TwistStamped, self.velocity_cb
-            )
-            self.joint_velocity_subscriber: rospy.Subscriber = rospy.Subscriber(
-                '{}/joint/velocity'.format(self.name.lower()
-                                           ), JointVelocity, self.joint_velocity_cb
-            )
-            self.cartesian_servo_subscriber: rospy.Subscriber = rospy.Subscriber(
-                '{}/cartesian/servo'.format(self.name.lower()
-                                            ), ServoStamped, self.servo_cb
-            )
+        #     # Subscribers
+        #     self.cartesian_velocity_subscriber: rospy.Subscriber = rospy.Subscriber(
+        #         '{}/cartesian/velocity'.format(self.name.lower()
+        #                                        ), TwistStamped, self.velocity_cb
+        #     )
+        #     self.joint_velocity_subscriber: rospy.Subscriber = rospy.Subscriber(
+        #         '{}/joint/velocity'.format(self.name.lower()
+        #                                    ), JointVelocity, self.joint_velocity_cb
+        #     )
+        #     self.cartesian_servo_subscriber: rospy.Subscriber = rospy.Subscriber(
+        #         '{}/cartesian/servo'.format(self.name.lower()
+        #                                     ), ServoStamped, self.servo_cb
+        #     )
 
-            # Action Servers
-            self.velocity_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
-                '{}/cartesian/guarded_velocity'.format(self.name.lower()),
-                GuardedVelocityAction,
-                execute_cb=self.guarded_velocity_cb,
-                auto_start=False
-            )
-            self.velocity_server.register_preempt_callback(self.preempt)
-            self.velocity_server.start()
+        #     # Action Servers
+        #     self.velocity_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
+        #         '{}/cartesian/guarded_velocity'.format(self.name.lower()),
+        #         GuardedVelocityAction,
+        #         execute_cb=self.guarded_velocity_cb,
+        #         auto_start=False
+        #     )
+        #     self.velocity_server.register_preempt_callback(self.preempt)
+        #     self.velocity_server.start()
 
-            self.pose_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
-                '{}/cartesian/pose'.format(self.name.lower()),
-                MoveToPoseAction,
-                execute_cb=self.pose_cb,
-                auto_start=False
-            )
-            self.pose_server.register_preempt_callback(self.preempt)
-            self.pose_server.start()
+        #     self.pose_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
+        #         '{}/cartesian/pose'.format(self.name.lower()),
+        #         MoveToPoseAction,
+        #         execute_cb=self.pose_cb,
+        #         auto_start=False
+        #     )
+        #     self.pose_server.register_preempt_callback(self.preempt)
+        #     self.pose_server.start()
 
-            self.joint_pose_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
-                '{}/joint/pose'.format(self.name.lower()),
-                MoveToJointPoseAction,
-                execute_cb=self.joint_pose_cb,
-                auto_start=False
-            )
-            self.joint_pose_server.register_preempt_callback(self.preempt)
-            self.joint_pose_server.start()
+        #     self.joint_pose_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
+        #         '{}/joint/pose'.format(self.name.lower()),
+        #         MoveToJointPoseAction,
+        #         execute_cb=self.joint_pose_cb,
+        #         auto_start=False
+        #     )
+        #     self.joint_pose_server.register_preempt_callback(self.preempt)
+        #     self.joint_pose_server.start()
 
-            self.named_pose_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
-                '{}/joint/named'.format(self.name.lower()),
-                MoveToNamedPoseAction,
-                execute_cb=self.named_pose_cb,
-                auto_start=False
-            )
-            self.named_pose_server.register_preempt_callback(self.preempt)
-            self.named_pose_server.start()
+        #     self.named_pose_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
+        #         '{}/joint/named'.format(self.name.lower()),
+        #         MoveToNamedPoseAction,
+        #         execute_cb=self.named_pose_cb,
+        #         auto_start=False
+        #     )
+        #     self.named_pose_server.register_preempt_callback(self.preempt)
+        #     self.named_pose_server.start()
 
-            self.home_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
-                '{}/home'.format(self.name.lower()),
-                HomeAction,
-                execute_cb=self.home_cb,
-                auto_start=False
-            )
-            self.home_server.register_preempt_callback(self.preempt)
-            self.home_server.start()
+        #     self.home_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
+        #         '{}/home'.format(self.name.lower()),
+        #         HomeAction,
+        #         execute_cb=self.home_cb,
+        #         auto_start=False
+        #     )
+        #     self.home_server.register_preempt_callback(self.preempt)
+        #     self.home_server.start()
 
-            rospy.Service(
-                '{}/set_cartesian_impedance'.format(self.name.lower()),
-                SetCartesianImpedance,
-                self.set_cartesian_impedance_cb
-            )
+        #     rospy.Service(
+        #         '{}/set_cartesian_impedance'.format(self.name.lower()),
+        #         SetCartesianImpedance,
+        #         self.set_cartesian_impedance_cb
+        #     )
 
-            rospy.Service(
-                '{}/get_ee_link_name'.format(self.name.lower()),
-                GetLinkName,
-                lambda req: GetLinkNameResponse(name=self.gripper)
-            )
+        #     rospy.Service(
+        #         '{}/get_ee_link_name'.format(self.name.lower()),
+        #         GetLinkName,
+        #         lambda req: GetLinkNameResponse(name=self.gripper)
+        #     )
             
-            rospy.Service(
-                '{}/get_base_link_name'.format(self.name.lower()),
-                GetLinkName,
-                lambda req: GetLinkNameResponse(name=self.base_link.name)
-            )
+        #     rospy.Service(
+        #         '{}/get_base_link_name'.format(self.name.lower()),
+        #         GetLinkName,
+        #         lambda req: GetLinkNameResponse(name=self.base_link.name)
+        #     )
             
-            rospy.Service('{}/get_named_poses'.format(self.name.lower()), GetNamedPoses,
-                          self.get_named_poses_cb)
+        #     rospy.Service('{}/get_named_poses'.format(self.name.lower()), GetNamedPoses,
+        #                   self.get_named_poses_cb)
 
-            rospy.Service('{}/set_named_pose'.format(self.name.lower()), AddNamedPose,
-                          self.add_named_pose_cb)
-            rospy.Service('{}/remove_named_pose'.format(self.name.lower()), RemoveNamedPose,
-                          self.remove_named_pose_cb)
+        #     rospy.Service('{}/set_named_pose'.format(self.name.lower()), AddNamedPose,
+        #                   self.add_named_pose_cb)
+        #     rospy.Service('{}/remove_named_pose'.format(self.name.lower()), RemoveNamedPose,
+        #                   self.remove_named_pose_cb)
 
-            rospy.Service(
-                '{}/add_named_pose_config'.format(self.name.lower()),
-                AddNamedPoseConfig,
-                self.add_named_pose_config_cb
-            )
-            rospy.Service(
-                '{}/remove_named_pose_config'.format(self.name.lower()),
-                RemoveNamedPoseConfig,
-                self.remove_named_pose_config_cb
-            )
-            rospy.Service(
-                '{}/get_named_pose_configs'.format(self.name.lower()),
-                GetNamedPoseConfigs,
-                self.get_named_pose_configs_cb
-            )
+        #     rospy.Service(
+        #         '{}/add_named_pose_config'.format(self.name.lower()),
+        #         AddNamedPoseConfig,
+        #         self.add_named_pose_config_cb
+        #     )
+        #     rospy.Service(
+        #         '{}/remove_named_pose_config'.format(self.name.lower()),
+        #         RemoveNamedPoseConfig,
+        #         self.remove_named_pose_config_cb
+        #     )
+        #     rospy.Service(
+        #         '{}/get_named_pose_configs'.format(self.name.lower()),
+        #         GetNamedPoseConfigs,
+        #         self.get_named_pose_configs_cb
+        #     )
 
-            rospy.Subscriber(
-                '{}/set_pid'.format(self.name.lower()),
-                Float64MultiArray,
-                self.set_pid
-            )
+        #     rospy.Subscriber(
+        #         '{}/set_pid'.format(self.name.lower()),
+        #         Float64MultiArray,
+        #         self.set_pid
+        #     )
 
-    def set_pid(self, msg):
-        self.Kp = msg.data[0]
-        self.Ki = msg.data[1]
-        self.Kd = msg.data[2]
+    # def set_pid(self, msg):
+    #     self.Kp = msg.data[0]
+    #     self.Ki = msg.data[1]
+    #     self.Kd = msg.data[2]
 
     def close(self):
         """

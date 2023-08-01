@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """
 .. codeauthor:: Gavin Suddreys
+.. codeauthor:: Dasun Gunasinghe
 """
 import os
 from glob import glob
@@ -61,22 +62,16 @@ for data_folder in data_folders:
     extra_files += package_files(data_folder)
 
 setup(
-    name='armer',
-
+    name=package_name,
     version='0.2.0',
-
     description='Armer - The ROS Arm drivEr',
-
     # long_description=long_description,
-
     long_description_content_type='text/markdown',
-
     url='https://github.com/qcr/armer',
-
     author='Gavin Suddrey',
-
+    maintainer='Dasun Gunasinghe, Timothy Morris',
+    maintainer_email='dasun.gunasinghe@qut.edu.au, timothy.morris@qut.edu.au',
     license='MIT',
-
     classifiers=[
         #   3 - Alpha
         #   4 - Beta
@@ -95,38 +90,31 @@ setup(
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
     ],
-
     python_requires='>=3.6',
-
     project_urls={
         # 'Documentation': 'https://petercorke.github.io/roboticstoolbox-python',
         'Source': 'https://github.com/qcr/armer',
         'Tracker': 'https://github.com/qcr/armer/issues'#,
         # 'Coverage': 'https://codecov.io/gh/petercorke/roboticstoolbox-python'
     },
-
     keywords='python robotics robotics-toolbox kinematics dynamics' \
              ' motion-planning trajectory-generation jacobian hessian' \
              ' control simulation robot-manipulator mobile-robot ros',
 
-    packages=find_packages(exclude=['tests']),
+    # packages=find_packages(exclude=['tests']),
+    packages=[package_name],
     package_data={'armer': extra_files},
-
     include_package_data=True,
-
     install_requires=req,
-
     extras_require={
         'dev': dev_req,
         'docs': docs_req
     },
-
     entry_points={
         'console_scripts': [
-          'armer = armer.entry_point:main'
+          'entry_point = armer.entry_point:main'
         ],
     },
-
     data_files=[
         (os.path.join('share', package_name), ['package.xml']),
         (os.path.join('share', package_name), glob('launch/*.launch.py')),
