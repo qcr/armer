@@ -1,20 +1,25 @@
 #!/usr/bin/env python3
-"""
-URDFRobot module defines the URDFRobot type
+"""URDFRobot module defines the URDFRobot type
 
-.. codeauthor:: Gavin Suddreys
-.. codeauthor:: Dasun Gunasinghe
+Defines the  robot based on URDF read (parameter) or file
 """
+
+from __future__ import annotations
+
+__author__ = ['Gavin Suddrey', 'Dasun Gunasinghe']
+__version__ = "0.1.0"
 
 import numpy as np
 import re
 import time
 import rospkg
+import xml.etree.ElementTree as ETT
+import spatialmath as sm
+
 from io import BytesIO
 from roboticstoolbox.robot import Robot, Link, ET, ETS
 from roboticstoolbox.tools import URDF
-import xml.etree.ElementTree as ETT
-import spatialmath
+
 
 class URDFRobot(Robot):
   def __init__(self,
@@ -26,16 +31,20 @@ class URDFRobot(Robot):
                urdf_file=None,
                *args,
                **kwargs):
+    # Initialise ROS node handle
     self.nh = nh
 
+    # Read URDF if specified as a file or from the ROS parameter server
     if urdf_file:
       links, name, urdf_string, urdf_filepath = self.URDF_read(urdf_file)
     else:
       links, name, urdf_string, urdf_filepath = self.URDF_read_description()
     
+    # Define/configure the gripper based on URDF read links
     self.gripper = gripper if gripper else URDFRobot.resolve_gripper(links)
     gripper_link = list(filter(lambda link: link.name == self.gripper, links))
     
+    # Configure a tool if specified
     if tool:
       ets = URDFRobot.resolve_ets(tool)
       
@@ -43,7 +52,7 @@ class URDFRobot(Robot):
         links.append(Link(ets, name=tool['name'], parent=self.gripper))
         self.gripper = tool['name']
 
-      gripper_link[0].tool = spatialmath.SE3(ets.compile()[0].A())
+      gripper_link[0].tool = sm.SE3(ets.compile()[0].A())
       
     # DEBUGGING
     # print(f"links:")
@@ -138,7 +147,7 @@ class URDFRobot(Robot):
 
 if __name__ == "__main__":  # pragma nocover
 
-    # TODO: change this to a known, more tracable xacro
+    # TODO: change this to a known, more traceable xacro
     r = URDFRobot(urdf_file='ur_description/urdf/ur5_joint_limited_robot.urdf.xacro')
     print(r)
     

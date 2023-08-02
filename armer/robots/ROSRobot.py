@@ -177,6 +177,7 @@ class ROSRobot(URDFRobot):
           1
         )
         
+        # Setup interfaces for non-readonly
         if not self.readonly:
             # Publishers
             self.joint_publisher = self.nh.create_publisher(
@@ -184,7 +185,6 @@ class ROSRobot(URDFRobot):
               self.joint_velocity_topic,
               1
             )
-
             self.state_publisher = self.nh.create_publisher(
                 ManipulatorState, 
                 '{}/state'.format(self.name.lower()), 
@@ -216,13 +216,15 @@ class ROSRobot(URDFRobot):
             self.cartesian_velocity_subscriber = self.nh.create_subscription(
                 TwistStamped,
                 '{}/cartesian/velocity'.format(self.name.lower()), 
-                self.velocity_cb,
+                self.cartesian_velocity_cb,
                 10
             )
-        #     self.joint_velocity_subscriber: rospy.Subscriber = rospy.Subscriber(
-        #         '{}/joint/velocity'.format(self.name.lower()
-        #                                    ), JointVelocity, self.joint_velocity_cb
-        #     )
+            self.joint_velocity_subscriber = self.nh.create_subscription(
+                JointVelocity,
+                '{}/joint/velocity'.format(self.name.lower()), 
+                self.joint_velocity_cb,
+                10
+            )
         #     self.cartesian_servo_subscriber: rospy.Subscriber = rospy.Subscriber(
         #         '{}/cartesian/servo'.format(self.name.lower()
         #                                     ), ServoStamped, self.servo_cb
@@ -338,9 +340,9 @@ class ROSRobot(URDFRobot):
         self.q = np.array(msg.position)[self.joint_indexes] if len(msg.position) == self.n else np.zeros(self.n)
         self.joint_states = msg
         
-    def velocity_cb(self, msg: TwistStamped) -> None:
-        """
-        ROS Service callback:
+    def cartesian_velocity_cb(self, msg: TwistStamped) -> None:
+        """ROS Service callback:
+        
         Moves the arm at the specified cartesian velocity
         w.r.t. a target frame
 
@@ -376,9 +378,9 @@ class ROSRobot(URDFRobot):
         return True
 
     def joint_velocity_cb(self, msg: JointVelocity) -> None:
-        """
-        ROS Service callback:
-        Moves the joints of the arm at the specified velocities
+        """ROS Service callback:
+        
+        Moves the joints of the arm at the specified joint velocities
 
         :param msg: [description]
         :type msg: JointVelocity
@@ -913,8 +915,15 @@ class ROSRobot(URDFRobot):
             if any(self.j_v) and current_time - self.last_update > 0.1:
                 self.j_v *= 0.9 if np.sum(np.absolute(self.j_v)) >= 0.0001 else 0
             
+        ## -- FINAL ROBOT JOINT VELOCITY UPDATE -- ##
+        # NOTE: check for joint array length miss-match and handle
+        if len(self.j_v) != len(self.qd):
+            self.logger(f"Incorrect velocity vector size {len(self.j_v)} | requires: {len(self.qd)}", 'warn')
+            self.preempt()
+        else:
+            self.qd = self.j_v
+
         # Update for next cycle
-        self.qd = self.j_v
         self.last_tick = current_time
         self.state_publisher.publish(self.state)
         self.event.set()
