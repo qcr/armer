@@ -17,6 +17,9 @@ import spatialmath as sm
 import numpy as np
 import yaml
 import time
+# Required for NEO
+import qpsolvers as qp
+import spatialgeometry as sg
 
 from typing import List, Any
 from threading import Lock, Event
@@ -31,6 +34,7 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 # ROS Message Imports
 from armer_msgs.msg import ManipulatorState, JointVelocity, ServoStamped, Guards
 from armer_msgs.action import GuardedVelocity, Home, MoveToJointPose, MoveToNamedPose, MoveToPose
+from armer_msgs.srv import GetNamedPoses, AddNamedPose 
 from geometry_msgs.msg import TwistStamped, Twist, PoseStamped
 from std_msgs.msg import Header, Float64MultiArray, Bool
 from sensor_msgs.msg import JointState
@@ -61,8 +65,10 @@ class ROSRobot(URDFRobot):
         
         # Setup the name of the robot
         self.name = name if name else self.name
-        # print(f"name: {self.name}")
+        # Configure action servers with their required callback group
         self.action_cb_group = action_cb_group if action_cb_group else ReentrantCallbackGroup()
+        # TESTING for NEO
+        self.collision_obj_list: List[sg.Shape] = list()
         
         # Handle the setup of joint stat and velocity topics for a ROS backend
         # NOTE: this should match the ros_control real robot state and control (group velocity) interface topics
@@ -109,6 +115,7 @@ class ROSRobot(URDFRobot):
         self.frequency = frequency if frequency else self.get_parameter(
           f'{self.joint_state_topic}/frequency', 500
         )
+        self.logger(f"Configured frequency (step): {self.frequency}")
         
         # Setup the robot's default ready state (or modified if specified)
         self.q = self.qr if hasattr(self, 'qr') else self.q # pylint: disable=no-member
@@ -168,7 +175,7 @@ class ROSRobot(URDFRobot):
 
         # Singularity index threshold (0 is a sigularity)
         # NOTE: this is a tested value and may require configuration (i.e., speed of robot)
-        self.logger(f"[INIT] Singularity Scalar Threshold set to: {singularity_thresh}")
+        self.logger(f"Singularity Scalar Threshold set to: {singularity_thresh}")
         self.singularity_thresh = singularity_thresh 
         self.manip_scalar = None
         self.singularity_approached = False
@@ -180,7 +187,7 @@ class ROSRobot(URDFRobot):
         self.nh.create_subscription(
           JointState,
           self.joint_state_topic,
-          self._state_cb,
+          self.robot_state_cb,
           1
         )
         
@@ -232,7 +239,6 @@ class ROSRobot(URDFRobot):
                 execute_callback=self.cartesian_pose_cb,
                 callback_group=self.action_cb_group
             )
-
             self.home_action = rclpy.action.ActionServer(
                 node=self.nh,
                 action_type=Home,
@@ -240,43 +246,40 @@ class ROSRobot(URDFRobot):
                 execute_callback=self.home_cb,
                 callback_group=self.action_cb_group
             )
-        #     self.velocity_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
-        #         '{}/cartesian/guarded_velocity'.format(self.name.lower()),
-        #         GuardedVelocityAction,
-        #         execute_cb=self.guarded_velocity_cb,
-        #         auto_start=False
-        #     )
-        #     self.velocity_server.register_preempt_callback(self.preempt)
-        #     self.velocity_server.start()
+            self.guarded_velocity_action = rclpy.action.ActionServer(
+                node=self.nh,
+                action_type=GuardedVelocity,
+                action_name='{}/cartesian/guarded_velocity'.format(self.name.lower()),
+                execute_callback=self.guarded_velocity_cb,
+                callback_group=self.action_cb_group
+            )
+            self.move_joint_action = rclpy.action.ActionServer(
+                node=self.nh,
+                action_type=MoveToJointPose,
+                action_name='{}/joint/pose'.format(self.name.lower()),
+                execute_callback=self.joint_pose_cb,
+                callback_group=self.action_cb_group
+            )
+            self.move_named_pose_action = rclpy.action.ActionServer(
+                node=self.nh,
+                action_type=MoveToNamedPose,
+                action_name='{}/joint/named'.format(self.name.lower()),
+                execute_callback=self.named_pose_cb,
+                callback_group=self.action_cb_group
+            )
 
-        #     self.pose_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
-        #         '{}/cartesian/pose'.format(self.name.lower()),
-        #         MoveToPoseAction,
-        #         execute_cb=self.pose_cb,
-        #         auto_start=False
-        #     )
-        #     self.pose_server.register_preempt_callback(self.preempt)
-        #     self.pose_server.start()
+            # -- Services -- #
+            self.get_named_pose_srv = self.nh.create_service(
+                GetNamedPoses, 
+                '{}/get_named_poses'.format(self.name.lower()), 
+                self.get_named_poses_cb
+            )
+            self.set_named_pose_srv = self.nh.create_service(
+                AddNamedPose, 
+                '{}/set_named_pose'.format(self.name.lower()), 
+                self.add_named_pose_cb
+            )
 
-        #     self.joint_pose_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
-        #         '{}/joint/pose'.format(self.name.lower()),
-        #         MoveToJointPoseAction,
-        #         execute_cb=self.joint_pose_cb,
-        #         auto_start=False
-        #     )
-        #     self.joint_pose_server.register_preempt_callback(self.preempt)
-        #     self.joint_pose_server.start()
-
-        #     self.named_pose_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
-        #         '{}/joint/named'.format(self.name.lower()),
-        #         MoveToNamedPoseAction,
-        #         execute_cb=self.named_pose_cb,
-        #         auto_start=False
-        #     )
-        #     self.named_pose_server.register_preempt_callback(self.preempt)
-        #     self.named_pose_server.start()
-
-        #     # Services
         #     rospy.Service('{}/recover'.format(self.name.lower()),
         #                   Empty, self.recover_cb)
         #     rospy.Service('{}/stop'.format(self.name.lower()),
@@ -299,9 +302,6 @@ class ROSRobot(URDFRobot):
         #         GetLinkName,
         #         lambda req: GetLinkNameResponse(name=self.base_link.name)
         #     )
-            
-        #     rospy.Service('{}/get_named_poses'.format(self.name.lower()), GetNamedPoses,
-        #                   self.get_named_poses_cb)
 
         #     rospy.Service('{}/set_named_pose'.format(self.name.lower()), AddNamedPose,
         #                   self.add_named_pose_cb)
@@ -324,21 +324,14 @@ class ROSRobot(URDFRobot):
         #         self.get_named_pose_configs_cb
         #     )
 
-        #     rospy.Subscriber(
-        #         '{}/set_pid'.format(self.name.lower()),
-        #         Float64MultiArray,
-        #         self.set_pid
-        #     )
-
-    def close(self):
+    # --------------------------------------------------------------------- #
+    # --------- ROS Topic Callback Methods -------------------------------- #
+    # --------------------------------------------------------------------- #
+    def robot_state_cb(self, msg):
+        """ROS Robot State Callback
+        
+        - when configured to a real robot gets real state info 
         """
-        Closes any resources associated with this robot
-        """
-        self.pose_server.need_to_terminate = True
-        self.joint_pose_server.need_to_terminate = True
-        self.named_pose_server.need_to_terminate = True
-
-    def _state_cb(self, msg):
         if not self.joint_indexes:
             for joint_name in self.joint_names:
                 self.joint_indexes.append(msg.name.index(joint_name))
@@ -347,7 +340,7 @@ class ROSRobot(URDFRobot):
         self.joint_states = msg
         
     def cartesian_velocity_cb(self, msg: TwistStamped) -> None:
-        """ROS Service callback:
+        """ROS Cartesian Velocity Subscriber Callback:
         
         Moves the arm at the specified cartesian velocity
         w.r.t. a target frame
@@ -362,29 +355,8 @@ class ROSRobot(URDFRobot):
             self.preempted = False
             self.__vel_move(msg)
 
-    def guarded_velocity_cb(self, msg) -> None:
-        if self.moving:
-            self.preempt()
-        
-        with self.lock:
-            self.preempted = False
-            
-            start_time = self.get_time()
-            triggered = 0
-            
-            while not self.preempted:
-                triggered = self.test_guards(msg.guards, start_time=start_time)
-
-                if triggered != 0:
-                    break
-
-                self.__vel_move(msg.twist_stamped)
-                time.sleep(0.01)
-
-        return True
-
     def joint_velocity_cb(self, msg: JointVelocity) -> None:
-        """ROS Service callback:
+        """ROS Joint Velocity Subscriber Callback:
         
         Moves the joints of the arm at the specified joint velocities
 
@@ -399,7 +371,7 @@ class ROSRobot(URDFRobot):
             self.last_update = self.get_time()
 
     def servo_cb(self, msg: ServoStamped) -> None:
-        """ROS Servoing Subscriber Callback:
+        """ROS Cartesian Servo Subscriber Callback:
         
         Servos the end-effector to the cartesian pose given by msg
         
@@ -418,6 +390,13 @@ class ROSRobot(URDFRobot):
             goal_pose = msg.pose
             goal_gain = msg.gain if msg.gain else 0.5
             goal_thresh = msg.threshold if msg.threshold else 0.005
+            # Configure servo flags
+            arrived = False
+            self.moving = True
+            self.preempted = False
+
+            # Current end-effector pose
+            Te = self.ets(start=self.base_link, end=self.gripper).eval(self.q)
 
             # Default frame to base_link if not specified
             if msg.header.frame_id == '':
@@ -437,22 +416,24 @@ class ROSRobot(URDFRobot):
             ]).SE3()
             target = sm.SE3(pose.position.x, pose.position.y, pose.position.z) * U
 
-            # Configure servo flags
-            arrived = False
-            self.moving = True
-            self.preempted = False
-
             # Calculate joint velocities using servo feature
             # NOTE: maximum gain currently capped at 5 
             velocities, arrived = rtb.p_servo(
-                self.ets(start=self.base_link, end=self.gripper).eval(self.q),
-                target,
-                min(5, goal_gain),
+                wTe=Te,
+                wTep=target,
+                gain=min(5, goal_gain),
                 threshold=goal_thresh
             )
 
-            # Apply calculated joint velocities to robot (managed in step method)
-            self.j_v = np.linalg.pinv(self.jacobe(self.q)) @ velocities
+            ##### TESTING NEO IMPLEMENTATION #####
+            # neo_jv = self.neo(Tep=target, velocities=velocities)
+            neo_jv = None
+
+            if np.any(neo_jv):
+                self.j_v = neo_jv[:len(self.q)]
+            else:
+                self.j_v = np.linalg.pinv(self.jacobe(self.q)) @ velocities
+
             self.last_update = self.get_time()
 
         # Configure arrived (bool) to std_msgs Bool type for publish
@@ -460,14 +441,53 @@ class ROSRobot(URDFRobot):
         arrived_out.data = arrived
         self.cartesian_servo_publisher.publish(arrived_out)
 
-    def cartesian_pose_cb(self, goal_handle):
+    # --------------------------------------------------------------------- #
+    # --------- ROS Action Callback Methods ------------------------------- #
+    # --------------------------------------------------------------------- #
+    def guarded_velocity_cb(self, goal_handle) -> None:
+        """ROS Action Server callback:
+        Moves the end-effector to the
+        cartesian pose indicated by goal (defined by guards in twist or wrench)
+
+        :param goal: [description]
+        :type goal: GuardedVelocity
         """
-        ROS Action Server callback:
+        request = goal_handle._goal_request
+
+        # Check for movement and preempt
+        if self.moving:
+            self.preempt()
+        
+        with self.lock:
+            self.preempted = False
+            
+            start_time = self.get_time()
+            triggered = 0
+            
+            while not self.preempted:
+                triggered = self.test_guards(request.guards, start_time=start_time)
+
+                if triggered != 0:
+                    break
+
+                self.__vel_move(request.twist_stamped)
+                time.sleep(0.01)
+
+            # Set action server outputs
+            goal_handle.succeed()
+            self.moving = False
+
+        # Finalise result
+        action_result = GuardedVelocity.Result()
+        return action_result
+    
+    def cartesian_pose_cb(self, goal_handle):
+        """ROS Action Server callback:
         Moves the end-effector to the
         cartesian pose indicated by goal
 
         :param goal: [description]
-        :type goal: MoveToPoseGoal
+        :type goal: MoveToPose
         """
         request = goal_handle._goal_request
 
@@ -513,67 +533,102 @@ class ROSRobot(URDFRobot):
 
         return action_result
 
-    def joint_pose_cb(self, goal) -> None:
-        """
-        ROS Action Server callback:
+    def joint_pose_cb(self, goal_handle):
+        """ROS Action Server callback:
+        
         Moves the arm the named pose indicated by goal
 
         :param goal: Goal message containing the name of
         the joint configuration to which the arm should move
-        :type goal: MoveToNamedPoseGoal
+        :type goal: MoveToJointPose
         """
+        request = goal_handle._goal_request
+
         if self.moving:
             self.preempt()
 
         with self.lock:     
 
-            self.executor = TrajectoryExecutor(
-              self,
-              self.traj_generator(self, np.array(goal.joints), goal.speed if goal.speed else 0.2)
-            )
+            # Handle user request joint array miss-match
+            if len(self.q) != len(request.joints):
+                self.logger(f"Requested joints number miss-match: {len(request.joints)} | required: {len(self.q)}", 'error')
+                goal_handle.abort()
+                result = False
+            else:
+                # Prepare executor with request joints as goal (at requested speed)
+                self.executor = TrajectoryExecutor(
+                    self,
+                    self.traj_generator(self, np.array(request.joints), request.speed if request.speed else 0.2)
+                )
 
-            while not self.executor.is_finished():
-              time.sleep(0.01)
+                while not self.executor.is_finished():
+                    time.sleep(0.01)
 
-            result = self.executor.is_succeeded()
-            
-            self.executor = None
-            self.moving = False
+                # Set action server outputs
+                result = self.executor.is_succeeded()
+                if result:
+                    goal_handle.succeed()
+                else:
+                    goal_handle.abort()
 
-        return result
+                self.executor = None
+                self.moving = False
 
-    def named_pose_cb(self, goal, result) -> None:
+        # Finalise result
+        action_result = MoveToJointPose.Result()
+        action_result.success = result
+
+        # DEBUGGING
+        # self.logger(f"action result: {action_result.success} | result: {result}")
+
+        return action_result
+
+    def named_pose_cb(self, goal_handle):
         """
         ROS Action Server callback:
         Moves the arm the named pose indicated by goal
 
         :param goal: Goal message containing the name of
         the joint configuration to which the arm should move
-        :type goal: MoveToNamedPoseGoal
+        :type goal: MoveToNamedPose
         """
+        request = goal_handle._goal_request
+
         if self.moving:
             self.preempt()
 
         with self.lock:
-            if not goal.pose_name in self.named_poses:
+            if not request.pose_name in self.named_poses:
               raise ArmerError('Unknown named pose')
 
-            qd = np.array(self.named_poses[goal.pose_name])
+            qd = np.array(self.named_poses[request.pose_name])
 
             self.executor = TrajectoryExecutor(
                 self,
-                self.traj_generator(self, qd, goal.speed if goal.speed else 0.2)
+                self.traj_generator(self, qd, request.speed if request.speed else 0.2)
             )
 
             while not self.executor.is_finished():
-                self.sleep(0.01)
+                time.sleep(0.01)
 
+            # Set action server outputs
             result = self.executor.is_succeeded()
-            
+            if result:
+                goal_handle.succeed()
+            else:
+                goal_handle.abort()
+
             self.executor = None
             self.moving = False
 
-        return result
+        # Finalise result
+        action_result = MoveToNamedPose.Result()
+        action_result.success = result
+
+        # DEBUGGING
+        # self.logger(f"action result: {action_result.success} | result: {result}")
+
+        return action_result
 
     def home_cb(self, goal_handle) -> None:
         """ROS Action to Send Robot Home
@@ -620,6 +675,9 @@ class ROSRobot(URDFRobot):
 
         return action_result
 
+    # --------------------------------------------------------------------- #
+    # --------- ROS Service Callback Methods ------------------------------ #
+    # --------------------------------------------------------------------- #
     def recover_cb(self, req): # pylint: disable=no-self-use
         """[summary]
         ROS Service callback:
@@ -645,6 +703,181 @@ class ROSRobot(URDFRobot):
         :rtype: GetNamedPoseConfigsResponse
         """
         return NotImplementedError()
+    
+    def get_named_poses_cb(self, request, response):
+        """
+        ROS Service callback:
+        Retrieves the list of named poses available to the arm
+
+        :param request: An empty request
+        :type request: GetNamesListRequest
+        :return: The list of named poses available for the arm
+        :rtype: GetNamesListResponse
+        """
+        # print(f"response attr: {response.__dir__()}")
+        response.names_list = list(self.named_poses.keys())
+        return response
+        
+    def add_named_pose_cb(self, request, response):
+        """
+        ROS Service callback:
+        Adds the current arm pose as a named pose and saves it to the host config
+
+        :param request: The name of the pose as well as whether to overwrite if the pose already exists
+        :type request: AddNamedPoseRequest
+        :return: True if the named pose was written successfully otherwise false
+        :rtype: AddNamedPoseResponse
+        """
+        if request.pose_name in self.named_poses and not request.overwrite:
+            self.logger('Named pose already exists.', 'warn')
+            response.success=False
+        else:
+            self.named_poses[request.pose_name] = self.q.tolist()
+            self.__write_config('named_poses', self.named_poses)
+            response.success=True
+
+        return response
+
+    def remove_named_pose_cb(self, req):
+        """
+        ROS Service callback:
+        Adds the current arm pose as a named pose and saves it to the host config
+
+        :param req: The name of the pose as well as whether to overwrite if the pose already exists
+        :type req: AddNamedPoseRequest
+        :return: True if the named pose was written successfully otherwise false
+        :rtype: AddNamedPoseResponse
+        """
+        raise NotImplementedError()
+
+    def add_named_pose_config_cb(self, request):
+        """[summary]
+
+        :param request: [description]
+        :type request: AddNamedPoseConfigRequest
+        :return: [description]
+        :rtype: AddNamedPoseConfigResponse
+        """
+        raise NotImplementedError()
+
+    def remove_named_pose_config_cb(self, request):
+        """[summary]
+
+        :param request: [description]
+        :type request: AddNamedPoseRequest
+        :return: [description]
+        :rtype: [type]
+        """
+        raise NotImplementedError()
+
+    def get_named_pose_configs_cb(self, request):
+        """[summary]
+
+        :param request: [description]
+        :type request: GetNamedPoseConfigsRequest
+        :return: [description]
+        :rtype: GetNamedPoseConfigsResponse
+        """
+        return self.custom_configs
+    
+    # --------------------------------------------------------------------- #
+    # --------- Standard Methods ------------------------------------------ #
+    # --------------------------------------------------------------------- #
+    def close(self):
+        """
+        Closes any resources associated with this robot
+        """
+        self.pose_server.need_to_terminate = True
+        self.joint_pose_server.need_to_terminate = True
+        self.named_pose_server.need_to_terminate = True
+
+    def add_collision_obj(self, obj: sg.Shape):
+        self.collision_obj_list.append(obj)
+
+    def neo(self, Tep, velocities):
+        """
+        Runs a version of Jesse H.'s NEO controller
+        <IN DEVELOPMENT
+        """
+        ##### Determine Slack #####
+        # Transform from the end-effector to desired pose
+        Te = self.fkine(self.q)
+        eTep = Te.inv() * Tep
+        # Spatial error
+        e = np.sum(np.abs(np.r_[eTep.t, eTep.rpy() * np.pi / 180]))
+
+        # Gain term (lambda) for control minimisation
+        Y = 0.01
+
+        # Quadratic component of objective function
+        Q = np.eye(len(self.q) + 6)
+
+        # Joint velocity component of Q
+        Q[:len(self.q), :len(self.q)] *= Y
+
+        # Slack component of Q
+        Q[len(self.q):, len(self.q):] = (1 / e) * np.eye(6)
+
+        ##### Determine the equality/inequality constraints #####
+        # The equality contraints
+        Aeq = np.c_[self.jacobe(self.q), np.eye(6)]
+        beq = velocities.reshape((6,))
+
+        # The inequality constraints for joint limit avoidance
+        Ain = np.zeros((len(self.q) + 6, len(self.q) + 6))
+        bin = np.zeros(len(self.q) + 6)
+
+        # The minimum angle (in radians) in which the joint is allowed to approach
+        # to its limit
+        ps = 0.05
+
+        # The influence angle (in radians) in which the velocity damper
+        # becomes active
+        pi = 0.9
+
+        # Form the joint limit velocity damper
+        Ain[:len(self.q), :len(self.q)], bin[:len(self.q)] = self.joint_velocity_damper(ps, pi, len(self.q))
+
+        ###### TODO: look for collision objects and form velocity damper constraints #####
+        for collision in self.collision_obj_list:
+            # print(f"collision obj: {collision}")
+            # Form the velocity damper inequality contraint for each collision
+            # object on the robot to the collision in the scene
+            c_Ain, c_bin = self.link_collision_damper(
+                collision,
+                self.q[:len(self.q)],
+                0.3,
+                0.05,
+                1.0,
+                start=self.link_dict["link1"],
+                end=self.link_dict["link_eef"],
+            )
+
+            # print(f"c_Ain: {np.shape(c_Ain)} | Ain: {np.shape(Ain)}")
+            # If there are any parts of the robot within the influence distance
+            # to the collision in the scene
+            if c_Ain is not None and c_bin is not None:
+                c_Ain = np.c_[c_Ain, np.zeros((c_Ain.shape[0], 5))]
+
+                # print(f"c_Ain (in prob area): {np.shape(c_Ain)} | Ain: {np.shape(Ain)}")
+                # Stack the inequality constraints
+                Ain = np.r_[Ain, c_Ain]
+                bin = np.r_[bin, c_bin]
+
+        # Linear component of objective function: the manipulability Jacobian
+        c = np.r_[-self.jacobm(self.q).reshape((len(self.q),)), np.zeros(6)]
+
+        # The lower and upper bounds on the joint velocity and slack variable
+        if np.any(self.qdlim):
+            lb = -np.r_[self.qdlim[:len(self.q)], 10 * np.ones(6)]
+            ub = np.r_[self.qdlim[:len(self.q)], 10 * np.ones(6)]
+
+            # Solve for the joint velocities dq
+            qd = qp.solve_qp(Q, c, Ain, bin, Aeq, beq, lb=lb, ub=ub, solver='daqp')
+        else:
+            qd = None
+
+        return qd
 
     def preempt(self, *args: list) -> None:
         """
@@ -776,72 +1009,6 @@ class ROSRobot(URDFRobot):
             
         return triggered
 
-    def get_named_poses_cb(self, req):
-        """
-        ROS Service callback:
-        Retrieves the list of named poses available to the arm
-
-        :param req: An empty request
-        :type req: GetNamesListRequest
-        :return: The list of named poses available for the arm
-        :rtype: GetNamesListResponse
-        """
-        raise NotImplementedError()
-        
-    def add_named_pose_cb(self, req):
-        """
-        ROS Service callback:
-        Adds the current arm pose as a named pose and saves it to the host config
-
-        :param req: The name of the pose as well as whether to overwrite if the pose already exists
-        :type req: AddNamedPoseRequest
-        :return: True if the named pose was written successfully otherwise false
-        :rtype: AddNamedPoseResponse
-        """
-        raise NotImplementedError()
-
-    def remove_named_pose_cb(self, req):
-        """
-        ROS Service callback:
-        Adds the current arm pose as a named pose and saves it to the host config
-
-        :param req: The name of the pose as well as whether to overwrite if the pose already exists
-        :type req: AddNamedPoseRequest
-        :return: True if the named pose was written successfully otherwise false
-        :rtype: AddNamedPoseResponse
-        """
-        raise NotImplementedError()
-
-    def add_named_pose_config_cb(self, request):
-        """[summary]
-
-        :param request: [description]
-        :type request: AddNamedPoseConfigRequest
-        :return: [description]
-        :rtype: AddNamedPoseConfigResponse
-        """
-        raise NotImplementedError()
-
-    def remove_named_pose_config_cb(self, request):
-        """[summary]
-
-        :param request: [description]
-        :type request: AddNamedPoseRequest
-        :return: [description]
-        :rtype: [type]
-        """
-        raise NotImplementedError()
-
-    def get_named_pose_configs_cb(self, request):
-        """[summary]
-
-        :param request: [description]
-        :type request: GetNamedPoseConfigsRequest
-        :return: [description]
-        :rtype: GetNamedPoseConfigsResponse
-        """
-        return self.custom_configs
-
     def publish(self):
         self.joint_publisher.publish(Float64MultiArray(data=self.qd))
 
@@ -867,11 +1034,98 @@ class ROSRobot(URDFRobot):
 
         if (np.fabs(self.manip_scalar) <= self.singularity_thresh and self.preempted == False):
             self.singularity_approached = True
+            self.logger(f"Preempted due to singularity {self.manip_scalar}", 'warn')
             return True
         else:
             self.singularity_approached = False
             return False
+        
+    def transform(self, stamped_message, target_frame_id):
+        T = self.tf_buffer.lookup_transform(
+        target_frame_id, 
+        stamped_message.header.frame_id,
+        self.get_time(False)
+        )
+      
+        return stamped_message
 
+    def get_time(self, as_float=True):
+        if hasattr(self.nh, 'get_clock'):
+            if as_float:
+                return self.nh.get_clock().now().nanoseconds / 1e9
+            return self.nh.get_clock().now()
+        else:
+            if as_float:
+                return self.nh.get_time()
+            return self.nh.Time().now()
+
+    def get_stamp(self):
+        if hasattr(self.nh, 'get_clock'):
+            return self.nh.get_clock().now().to_msg()
+        return self.nh.Time.now()
+
+    def get_parameter(self, param_name, default_value=None):
+        if hasattr(self.nh, 'get_parameter'):
+            if not self.nh.has_parameter(param_name):
+                self.nh.declare_parameter(param_name, default_value)
+            return self.nh.get_parameter(param_name).value
+        return self.nh.get_param(param_name, default_value)
+
+    def __load_named_pose_config(self):
+        """[summary]
+        """
+        self.named_poses = {}
+        for config_name in self.custom_configs:
+            try:
+                config = yaml.load(open(config_name))
+                if config and 'named_poses' in config:
+                    self.named_poses.update(config['named_poses'])
+            except IOError:
+                self.logger(
+                    'Unable to locate configuration file: {}'.format(config_name), 'warn'
+                )
+
+        if os.path.exists(self.config_path):
+            try:
+                config = yaml.load(open(self.config_path),
+                                   Loader=yaml.SafeLoader)
+                if config and 'named_poses' in config:
+                    self.named_poses.update(config['named_poses'])
+
+            except IOError:
+                pass
+
+    def __write_config(self, key: str, value: Any):
+        """[summary]
+
+        :param key: [description]
+        :type key: str
+        :param value: [description]
+        :type value: Any
+        """
+        if not os.path.exists(os.path.dirname(self.config_path)):
+            os.makedirs(os.path.dirname(self.config_path))
+
+        config = {}
+
+        try:
+            with open(self.config_path) as handle:
+                current = yaml.load(handle.read(), Loader=yaml.SafeLoader)
+
+                if current:
+                    config = current
+
+        except IOError:
+            pass
+
+        config.update({key: value})
+
+        with open(self.config_path, 'w') as handle:
+            handle.write(yaml.dump(config))
+
+    # --------------------------------------------------------------------- #
+    # --------- Main Execution Method for ARMer --------------------------- #
+    # --------------------------------------------------------------------- #
     def step(self, dt: float = 0.01) -> None:  # pylint: disable=unused-argument
         """
         Updates the robot joints (robot.q) used in computing kinematics
@@ -971,86 +1225,3 @@ class ROSRobot(URDFRobot):
         self.last_tick = current_time
         self.state_publisher.publish(self.state)
         self.event.set()
-
-    def transform(self, stamped_message, target_frame_id):
-        T = self.tf_buffer.lookup_transform(
-        target_frame_id, 
-        stamped_message.header.frame_id,
-        self.get_time(False)
-        )
-      
-        return stamped_message
-
-    def get_time(self, as_float=True):
-        if hasattr(self.nh, 'get_clock'):
-            if as_float:
-                return self.nh.get_clock().now().nanoseconds / 1e9
-            return self.nh.get_clock().now()
-        else:
-            if as_float:
-                return self.nh.get_time()
-            return self.nh.Time().now()
-
-    def get_stamp(self):
-        if hasattr(self.nh, 'get_clock'):
-            return self.nh.get_clock().now().to_msg()
-        return self.nh.Time.now()
-
-    def get_parameter(self, param_name, default_value=None):
-        if hasattr(self.nh, 'get_parameter'):
-            if not self.nh.has_parameter(param_name):
-                self.nh.declare_parameter(param_name, default_value)
-            return self.nh.get_parameter(param_name).value
-        return self.nh.get_param(param_name, default_value)
-
-    def __load_named_pose_config(self):
-        """[summary]
-        """
-        self.named_poses = {}
-        for config_name in self.custom_configs:
-            try:
-                config = yaml.load(open(config_name))
-                if config and 'named_poses' in config:
-                    self.named_poses.update(config['named_poses'])
-            except IOError:
-                self.logger(
-                    'Unable to locate configuration file: {}'.format(config_name), 'warn'
-                )
-
-        if os.path.exists(self.config_path):
-            try:
-                config = yaml.load(open(self.config_path),
-                                   Loader=yaml.SafeLoader)
-                if config and 'named_poses' in config:
-                    self.named_poses.update(config['named_poses'])
-
-            except IOError:
-                pass
-
-    def __write_config(self, key: str, value: Any):
-        """[summary]
-
-        :param key: [description]
-        :type key: str
-        :param value: [description]
-        :type value: Any
-        """
-        if not os.path.exists(os.path.dirname(self.config_path)):
-            os.makedirs(os.path.dirname(self.config_path))
-
-        config = {}
-
-        try:
-            with open(self.config_path) as handle:
-                current = yaml.load(handle.read(), Loader=yaml.SafeLoader)
-
-                if current:
-                    config = current
-
-        except IOError:
-            pass
-
-        config.update({key: value})
-
-        with open(self.config_path, 'w') as handle:
-            handle.write(yaml.dump(config))
