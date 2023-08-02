@@ -33,10 +33,11 @@ class ArmerNode(Node):
     self.declare_parameter(name='config', value=os.path.join(__path__, 'cfg/panda_sim.yaml'))
     
     # NOTE: defaults to the panda simulation 
-    #       attempts load from parameter server or current path to panda simulation config (default)
+    #       attempts load from parameter or current path to panda simulation config (default)
+    config = self.get_parameter('config').get_parameter_value().string_value
     self.armer = Armer.load(
       self, 
-      self.get_parameter_or('config').get_parameter_value().string_value or os.path.join(__path__, 'cfg/panda_sim.yaml')
+      config or os.path.join(__path__, 'cfg/panda_sim.yaml')
     )
 
     # Setup the ROS timer callback to run the main ARMer functionality (step method)
