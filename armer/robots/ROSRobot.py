@@ -1,9 +1,14 @@
-"""
-ROSRobot module defines the ROSRobot type
+#!/usr/bin/env python3
+"""ROSRobot module defines the ROSRobot type
 
-.. codeauthor:: Gavin Suddreys
-.. codeauthor:: Dasun Gunasinghe
+Defines the callbacks and underlying function to control a roboticstoolbox robot
 """
+
+from __future__ import annotations
+
+__author__ = ['Gavin Suddrey', 'Dasun Gunasinghe']
+__version__ = "0.1.0"
+
 import os
 import rclpy
 import tf2_ros
@@ -16,12 +21,11 @@ import time
 from typing import List, Any
 from threading import Lock, Event
 from armer.models.URDFRobot import URDFRobot
-from armer.trajectory import TrajectoryExecutor
-from armer.utils import ikine, mjtg
-from armer.errors import ArmerError
+from armer.utils import mjtg, ikine
 
 # pylint: disable=too-many-instance-attributes
 
+# ROS Message Imports
 from armer_msgs.msg import ManipulatorState, JointVelocity, ServoStamped, Guards
 from armer_msgs.action import GuardedVelocity, Home, MoveToJointPose, MoveToNamedPose, MoveToPose
 from geometry_msgs.msg import TwistStamped, Twist, PoseStamped
@@ -33,12 +37,10 @@ class ControlMode:
    CARTESIAN=2
 
 class ROSRobot(URDFRobot):
+    """The ROSRobot class wraps the URDFRobot implementing basic ROS functionality
     """
-    The ROSRobot class wraps the rtb.ERobot implementing basic ROS functionality
-    """
-
     def __init__(self,
-                 nh,
+                 nh=None,
                  name: str = None,
                  joint_state_topic: str = None,
                  joint_velocity_topic: str = None,
@@ -53,8 +55,12 @@ class ROSRobot(URDFRobot):
         
         super().__init__(nh, *args, **kwargs)
         
+        # Setup the name of the robot
         self.name = name if name else self.name
         
+        # Handle the setup of joint stat and velocity topics for a ROS backend
+        # NOTE: this should match the ros_control real robot state and control (group velocity) interface topics
+        #       the defaults are generally typical, but could be different
         self.joint_state_topic = joint_state_topic \
                 if joint_state_topic \
                 else '/joint_states'
@@ -63,16 +69,21 @@ class ROSRobot(URDFRobot):
                 if joint_velocity_topic \
                 else '/joint_group_velocity_controller/command'
 
+        # Specify the path to named pose configuration
+        # NOTE: this is a yaml to load/save named poses
+        #       the default is in the root path (for shared usage)
+        #       can be configured for project specific loading (see service)
         self.config_path = config_path if config_path else os.path.join(
             os.getenv('HOME', '/root'),
             '.ros/configs/armer.yaml'
         )
 
+        # Configure the gripper name
         if not hasattr(self, 'gripper'):
-          self.gripper = self.grippers[0].name
+            self.gripper = self.grippers[0].name
           
+        # Sort links by parents starting from gripper
         sorted_links=[]
-        #sort links by parents starting from gripper
         link=self.link_dict[self.gripper]   
         while link is not None:
             sorted_links.append(link)
@@ -82,53 +93,64 @@ class ROSRobot(URDFRobot):
         self.joint_indexes = []
         self.joint_names = list(map(lambda link: link._joint_name, filter(lambda link: link.isjoint, sorted_links)))
         
+        # Configure a new origin if specified
         if origin:
             self.base = sm.SE3(origin[:3]) @ sm.SE3.RPY(origin[3:])
 
+        # Configure the frequency of operation (step method) based on input
+        # NOTE: defaulting to 500Hz
+        # TODO: currently getting from a defined param - is this correct?
         self.frequency = frequency if frequency else self.get_parameter(
           f'{self.joint_state_topic}/frequency', 500
         )
         
+        # Setup the robot's default ready state (or modified if specified)
         self.q = self.qr if hasattr(self, 'qr') else self.q # pylint: disable=no-member
         if modified_qr:
             self.qr = modified_qr
             self.q = modified_qr
 
-        self.joint_states = None # Joint state message
+        # Joint state message
+        self.joint_states = None 
 
         # Guards used to prevent multiple motion requests conflicting
         self._controller_mode = ControlMode.JOINTS
 
+        # Flag initialisation
         self.moving: bool = False
         self.last_moving: bool = False
-
         self.preempted: bool = False
 
+        # Thread variable setup
         self.lock: Lock = Lock()
         self.event: Event = Event()
 
-        # Arm state property
+        # Arm state property setup
         self.state: ManipulatorState = ManipulatorState()
-
-        self.e_v_frame: str = None # Expected cartesian velocity
-
-        self.e_v: np.array = np.zeros(shape=(6,))  # cartesian motion
+        # Expected cartesian velocity, frame and joint velocity initialisation
+        self.e_v_frame: str = None
+        self.e_v: np.array = np.zeros(shape=(6,)) 
         self.j_v: np.array = np.zeros(
             shape=(len(self.q),)
-        )  # expected joint velocity
+        )
 
+        # Expected position of end-effector initialisation
         self.e_p = self.fkine(self.q, start=self.base_link, end=self.gripper)
 
+        # Timer variable setup
         self.last_update: float = 0
         self.last_tick: float = 0
 
-        self.executor = None
-        
+        # Trajectory executor and generator initialisation
+        # NOTE: default is a minimum jerk trajectory (see armer.utils)
+        #       this can be replaced by any generator as needed
+        # TODO: introduce mechanism to update generator and solver as needed
+        self.executor = None        
         self.traj_generator = mjtg
         self.ik_solver = ikine
 
+        # Configure ROS transform buffer and listener
         self.tf_buffer = tf2_ros.Buffer()
-        
         if hasattr(self.nh, 'get_clock'):
           self.tf_listener = tf2_ros.transform_listener.TransformListener(self.tf_buffer, self.nh)
         else:
@@ -145,7 +167,7 @@ class ROSRobot(URDFRobot):
         self.manip_scalar = None
         self.singularity_approached = False
 
-        self.__load_config()
+        self.__load_named_pose_config()
 
         #### --- ROS SETUP --- ###
         self.nh.create_subscription(
@@ -190,11 +212,13 @@ class ROSRobot(URDFRobot):
         #                   Empty, self.preempt)
 
 
-        #     # Subscribers
-        #     self.cartesian_velocity_subscriber: rospy.Subscriber = rospy.Subscriber(
-        #         '{}/cartesian/velocity'.format(self.name.lower()
-        #                                        ), TwistStamped, self.velocity_cb
-        #     )
+            # Subscribers
+            self.cartesian_velocity_subscriber = self.nh.create_subscription(
+                TwistStamped,
+                '{}/cartesian/velocity'.format(self.name.lower()), 
+                self.velocity_cb,
+                10
+            )
         #     self.joint_velocity_subscriber: rospy.Subscriber = rospy.Subscriber(
         #         '{}/joint/velocity'.format(self.name.lower()
         #                                    ), JointVelocity, self.joint_velocity_cb
@@ -445,7 +469,7 @@ class ROSRobot(URDFRobot):
             
             solution = ikine(self, pose, q0=self.q, end=self.gripper)
             
-            self.executor = TrajectoryExecutor(
+            self.executor = armer.trajectory.armer.trajectory.TrajectoryExecutor(
               self,
               self.traj_generator(self, solution.q, goal.speed if goal.speed else 0.2)
             )
@@ -474,7 +498,7 @@ class ROSRobot(URDFRobot):
 
         with self.lock:     
 
-            self.executor = TrajectoryExecutor(
+            self.executor = armer.trajectory.armer.trajectory.TrajectoryExecutor(
               self,
               self.traj_generator(self, np.array(goal.joints), goal.speed if goal.speed else 0.2)
             )
@@ -503,11 +527,11 @@ class ROSRobot(URDFRobot):
 
         with self.lock:
             if not goal.pose_name in self.named_poses:
-              raise ArmerError('Unknown named pose')
+              raise armer.errors.ArmerError('Unknown named pose')
 
             qd = np.array(self.named_poses[goal.pose_name])
 
-            self.executor = TrajectoryExecutor(
+            self.executor = armer.trajectory.armer.trajectory.TrajectoryExecutor(
                 self,
                 self.traj_generator(self, qd, goal.speed if goal.speed else 0.2)
             )
@@ -536,7 +560,7 @@ class ROSRobot(URDFRobot):
         with self.lock:
             qd = np.array(self.qr) if hasattr(self, 'qr') else self.q
             
-            self.executor = TrajectoryExecutor(
+            self.executor = armer.trajectory.armer.trajectory.TrajectoryExecutor(
                 self,
                 self.traj_generator(self, qd, goal.speed if goal.speed else 0.2)
             )
@@ -806,8 +830,8 @@ class ROSRobot(URDFRobot):
     def step(self, dt: float = 0.01) -> None:  # pylint: disable=unused-argument
         """
         Updates the robot joints (robot.q) used in computing kinematics
-        :param dt: the delta time since the last update, defaults to 0.01
-        :type dt: float, optional
+        :param dt: the delta time since the last update, defaults to 0.01 (must be in seconds)
+        :type dt: float         
         """
         if self.readonly:
             return
@@ -819,8 +843,9 @@ class ROSRobot(URDFRobot):
         if self.state.errors != 0 or self.check_singularity(self.q):
             self.preempt()
 
-        # calculate joint velocities from desired cartesian velocity
+        ## -- DIRECT CARTESIAN CONTROL -- ##
         if self._controller_mode == ControlMode.CARTESIAN:
+            # Handle communication delays and error handling on cartesian control
             if current_time - self.last_update > 0.1:
                 self.e_v *= 0.9 if np.sum(np.absolute(self.e_v)
                                           ) >= 0.0001 else 0
@@ -829,94 +854,103 @@ class ROSRobot(URDFRobot):
                     self._controller_mode = ControlMode.JOINTS
 
             try:
-              print(f"base_link name: {self.base_link.name}")
-              print(f"e_v_frame name: {self.e_v_frame}")
-              print(f"get_time: {self.get_time(False)}")
-              _, orientation = self.tf_buffer.lookup_transform(
-                  self.base_link.name,
-                  self.e_v_frame,
-                  self.get_time(False)
-              )
-              
-              U = sm.UnitQuaternion([
-                  orientation[-1],
-                  *orientation[:3]
-              ], norm=True, check=False).sm.SE3()
-              
-              e_v = np.concatenate((
+                # DEBUGGING
+                # print(f"base_link name: {self.base_link.name}")
+                # print(f"e_v_frame name: {self.e_v_frame}")
+
+                # Get the transform from the defined base link to the target (as requested)
+                # NOTE: 
+                # - this lookup returns a TransformStamped type
+                # - the time is 0 to get the latest
+                tfs = self.tf_buffer.lookup_transform(
+                    target_frame=self.base_link.name,
+                    source_frame=self.e_v_frame,
+                    time=rclpy.time.Time()
+                )
+
+                # Convert tfs to an SE3
+                U = sm.UnitQuaternion([
+                    tfs.transform.rotation.w,
+                    tfs.transform.rotation.x,
+                    tfs.transform.rotation.y,
+                    tfs.transform.rotation.z,
+                ], norm=True, check=False).SE3()
+                
+                e_v = np.concatenate((
                 (U.A @ np.concatenate((self.e_v[:3], [1]), axis=0))[:3],
                 (U.A @ np.concatenate((self.e_v[3:], [1]), axis=0))[:3]
-              ), axis=0)
-              
-              # Calculate error in base frame
-              p = self.e_p.A[:3, 3] + e_v[:3] * dt                     # expected position
-              Rq = sm.UnitQuaternion.RPY(e_v[3:] * dt) * sm.UnitQuaternion(self.e_p.R)
-              
-              T = sm.SE3.Rt(sm.SO3(Rq.R), p, check=False)   # expected pose
-              Tactual = self.fkine(self.q, start=self.base_link, end=self.gripper) # actual pose
-              
-              e_rot = (sm.SO3(T.R @ np.linalg.pinv(Tactual.R), check=False).rpy() + np.pi) % (2*np.pi) - np.pi
-              error = np.concatenate((p - Tactual.t, e_rot), axis=0)
-              
-              e_v = e_v + error
-              
-              self.e_p = T
-                            
-              self.j_v = np.linalg.pinv(
-                self.jacob0(self.q, end=self.gripper)) @ e_v
+                ), axis=0)
+                
+                # -- Calculate error in base frame -- #
+                # Get the expected position/rotation
+                p = self.e_p.A[:3, 3] + e_v[:3] * dt                     
+                Rq = sm.UnitQuaternion.RPY(e_v[3:] * dt) * sm.UnitQuaternion(self.e_p.R)
+                
+                # Convert to an expected pose for comparison with the actual pose
+                T = sm.SE3.Rt(sm.SO3(Rq.R), p, check=False) 
+                Tactual = self.fkine(self.q, start=self.base_link, end=self.gripper)
+                
+                # Calculate positional/rotational error with actual
+                e_rot = (sm.SO3(T.R @ np.linalg.pinv(Tactual.R), check=False).rpy() + np.pi) % (2*np.pi) - np.pi
+                error = np.concatenate((p - Tactual.t, e_rot), axis=0)
+                
+                # Apply error
+                e_v = e_v + error
+                # Updated expected pose
+                self.e_p = T
+                # Apply as joint velocities
+                self.j_v = np.linalg.pinv(self.jacob0(self.q, end=self.gripper)) @ e_v
               
             except (tf2_ros.LookupException, tf2_ros.ExtrapolationException):
               self.logger('No valid transform found between {} and {}'.format(self.base_link.name, self.e_v_frame), 'warn')
               self.preempt()
 
-        # apply desired joint velocity to robot
+        ## -- TRAJECTORY-BASED EXECUTION UPDATE -- ##
         if self.executor:
-          self.j_v = self.executor.step(dt)  
+            self.j_v = self.executor.step(dt)  
         else:
             # Needed for preempting joint velocity control
             if any(self.j_v) and current_time - self.last_update > 0.1:
                 self.j_v *= 0.9 if np.sum(np.absolute(self.j_v)) >= 0.0001 else 0
             
-            
+        # Update for next cycle
         self.qd = self.j_v
         self.last_tick = current_time
-
         self.state_publisher.publish(self.state)
-
         self.event.set()
 
     def transform(self, stamped_message, target_frame_id):
-      T = self.tf_buffer.lookup_transform(
+        T = self.tf_buffer.lookup_transform(
         target_frame_id, 
         stamped_message.header.frame_id,
         self.get_time(False)
-      )
+        )
       
-      return stamped_message
+        return stamped_message
 
     def get_time(self, as_float=True):
-      if hasattr(self.nh, 'get_clock'):
-        if as_float:
-          return self.nh.get_clock().now().nanoseconds / 1e9
-        return self.nh.get_clock().now()
-      else:
-        if as_float:
-          return self.nh.get_time()
-        return self.nh.Time().now()
+        if hasattr(self.nh, 'get_clock'):
+            if as_float:
+                return self.nh.get_clock().now().nanoseconds / 1e9
+            return self.nh.get_clock().now()
+        else:
+            if as_float:
+                return self.nh.get_time()
+            return self.nh.Time().now()
 
     def get_stamp(self):
-      if hasattr(self.nh, 'get_clock'):
-        return self.nh.get_clock().now().to_msg()
-      return self.nh.Time.now()
+        if hasattr(self.nh, 'get_clock'):
+            return self.nh.get_clock().now().to_msg()
+        return self.nh.Time.now()
 
     def get_parameter(self, param_name, default_value=None):
-      if hasattr(self.nh, 'get_parameter'):
-        if not self.nh.has_parameter(param_name):
-          self.nh.declare_parameter(param_name, default_value)
-        return self.nh.get_parameter(param_name).value
-      return self.nh.get_param(param_name, default_value)
+        if hasattr(self.nh, 'get_parameter'):
+            if not self.nh.has_parameter(param_name):
+                self.nh.declare_parameter(param_name, default_value)
+            return self.nh.get_parameter(param_name).value
+        return self.nh.get_param(param_name, default_value)
 
-    def __load_config(self):
+    def __load_named_pose_config(self):
         """[summary]
         """
         self.named_poses = {}

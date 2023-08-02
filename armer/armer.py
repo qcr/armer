@@ -1,19 +1,21 @@
-"""
-Armer Class
+#!/usr/bin/env python3
+"""The Armer Class/Driver
 
-.. codeauthor:: Gavin Suddreys
-.. codeauthor:: Dasun Gunasinghe
+This class handles the loading and setup of the ARMer class based on user specified details
 """
+
 from __future__ import annotations
-from typing import List, Dict, Any, Tuple
+
+__author__ = ['Gavin Suddrey', 'Dasun Gunasinghe']
+__version__ = "0.1.0"
 
 import importlib
 import tf2_ros
 import yaml
 import roboticstoolbox as rtb
+import spatialmath as sm
 
-from roboticstoolbox.backends.swift import Swift
-from spatialmath.base.argcheck import getvector
+from typing import List, Dict, Any, Tuple
 from armer.utils import populate_transform_stamped
 from armer.robots import ROSRobot
 
@@ -25,16 +27,13 @@ class Armer:
     :type robots: List[rtb.robot.Robot], optional
     :param backend: [description], defaults to None
     :type backend: rtb.backends.Connector, optional
-
-    .. codeauthor:: Gavin Suddrey
-    .. sectionauthor:: Gavin Suddrey
     """
 
     # pylint: disable=too-many-instance-attributes
 
     def __init__(
             self,
-            nh,
+            nh=None,
             robots: List[rtb.robot.Robot] = None,
             backend: rtb.backends.Connector = None,
             backend_args: Dict[str, Any] = None,
@@ -42,17 +41,16 @@ class Armer:
             publish_transforms: bool = False,
             logging: dict[str, bool] = None) -> None:
 
-        # Note that ROSRobot is configured as either a ROS1 or ROS2 robot prior to initialising
         self.robots: List[ROSRobot] = robots
         self.backend: rtb.backends.Connector = backend
         self.readonly_backends : List[rtb.backends.Connector] = readonly_backends \
             if readonly_backends else []
 
         if not self.robots:
-            self.robots = [ROSRobot(self, rtb.models.URDF.UR5())]
+            self.robots = [ROSRobot(self, rtb.models.URDF.Panda())]
 
         if not self.backend:
-            self.backend = Swift()
+            self.backend = rtb.backends.swift.Swift()
 
         self.is_publishing_transforms = publish_transforms
 
@@ -82,24 +80,21 @@ class Armer:
         self.log_frequency = logging and 'frequency' in logging and logging['frequency']
 
     def close(self):
-        """
-        Close backend and stop action servers
-        """
+        """Close backend and stop action servers"""
         self.backend.close()
 
         for robot in self.robots:
             robot.close()
 
     def publish_transforms(self, timestamp) -> None:
-        """[summary]
-        """
+        """Publishes transforms (ROS2)"""
         if not self.is_publishing_transforms:
             return
 
         transforms = []
 
         for robot in self.robots:
-            joint_positions = getvector(robot.q, robot.n)
+            joint_positions = sm.base.argcheck.getvector(robot.q, robot.n)
 
             for link in robot.links:
                 if link.parent is None:
@@ -118,7 +113,7 @@ class Armer:
                 ))
 
             for gripper in robot.grippers:
-                joint_positions = getvector(gripper.q, gripper.n)
+                joint_positions = sm.base.argcheck.getvector(gripper.q, gripper.n)
 
                 for link in gripper.links:
                     if link.parent is None:
@@ -140,8 +135,7 @@ class Armer:
 
     @staticmethod
     def load(nh, path: str) -> Armer:
-        """
-        Generates an Armer Driver instance from the configuration file at path
+        """Generates an Armer Driver instance from the configuration file at path
 
         :param path: The path to the configuration file
         :type path: str
@@ -188,9 +182,8 @@ class Armer:
         logging = config['logging'] if 'logging' in config else {}
         publish_transforms = config['publish_transforms'] if 'publish_transforms' in config else False
         
-        print(f"Here in armer.py finishing")
         return Armer(
-            nh,
+            nh=nh,
             robots=robots,
             backend=backend,
             backend_args=backend_args,
@@ -200,13 +193,14 @@ class Armer:
         )
 
     def step(self, dt: float, current_time: float) -> None:
-      for robot in self.robots:
-          robot.step(dt=dt)
+        """Main step method - controlled by ROS2 node"""
+        for robot in self.robots:
+            robot.step(dt=dt)
 
-      # with Timer('step'):
-      self.backend.step(dt=dt)
+        # with Timer('step'):
+        self.backend.step(dt=dt)
 
-      for backend, args in self.readonly_backends:
-          backend.step(dt=dt)
+        for backend, args in self.readonly_backends:
+            backend.step(dt=dt)
 
-      self.publish_transforms(current_time)
+        self.publish_transforms(current_time)
