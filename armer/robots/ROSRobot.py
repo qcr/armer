@@ -22,6 +22,8 @@ from typing import List, Any
 from threading import Lock, Event
 from armer.models.URDFRobot import URDFRobot
 from armer.utils import mjtg, ikine
+from armer.errors import ArmerError
+from armer.trajectory import TrajectoryExecutor
 
 # pylint: disable=too-many-instance-attributes
 
@@ -190,18 +192,11 @@ class ROSRobot(URDFRobot):
                 '{}/state'.format(self.name.lower()), 
                 1
             )
-            self.cartesian_servo_publisher: self.nh.create_publisher(
+            self.cartesian_servo_publisher = self.nh.create_publisher(
                 Bool, 
                 '{}/cartesian/servo/arrived'.format(self.name.lower()), 
                 1
             )
-
-        #     rclpy.action.ActionServer(
-        #       self.nh,
-        #       MoveToPose,
-        #       '{}/cartesian/pose'.format(self.name.lower()),
-        #       self.pose_cb
-        #     )
             
         #     return
             
@@ -225,12 +220,20 @@ class ROSRobot(URDFRobot):
                 self.joint_velocity_cb,
                 10
             )
-        #     self.cartesian_servo_subscriber: rospy.Subscriber = rospy.Subscriber(
-        #         '{}/cartesian/servo'.format(self.name.lower()
-        #                                     ), ServoStamped, self.servo_cb
-        #     )
+            self.cartesian_servo_subscriber = self.nh.create_subscription(
+                ServoStamped,
+                '{}/cartesian/servo'.format(self.name.lower()), 
+                self.servo_cb,
+                10
+            )
 
         #     # Action Servers
+                #     rclpy.action.ActionServer(
+        #       self.nh,
+        #       MoveToPose,
+        #       '{}/cartesian/pose'.format(self.name.lower()),
+        #       self.pose_cb
+        #     )
         #     self.velocity_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
         #         '{}/cartesian/guarded_velocity'.format(self.name.lower()),
         #         GuardedVelocityAction,
@@ -393,8 +396,8 @@ class ROSRobot(URDFRobot):
             self.last_update = self.get_time()
 
     def servo_cb(self, msg: ServoStamped) -> None:
-        """
-        ROS Servoing Subscriber Callback:
+        """ROS Servoing Subscriber Callback:
+        
         Servos the end-effector to the cartesian pose given by msg
         
         :param msg: [description]
@@ -408,44 +411,51 @@ class ROSRobot(URDFRobot):
             self.preempt()
         
         with self.lock:
+            # Setup servo parameters
             goal_pose = msg.pose
-            goal_gain = msg.gain if msg.gain else 3
+            goal_gain = msg.gain if msg.gain else 0.5
             goal_thresh = msg.threshold if msg.threshold else 0.005
 
+            # Default frame to base_link if not specified
             if msg.header.frame_id == '':
                 msg.header.frame_id = self.base_link.name
             
+            # Construct a target pose (SE3) for servo
             goal_pose_stamped = self.transform(
                 PoseStamped(header=msg.header, pose=goal_pose),
                 self.base_link.name
             )
-            
             pose = goal_pose_stamped.pose
-
-            target = sm.SE3(pose.position.x, pose.position.y, pose.position.z) * sm.UnitQuaternion([
+            U = sm.UnitQuaternion([
                 pose.orientation.w,
                 pose.orientation.x,
                 pose.orientation.y,
                 pose.orientation.z
-            ]).sm.SE3()
+            ]).SE3()
+            target = sm.SE3(pose.position.x, pose.position.y, pose.position.z) * U
 
+            # Configure servo flags
             arrived = False
-
             self.moving = True
             self.preempted = False
 
+            # Calculate joint velocities using servo feature
+            # NOTE: maximum gain currently capped at 5 
             velocities, arrived = rtb.p_servo(
                 self.ets(start=self.base_link, end=self.gripper).eval(self.q),
                 target,
-                min(20, goal_gain),
+                min(5, goal_gain),
                 threshold=goal_thresh
             )
 
-            self.j_v = np.linalg.pinv(
-                self.jacobe(self.q)) @ velocities
+            # Apply calculated joint velocities to robot (managed in step method)
+            self.j_v = np.linalg.pinv(self.jacobe(self.q)) @ velocities
             self.last_update = self.get_time()
 
-        self.cartesian_servo_publisher.publish(arrived)
+        # Configure arrived (bool) to std_msgs Bool type for publish
+        arrived_out = Bool()
+        arrived_out.data = arrived
+        self.cartesian_servo_publisher.publish(arrived_out)
 
     def pose_cb(self, goal):
         """
@@ -471,7 +481,7 @@ class ROSRobot(URDFRobot):
             
             solution = ikine(self, pose, q0=self.q, end=self.gripper)
             
-            self.executor = armer.trajectory.armer.trajectory.TrajectoryExecutor(
+            self.executor = TrajectoryExecutor(
               self,
               self.traj_generator(self, solution.q, goal.speed if goal.speed else 0.2)
             )
@@ -500,7 +510,7 @@ class ROSRobot(URDFRobot):
 
         with self.lock:     
 
-            self.executor = armer.trajectory.armer.trajectory.TrajectoryExecutor(
+            self.executor = TrajectoryExecutor(
               self,
               self.traj_generator(self, np.array(goal.joints), goal.speed if goal.speed else 0.2)
             )
@@ -529,11 +539,11 @@ class ROSRobot(URDFRobot):
 
         with self.lock:
             if not goal.pose_name in self.named_poses:
-              raise armer.errors.ArmerError('Unknown named pose')
+              raise ArmerError('Unknown named pose')
 
             qd = np.array(self.named_poses[goal.pose_name])
 
-            self.executor = armer.trajectory.armer.trajectory.TrajectoryExecutor(
+            self.executor = TrajectoryExecutor(
                 self,
                 self.traj_generator(self, qd, goal.speed if goal.speed else 0.2)
             )
@@ -562,7 +572,7 @@ class ROSRobot(URDFRobot):
         with self.lock:
             qd = np.array(self.qr) if hasattr(self, 'qr') else self.q
             
-            self.executor = armer.trajectory.armer.trajectory.TrajectoryExecutor(
+            self.executor = TrajectoryExecutor(
                 self,
                 self.traj_generator(self, qd, goal.speed if goal.speed else 0.2)
             )
