@@ -34,7 +34,7 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 # ROS Message Imports
 from armer_msgs.msg import ManipulatorState, JointVelocity, ServoStamped, Guards
 from armer_msgs.action import GuardedVelocity, Home, MoveToJointPose, MoveToNamedPose, MoveToPose
-from armer_msgs.srv import GetNamedPoses, AddNamedPose 
+from armer_msgs.srv import GetNamedPoses, AddNamedPose, RemoveNamedPose, AddNamedPoseConfig, RemoveNamedPoseConfig, GetNamedPoseConfigs 
 from geometry_msgs.msg import TwistStamped, Twist, PoseStamped
 from std_msgs.msg import Header, Float64MultiArray, Bool
 from sensor_msgs.msg import JointState
@@ -279,49 +279,46 @@ class ROSRobot(URDFRobot):
                 '{}/set_named_pose'.format(self.name.lower()), 
                 self.add_named_pose_cb
             )
+            self.remove_named_pose_srv = self.nh.create_service(
+                RemoveNamedPose, 
+                '{}/remove_named_pose'.format(self.name.lower()), 
+                self.remove_named_pose_cb
+            )
+            self.add_named_pose_config_srv = self.nh.create_service(
+                AddNamedPoseConfig, 
+                '{}/add_named_pose_config'.format(self.name.lower()), 
+                self.add_named_pose_config_cb
+            )
+            self.remove_named_pose_config_srv = self.nh.create_service(
+                RemoveNamedPoseConfig, 
+                '{}/remove_named_pose_config'.format(self.name.lower()), 
+                self.remove_named_pose_config_cb
+            )
+            self.get_named_pose_config_srv = self.nh.create_service(
+                GetNamedPoseConfigs, 
+                '{}/get_named_pose_configs'.format(self.name.lower()), 
+                self.get_named_pose_configs_cb
+            )
 
+        # TODO: add these services when ready
         #     rospy.Service('{}/recover'.format(self.name.lower()),
         #                   Empty, self.recover_cb)
         #     rospy.Service('{}/stop'.format(self.name.lower()),
         #                   Empty, self.preempt)
-
         #     rospy.Service(
         #         '{}/set_cartesian_impedance'.format(self.name.lower()),
         #         SetCartesianImpedance,
         #         self.set_cartesian_impedance_cb
         #     )
-
         #     rospy.Service(
         #         '{}/get_ee_link_name'.format(self.name.lower()),
         #         GetLinkName,
         #         lambda req: GetLinkNameResponse(name=self.gripper)
         #     )
-            
         #     rospy.Service(
         #         '{}/get_base_link_name'.format(self.name.lower()),
         #         GetLinkName,
         #         lambda req: GetLinkNameResponse(name=self.base_link.name)
-        #     )
-
-        #     rospy.Service('{}/set_named_pose'.format(self.name.lower()), AddNamedPose,
-        #                   self.add_named_pose_cb)
-        #     rospy.Service('{}/remove_named_pose'.format(self.name.lower()), RemoveNamedPose,
-        #                   self.remove_named_pose_cb)
-
-        #     rospy.Service(
-        #         '{}/add_named_pose_config'.format(self.name.lower()),
-        #         AddNamedPoseConfig,
-        #         self.add_named_pose_config_cb
-        #     )
-        #     rospy.Service(
-        #         '{}/remove_named_pose_config'.format(self.name.lower()),
-        #         RemoveNamedPoseConfig,
-        #         self.remove_named_pose_config_cb
-        #     )
-        #     rospy.Service(
-        #         '{}/get_named_pose_configs'.format(self.name.lower()),
-        #         GetNamedPoseConfigs,
-        #         self.get_named_pose_configs_cb
         #     )
 
     # --------------------------------------------------------------------- #
@@ -598,28 +595,32 @@ class ROSRobot(URDFRobot):
             self.preempt()
 
         with self.lock:
+            # Error handling on missing pose name
             if not request.pose_name in self.named_poses:
-              raise ArmerError('Unknown named pose')
-
-            qd = np.array(self.named_poses[request.pose_name])
-
-            self.executor = TrajectoryExecutor(
-                self,
-                self.traj_generator(self, qd, request.speed if request.speed else 0.2)
-            )
-
-            while not self.executor.is_finished():
-                time.sleep(0.01)
-
-            # Set action server outputs
-            result = self.executor.is_succeeded()
-            if result:
-                goal_handle.succeed()
-            else:
+                self.logger(f"Unknown named pose: {request.pose_name}", 'warn')
+                result = False
                 goal_handle.abort()
 
-            self.executor = None
-            self.moving = False
+            else:
+                qd = np.array(self.named_poses[request.pose_name])
+
+                self.executor = TrajectoryExecutor(
+                    self,
+                    self.traj_generator(self, qd, request.speed if request.speed else 0.2)
+                )
+
+                while not self.executor.is_finished():
+                    time.sleep(0.01)
+
+                # Set action server outputs
+                result = self.executor.is_succeeded()
+                if result:
+                    goal_handle.succeed()
+                else:
+                    goal_handle.abort()
+
+                self.executor = None
+                self.moving = False
 
         # Finalise result
         action_result = MoveToNamedPose.Result()
@@ -738,7 +739,7 @@ class ROSRobot(URDFRobot):
 
         return response
 
-    def remove_named_pose_cb(self, req):
+    def remove_named_pose_cb(self, request, response):
         """
         ROS Service callback:
         Adds the current arm pose as a named pose and saves it to the host config
@@ -748,9 +749,17 @@ class ROSRobot(URDFRobot):
         :return: True if the named pose was written successfully otherwise false
         :rtype: AddNamedPoseResponse
         """
-        raise NotImplementedError()
+        if request.pose_name not in self.named_poses and not request.overwrite:
+            self.logger('Named pose does not exists.', 'warn')
+            response.success=False
+        else:
+            del self.named_poses[request.pose_name]
+            self.__write_config('named_poses', self.named_poses)
+            response.success=True
 
-    def add_named_pose_config_cb(self, request):
+        return response
+
+    def add_named_pose_config_cb(self, request, response):
         """[summary]
 
         :param request: [description]
@@ -758,9 +767,13 @@ class ROSRobot(URDFRobot):
         :return: [description]
         :rtype: AddNamedPoseConfigResponse
         """
-        raise NotImplementedError()
+        self.custom_configs.append(request.config_path)
+        self.__load_named_pose_config()
+        
+        print(f"response attr: {response.__dir__()}")
+        return True
 
-    def remove_named_pose_config_cb(self, request):
+    def remove_named_pose_config_cb(self, request, response):
         """[summary]
 
         :param request: [description]
@@ -768,9 +781,14 @@ class ROSRobot(URDFRobot):
         :return: [description]
         :rtype: [type]
         """
-        raise NotImplementedError()
+        if request.config_path in self.custom_configs:
+            self.custom_configs.remove(request.config_path)
+            self.__load_named_pose_config()
 
-    def get_named_pose_configs_cb(self, request):
+        print(f"response attr: {response.__dir__()}")
+        return True
+
+    def get_named_pose_configs_cb(self, request, response):
         """[summary]
 
         :param request: [description]
@@ -778,7 +796,8 @@ class ROSRobot(URDFRobot):
         :return: [description]
         :rtype: GetNamedPoseConfigsResponse
         """
-        return self.custom_configs
+        response.configs = str(self.custom_configs)
+        return response
     
     # --------------------------------------------------------------------- #
     # --------- Standard Methods ------------------------------------------ #
