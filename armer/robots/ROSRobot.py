@@ -24,6 +24,7 @@ from armer.models.URDFRobot import URDFRobot
 from armer.utils import mjtg, ikine
 from armer.errors import ArmerError
 from armer.trajectory import TrajectoryExecutor
+from rclpy.callback_groups import ReentrantCallbackGroup
 
 # pylint: disable=too-many-instance-attributes
 
@@ -52,6 +53,7 @@ class ROSRobot(URDFRobot):
                  frequency=None,
                  modified_qr=None,
                  singularity_thresh=0.02,
+                 action_cb_group=None,
                  * args,
                  **kwargs):  # pylint: disable=unused-argument
         
@@ -59,6 +61,8 @@ class ROSRobot(URDFRobot):
         
         # Setup the name of the robot
         self.name = name if name else self.name
+        # print(f"name: {self.name}")
+        self.action_cb_group = action_cb_group if action_cb_group else ReentrantCallbackGroup()
         
         # Handle the setup of joint stat and velocity topics for a ROS backend
         # NOTE: this should match the ros_control real robot state and control (group velocity) interface topics
@@ -169,6 +173,7 @@ class ROSRobot(URDFRobot):
         self.manip_scalar = None
         self.singularity_approached = False
 
+        # Loads a configured named pose config 
         self.__load_named_pose_config()
 
         #### --- ROS SETUP --- ###
@@ -181,11 +186,12 @@ class ROSRobot(URDFRobot):
         
         # Setup interfaces for non-readonly
         if not self.readonly:
-            # Publishers
+            # -- Publishers -- #
+            # NOTE: the joint publisher topic should attach to the ros_control input for real robot
             self.joint_publisher = self.nh.create_publisher(
-              Float64MultiArray,
-              self.joint_velocity_topic,
-              1
+                Float64MultiArray,
+                self.joint_velocity_topic,
+                1
             )
             self.state_publisher = self.nh.create_publisher(
                 ManipulatorState, 
@@ -197,17 +203,8 @@ class ROSRobot(URDFRobot):
                 '{}/cartesian/servo/arrived'.format(self.name.lower()), 
                 1
             )
-            
-        #     return
-            
-        #     # Services
-        #     rospy.Service('{}/recover'.format(self.name.lower()),
-        #                   Empty, self.recover_cb)
-        #     rospy.Service('{}/stop'.format(self.name.lower()),
-        #                   Empty, self.preempt)
-
-
-            # Subscribers
+                    
+            # -- Subscribers -- #
             self.cartesian_velocity_subscriber = self.nh.create_subscription(
                 TwistStamped,
                 '{}/cartesian/velocity'.format(self.name.lower()), 
@@ -227,13 +224,22 @@ class ROSRobot(URDFRobot):
                 10
             )
 
-        #     # Action Servers
-                #     rclpy.action.ActionServer(
-        #       self.nh,
-        #       MoveToPose,
-        #       '{}/cartesian/pose'.format(self.name.lower()),
-        #       self.pose_cb
-        #     )
+            # -- Action Servers -- #
+            self.move_pose_action = rclpy.action.ActionServer(
+                node=self.nh,
+                action_type=MoveToPose,
+                action_name='{}/cartesian/pose'.format(self.name.lower()),
+                execute_callback=self.cartesian_pose_cb,
+                callback_group=self.action_cb_group
+            )
+
+            self.home_action = rclpy.action.ActionServer(
+                node=self.nh,
+                action_type=Home,
+                action_name='{}/home'.format(self.name.lower()),
+                execute_callback=self.home_cb,
+                callback_group=self.action_cb_group
+            )
         #     self.velocity_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
         #         '{}/cartesian/guarded_velocity'.format(self.name.lower()),
         #         GuardedVelocityAction,
@@ -270,14 +276,11 @@ class ROSRobot(URDFRobot):
         #     self.named_pose_server.register_preempt_callback(self.preempt)
         #     self.named_pose_server.start()
 
-        #     self.home_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
-        #         '{}/home'.format(self.name.lower()),
-        #         HomeAction,
-        #         execute_cb=self.home_cb,
-        #         auto_start=False
-        #     )
-        #     self.home_server.register_preempt_callback(self.preempt)
-        #     self.home_server.start()
+        #     # Services
+        #     rospy.Service('{}/recover'.format(self.name.lower()),
+        #                   Empty, self.recover_cb)
+        #     rospy.Service('{}/stop'.format(self.name.lower()),
+        #                   Empty, self.preempt)
 
         #     rospy.Service(
         #         '{}/set_cartesian_impedance'.format(self.name.lower()),
@@ -457,7 +460,7 @@ class ROSRobot(URDFRobot):
         arrived_out.data = arrived
         self.cartesian_servo_publisher.publish(arrived_out)
 
-    def pose_cb(self, goal):
+    def cartesian_pose_cb(self, goal_handle):
         """
         ROS Action Server callback:
         Moves the end-effector to the
@@ -466,35 +469,49 @@ class ROSRobot(URDFRobot):
         :param goal: [description]
         :type goal: MoveToPoseGoal
         """
+        request = goal_handle._goal_request
+
+        # Check for movement and preempt
         if self.moving:
             self.preempt()
 
         with self.lock:
-            goal_pose = goal.pose_stamped
-
+            # Take requested pose goal and resolve for execution
+            goal_pose = request.pose_stamped
             if goal_pose.header.frame_id == '':
                 goal_pose.header.frame_id = self.base_link.name
-
             goal_pose = self.transform(goal_pose, self.base_link.name)
-            
             pose = goal_pose.pose
             
+            # Calculate solution to pose and execute configured trajectory type
             solution = ikine(self, pose, q0=self.q, end=self.gripper)
-            
             self.executor = TrajectoryExecutor(
               self,
-              self.traj_generator(self, solution.q, goal.speed if goal.speed else 0.2)
+              self.traj_generator(self, solution.q, request.speed if request.speed else 0.2)
             )
 
+            # Wait for finish (NOTE: this is a Reentrant Callback, so the step method updates)
             while not self.executor.is_finished():
               time.sleep(0.01)
 
+            # Set action server outputs
             result = self.executor.is_succeeded()
+            if result:
+                goal_handle.succeed()
+            else:
+                goal_handle.abort()
 
             self.executor = None
             self.moving = False
 
-        return result
+        # Finalise result
+        action_result = MoveToPose.Result()
+        action_result.success = result
+
+        # DEBUGGING
+        # self.logger(f"action result: {action_result.success} | result: {result}")
+
+        return action_result
 
     def joint_pose_cb(self, goal) -> None:
         """
@@ -558,34 +575,50 @@ class ROSRobot(URDFRobot):
 
         return result
 
-    def home_cb(self, goal) -> None:
-        """[summary]
+    def home_cb(self, goal_handle) -> None:
+        """ROS Action to Send Robot Home
 
         :param req: Empty request
         :type req: EmptyRequest
         :return: Empty response
         :rtype: EmptyResponse
         """
+        request = goal_handle._goal_request
+
+        # Check for movement and preempt
         if self.moving:
             self.preempt()
             
         with self.lock:
+            # Get the configured ready state (joints) of the arm and execute configured trajectory type
             qd = np.array(self.qr) if hasattr(self, 'qr') else self.q
-            
             self.executor = TrajectoryExecutor(
                 self,
-                self.traj_generator(self, qd, goal.speed if goal.speed else 0.2)
+                self.traj_generator(self, qd, request.speed if request.speed else 0.2)
             )
 
+            # Wait for finish (NOTE: this is a Reentrant Callback, so the step method updates)
             while not self.executor.is_finished():
-              time.sleep(0.01)
+                time.sleep(0.01)
 
+            # Set action server outputs
             result = self.executor.is_succeeded()
+            if result:
+                goal_handle.succeed()
+            else:
+                goal_handle.abort()
                 
             self.executor = None
             self.moving = False
 
-        return result
+        # Finalise result
+        action_result = Home.Result()
+        action_result.success = result
+
+        # DEBUGGING
+        # self.logger(f"action result: {action_result.success} | result: {result}")
+
+        return action_result
 
     def recover_cb(self, req): # pylint: disable=no-self-use
         """[summary]
@@ -919,6 +952,7 @@ class ROSRobot(URDFRobot):
 
         ## -- TRAJECTORY-BASED EXECUTION UPDATE -- ##
         if self.executor:
+            # self.logger(f"Requested traj")
             self.j_v = self.executor.step(dt)  
         else:
             # Needed for preempting joint velocity control

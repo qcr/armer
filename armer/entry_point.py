@@ -12,9 +12,11 @@ __version__ = "0.1.0"
 import os
 import rclpy
 import ament_index_python
-from rclpy.node import Node
+import numpy as np
 from armer.armer import Armer
-from std_msgs.msg import String
+from rclpy.node import Node
+from rclpy.executors import MultiThreadedExecutor
+from rclpy.callback_groups import ReentrantCallbackGroup
 
 __path__ = ament_index_python.packages.get_package_share_directory('armer')
 
@@ -39,12 +41,17 @@ class ArmerNode(Node):
 
     # Setup the ROS timer callback to run the main ARMer functionality (step method)
     self.last_time = self.get_clock().now()
-    self.timer = self.create_timer(1 / self.armer.frequency, self.timer_callback)
+    self.timer = self.create_timer(
+      timer_period_sec=(1 / self.armer.frequency), 
+      callback=self.timer_callback, 
+      callback_group=ReentrantCallbackGroup()
+    )
 
   def timer_callback(self):
     """ROS2 Callback Mechanism
     
     Set to configured frequency (init)
+    NOTE: 
     """
     current_time = self.get_clock().now()
     # Get dt in seconds (REQUIRED)
@@ -61,15 +68,19 @@ class ArmerNode(Node):
 def main(args=None):
     rclpy.init(args=args)
 
-    armer = ArmerNode()
+    try:
+      armer = ArmerNode()
+      executor = MultiThreadedExecutor(num_threads=4)
+      executor.add_node(armer)
 
-    rclpy.spin(armer)
+      try:
+          executor.spin()
+      finally:
+          executor.shutdown()
+          armer.destroy_node()
 
-    # Destroy the node explicitly
-    # (optional - otherwise it will be done automatically
-    # when the garbage collector destroys the node object)
-    armer.destroy_node()
-    rclpy.shutdown()
+    finally:
+        rclpy.shutdown()
 
 if __name__ == '__main__':
   main()
