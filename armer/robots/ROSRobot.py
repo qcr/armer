@@ -694,6 +694,11 @@ class ROSRobot(rtb.Robot):
                 # TODO: Check if we bother processing the goal_pose given the tracked_pose distance
                 tracked_pose = goal_pose
 
+                # IS THE GOAL POSE WITHIN THE BOUNDRY?...
+                if self.pose_within_workspace(goal_pose.pose) == False:
+                    pub_rate.sleep()
+                    continue
+
                 if goal.linear_motion:
                     # Method 2: Use Servo to Pose
                     # Handle variables for servo
@@ -848,6 +853,16 @@ class ROSRobot(rtb.Robot):
             )
             
             pose = goal_pose.pose
+
+            # IS THE GOAL POSE WITHIN THE BOUNDRY?...
+            if self.pose_within_workspace(pose) == False:
+                rospy.logwarn("-- Pose goal outside defined workspace; refusing to move...")
+                self.pose_server.set_succeeded(
+                  MoveToPoseResult(success=False), 'Named pose outside defined workspace'
+                )
+                self.executor = None
+                self.moving = False
+                return
             
             solution = ikine(self, pose, q0=self.q, end=self.gripper)
 
@@ -932,6 +947,22 @@ class ROSRobot(rtb.Robot):
 
             qd = np.array(self.named_poses[goal.pose_name])
 
+            # IS THE GOAL POSE WITHIN THE BOUNDRY?...
+            goal_pose_se3 = SE3(self.ets(start=self.base_link, end=self.gripper).eval(qd))
+            goal_pose = Pose()
+            goal_pose.position.x = goal_pose_se3.t[0]
+            goal_pose.position.y = goal_pose_se3.t[1]
+            goal_pose.position.z = goal_pose_se3.t[2]
+
+            if self.pose_within_workspace(goal_pose) == False:
+                rospy.logwarn("-- Named pose goal outside defined workspace; refusing to move...")
+                self.named_pose_server.set_succeeded(
+                  MoveToNamedPoseResult(success=False), 'Named pose outside defined workspace'
+                )
+                self.executor = None
+                self.moving = False
+                return
+            
             self.executor = TrajectoryExecutor(
                 self,
                 self.traj_generator(self, qd, goal.speed if goal.speed else 0.2)
@@ -1469,6 +1500,54 @@ class ROSRobot(rtb.Robot):
         self._controller_mode = ControlMode.CARTESIAN
         self.last_update = rospy.get_time()
 
+    def pose_within_workspace(self, pose=Pose):
+        path = rospy.get_param('/robot_workspace', '')
+        if path == '':
+            # No workspace defined - assume infinite workspace
+            # TODO: remove debug message
+            rospy.logwarn("No WORKSPACE DEFINED")
+            return True
+        
+        if os.path.isfile(path) == False:
+            # In this case fail safe as a workspace definition had been attempted by user
+            rospy.logerr(f"[{self.name}] WORKSPACE COULD NOT BE DEFINED! (Invalid Path) Please check the workspace.yaml file located at {path}")
+            return False
+        
+        # TODO: The workspace should be stored in param server
+        # TODO: The workspace should only update when requested rather than re-sourcing constantly
+        with open(path, 'r') as handle:
+            config = yaml.load(handle, Loader=yaml.SafeLoader)
+
+        workspace = config['workspace'] if 'workspace' in config else None
+        rospy.logdebug(f"Boundary--: {workspace}")
+
+        if workspace == None:
+            rospy.logerr(f"[{self.name}] WORKSPACE COULD NOT BE DEFINED! (Invalid Yaml) Please check the workspace.yaml file located at {path}")
+            # In this case fail safe as a workspace definition had been attempted by user
+            return False
+
+        min_x = workspace[0]['min'][0]['x']
+        min_y = workspace[0]['min'][0]['y']
+        min_z = workspace[0]['min'][0]['z']
+
+        max_x = workspace[1]['max'][0]['x']
+        max_y = workspace[1]['max'][0]['y']
+        max_z = workspace[1]['max'][0]['z']
+
+        # Check that cartesian position of end-effector is within defined constraints. 
+        # NOTE: the following bounds are based from the base_link which is the origin point. 
+        # Assumed main constraint is z-axis plane (added a y-axis/End-Point) plane termination condition as well
+        # NOTE: this is assuming Left-to-Right motion w.r.t Robot base_link
+        if(pose.position.x <= min_x or pose.position.x >= max_x or \
+            pose.position.y <= min_y or pose.position.y >= max_y or \
+                pose.position.z <= min_z or pose.position.z >= max_z):
+
+            rospy.logerr(f"[{self.name}] ROBOT **would** EXCEEDED DEFINED BOUNDARY!!!")
+            rospy.logerr(f"[{self.name}] - Goal pose.position: {pose.position}")
+            return False
+        else:
+            return True
+        
     def get_state(self) -> ManipulatorState:
         """
         Generates a ManipulatorState message for the robot
