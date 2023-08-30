@@ -1714,11 +1714,28 @@ class ROSRobot(rtb.Robot):
 
         # apply desired joint velocity to robot
         if self.executor:
-          self.j_v = self.executor.step(dt)  
+            self.j_v = self.executor.step(dt)
+
+            # TODO: Remove?
+            # - Need to validate if this is still required
+            # - - IF it is required the rounding limit should be a param
+            bob = [v if np.absolute(v) >= 0.0001 else 0 for v in self.j_v]
+            if np.any(self.j_v != bob):
+                self.j_v = bob
         else:
+            # TODO: Remove?
+            # - Need to validate if this is still required
+            # - - IF it is required the rounding limit should be a param
+            bob = [v if np.absolute(v) >= 0.0001 else 0 for v in self.j_v]
+            if np.any(self.j_v != bob):
+                self.j_v = bob
+
             # Needed for preempting joint velocity control
+            # - this is painfully hard coded...
+            # -- should it be the sum or just an any(abs(value) >= min)?
+            # -- should the else case be an array of zeros?
             if any(self.j_v) and current_time - self.last_update > 0.1:
-                self.j_v *= 0.9 if np.sum(np.absolute(self.j_v)) >= 0.0001 else 0
+                self.j_v = [v * 0.9 if np.absolute(v) > 0 else 0 for v in self.j_v]
             
         self.qd = self.j_v
         self.last_tick = current_time

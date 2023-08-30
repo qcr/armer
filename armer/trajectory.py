@@ -36,7 +36,7 @@ class TrajectoryExecutor:
 
   def step(self, dt: float):
     # Self termination if within goal space
-    if self.is_finished(cutoff=0.01):
+    if self._finished or self.is_finished(cutoff=0.01):
       return np.zeros(self.robot.n)
 
     # Compute current state jacobian
@@ -68,6 +68,9 @@ class TrajectoryExecutor:
     corr_jv = current_jv + erro_jv
     
     # corr_jv = np.zeros(self.robot.n)
+    # TODO: Validate 
+    # - has this max delta been checked on xArm and others?
+    # - should it be exposed as a parameter?
     if np.any(np.max(np.fabs(erro_jp)) > 0.5):
         rospy.logerr('Exceeded delta joint position max')
         self._finished = True
@@ -75,6 +78,7 @@ class TrajectoryExecutor:
     # Increment time step(s)
     self.time_step += dt if self.traj.istime else 1
 
+    # TODO: remove debugging - note that this method is sometimes preempted...
     # DEBUG
     # print(f"---")
     # print(f"time step is: {self.time_step}")
