@@ -944,6 +944,8 @@ class ROSRobot(rtb.Robot):
                     MoveToNamedPoseResult(success=False),
                     'Unknown named pose'
                 )
+                rospy.logwarn(f"-- Named pose goal ({goal.pose_name}) is unknown; refusing to move...")
+                return
 
             qd = np.array(self.named_poses[goal.pose_name])
 
@@ -1288,7 +1290,7 @@ class ROSRobot(rtb.Robot):
         :return: [description]
         :rtype: GetNamedPoseConfigsResponse
         """
-        return self.custom_configs
+        return str(self.custom_configs)
     
     def set_pid(self, msg):
         """
@@ -1501,6 +1503,7 @@ class ROSRobot(rtb.Robot):
         self.last_update = rospy.get_time()
 
     def pose_within_workspace(self, pose=Pose):
+        # TODO: The workspace should be stored in param server!!!
         path = rospy.get_param('/robot_workspace', '')
         if path == '':
             # No workspace defined - assume infinite workspace
