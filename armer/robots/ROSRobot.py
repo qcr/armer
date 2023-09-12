@@ -280,6 +280,15 @@ class ROSRobot(rtb.Robot):
             self.named_pose_server.register_preempt_callback(self.preempt)
             self.named_pose_server.start()
 
+            self.named_pose_in_frame_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
+                '{}/joint/named_in_frame'.format(self.name.lower()),
+                MoveToNamedPoseAction,
+                execute_cb=self.named_pose_in_frame_cb,
+                auto_start=False
+            )
+            self.named_pose_in_frame_server.register_preempt_callback(self.preempt)
+            self.named_pose_in_frame_server.start()
+
             self.named_pose_distance_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
                 '{}/measurement/named_to_gripper'.format(self.name.lower()),
                 MoveToNamedPoseAction,
@@ -351,6 +360,12 @@ class ROSRobot(rtb.Robot):
                 '{}/set_named_pose'.format(self.name.lower()), 
                 AddNamedPose,
                 self.add_named_pose_cb
+            )
+
+            rospy.Service(
+                '{}/set_named_pose_in_frame'.format(self.name.lower()), 
+                AddNamedPoseInFrame,
+                self.add_named_pose_in_frame_cb
             )
             
             rospy.Service(
@@ -1003,6 +1018,124 @@ class ROSRobot(rtb.Robot):
             self.executor = None
             self.moving = False
 
+    def named_pose_in_frame_cb(self, goal: MoveToNamedPoseGoal) -> None:
+        """
+        
+        """
+        if self.moving:
+            self.preempt()
+
+        with self.lock:
+            named_poses = {}
+
+            # TODO: clean this up...
+            # Defaults to /home/qcr/.ros/configs/system_named_poses.yaml
+            # config_file = self.config_path if not self.custom_configs else self.custom_configs[-1]
+            config_file = '/home/qcr/armer_ws/src/armer_descriptions/data/custom/cgras_descriptions/config/named_poses.yaml'
+            config_file = config_file.replace('.yaml', '_in_frame.yaml')
+
+            try:
+                config = yaml.load(open(config_file), Loader=yaml.SafeLoader)
+                if config and 'named_poses' in config:
+                    named_poses = config['named_poses']
+            except IOError:
+                rospy.logwarn(
+                    'Unable to locate configuration file: {}'.format(config_file))
+                self.named_pose_in_frame_server.set_aborted(
+                    MoveToNamedPoseResult(success=False),
+                    'Unable to locate configuration file: {}'.format(config_file)
+                )
+                return           
+
+            if not goal.pose_name in named_poses:
+                self.named_pose_in_frame_server.set_aborted(
+                    MoveToNamedPoseResult(success=False),
+                    'Unknown named pose'
+                )
+                rospy.logwarn(f"-- Named pose goal ({goal.pose_name}) is unknown; refusing to move...")
+                return
+
+            # TODO: YAML yuck...
+            the_pose = named_poses[goal.pose_name]
+            frame_id = the_pose['frame_id']
+            translation = the_pose['position']
+            orientation = the_pose['orientation']
+
+            ## named PoseStamped position
+            header = Header()
+            header.frame_id = frame_id
+
+            pose_stamped = PoseStamped()
+            pose_stamped.header = header
+  
+            pose_stamped.pose.position.x = translation[0]
+            pose_stamped.pose.position.y = translation[1]
+            pose_stamped.pose.position.z = translation[2]
+
+            pose_stamped.pose.orientation.w = orientation[0]
+            pose_stamped.pose.orientation.x = orientation[1]
+            pose_stamped.pose.orientation.y = orientation[2]
+            pose_stamped.pose.orientation.z = orientation[3]
+
+            # Transform into the current base_link ready for inv kin
+            # TODO: base_link here should come from self.base_link (assuming this is base_link)
+            goal_pose = self.tf_listener.transformPose(
+                        '/base_link',
+                        pose_stamped,
+                    )
+
+            pose = goal_pose.pose
+
+            rospy.logdebug(f"Named Pose In Frame ---\nFROM: {pose_stamped}")
+            rospy.logdebug(f"Named Pose In Frame ---\nTO POSE: {goal_pose}")
+
+            solution = None
+            try:
+                solution = ikine(self, pose, q0=self.q, end=self.gripper)
+            except:
+                rospy.logwarn("Failed to get IK Solution...")
+                self.named_pose_in_frame_server.set_succeeded(
+                  MoveToNamedPoseResult(success=False), f'Failed to solve for Named pose ({goal.pose_name}) in frame: {frame_id}'
+                )
+                self.executor = None
+                self.moving = False
+                return
+            
+            rospy.logdebug(f"Named Pose In Frame ---\nTO JOINTS: {solution.q.tolist()}")
+
+            self.named_pose_in_frame_server.set_succeeded(MoveToNamedPoseResult(success=True))
+        
+            # TODO: BOB FIX THIS...
+            if self.pose_within_workspace(pose) == False:
+                rospy.logwarn(f"-- Named pose ({goal.pose_name}) goal outside defined workspace; refusing to move...")
+                self.named_pose_in_frame_server.set_succeeded(
+                  MoveToNamedPoseResult(success=False), f'Named pose ({goal.pose_name}) outside defined workspace using frame: {goal.frame_id}'
+                )
+                self.executor = None
+                self.moving = False
+                return
+
+            # NORMAL....            
+            self.executor = TrajectoryExecutor(
+                self,
+                self.traj_generator(self, solution.q, goal.speed if goal.speed else 0.2)
+            )
+
+            while not self.executor.is_finished():
+                rospy.sleep(0.01)
+
+            if self.executor.is_succeeded():
+                self.named_pose_in_frame_server.set_succeeded(
+                        MoveToNamedPoseResult(success=True)
+                )
+            else:
+                self.named_pose_in_frame_server.set_aborted(
+                  MoveToNamedPoseResult(success=False)
+                )
+
+            self.executor = None
+            self.moving = False
+    
     def named_pose_cb(self, goal: MoveToNamedPoseGoal) -> None:
         """
         ROS Action Server callback:
@@ -1268,6 +1401,69 @@ class ROSRobot(rtb.Robot):
         :rtype: GetNamesListResponse
         """
         return GetNamedPosesResponse(list(self.named_poses.keys()))
+    
+    def add_named_pose_in_frame_cb(self, req: AddNamedPoseInFrameRequest) -> AddNamedPoseInFrameResponse:
+        """
+        """
+        named_poses = {}
+        # Defaults to /home/qcr/.ros/configs/system_named_poses.yaml
+        # config_file = self.config_path if not self.custom_configs else self.custom_configs[-1]
+        config_file = '/home/qcr/armer_ws/src/armer_descriptions/data/custom/cgras_descriptions/config/named_poses.yaml'
+        config_file = config_file.replace('.yaml', '_in_frame.yaml')
+        try:
+            config = yaml.load(open(config_file), Loader=yaml.SafeLoader)
+            if config and 'named_poses' in config:
+                named_poses = config['named_poses']
+        except IOError:
+            rospy.logwarn(
+                'Unable to locate configuration file: {}'.format(config_file))
+            return AddNamedPoseInFrameResponse(success=False)            
+            
+        if req.name in named_poses and not req.overwrite:
+            rospy.logerr('Named pose already exists.')
+            return AddNamedPoseInFrameResponse(success=False)
+
+        # TODO: transform into frame requested and save PoseStamped
+        ## named PoseStamped position
+        ee_pose = self.ets(start=self.base_link, end=self.gripper).eval(self.q.tolist())
+        header = Header()
+        header.frame_id = '/base_link' #self.base_link.name
+        # header.stamp = rospy.Time.now()
+
+        pose_stamped = PoseStamped()
+        pose_stamped.header = header
+
+        translation = ee_pose[:3, 3]    
+        pose_stamped.pose.position.x = translation[0]
+        pose_stamped.pose.position.y = translation[1]
+        pose_stamped.pose.position.z = translation[2]
+
+        rotation = ee_pose[:3, :3]
+        ee_rot = sm.UnitQuaternion(rotation)
+
+        pose_stamped.pose.orientation.w = ee_rot.A[0]
+        pose_stamped.pose.orientation.x = ee_rot.A[1]
+        pose_stamped.pose.orientation.y = ee_rot.A[2]
+        pose_stamped.pose.orientation.z = ee_rot.A[3]
+
+        # TODO: do the transform...
+        reference_frame_id = req.wrt_frame_id if req.wrt_frame_id != '' else '/base_link'
+        tf = self.tf_listener.transformPose(
+                    reference_frame_id,
+                    pose_stamped,
+                )
+
+        # TODO: get real serialisation for PoseStamped to YAML...(use JSON!)
+        yaml_posestamped = {}
+        yaml_posestamped['frame_id'] = reference_frame_id
+        yaml_posestamped['position'] = np.array([tf.pose.position.x, tf.pose.position.y, tf.pose.position.z]).tolist()
+        yaml_posestamped['orientation'] = np.array([tf.pose.orientation.w, tf.pose.orientation.x, tf.pose.orientation.y, tf.pose.orientation.z]).tolist()
+
+        named_poses[req.name] = yaml_posestamped
+
+        self.__write_config('named_poses', named_poses, config_file)
+
+        return AddNamedPoseInFrameResponse(success=True)
 
     def add_named_pose_cb(self, req: AddNamedPoseRequest) -> AddNamedPoseResponse:
         """
