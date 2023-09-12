@@ -234,6 +234,15 @@ class ROSRobot(rtb.Robot):
             self.pose_server.register_preempt_callback(self.preempt)
             self.pose_server.start()
 
+            self.step_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
+                '{}/cartesian/step'.format(self.name.lower()),
+                MoveToPoseAction,
+                execute_cb=self.step_cb,
+                auto_start=False
+            )
+            self.step_server.register_preempt_callback(self.preempt)
+            self.step_server.start()
+
             self.pose_tracking_server: actionlib.SimpleActionServer = actionlib.SimpleActionServer(
                 '{}/cartesian/track_pose'.format(self.name.lower()),
                 TrackPoseAction,
@@ -883,6 +892,74 @@ class ROSRobot(rtb.Robot):
                 self.pose_server.set_succeeded(MoveToPoseResult(success=True))
             else:
                 self.pose_server.set_aborted(MoveToPoseResult(success=False))
+
+            self.executor = None
+            self.moving = False
+
+    def step_cb(self, goal: MoveToPoseGoal) -> None:
+        """
+        """
+        if self.moving:
+            self.preempt()
+
+        with self.lock:
+            goal_pose = goal.pose_stamped
+
+            if goal_pose.header.frame_id == '':
+                goal_pose.header.frame_id = self.base_link.name
+
+            goal_pose = self.tf_listener.transformPose(
+                self.base_link.name,
+                goal_pose,
+            )
+            
+            step_pose = goal_pose.pose
+
+            ee_pose = self.ets(start=self.base_link, end=self.gripper).eval(self.q.tolist())
+
+            translation = ee_pose[:3, 3]    
+            step_pose.position.x += translation[0]
+            step_pose.position.y += translation[1]
+            step_pose.position.z += translation[2]
+
+            rotation = ee_pose[:3, :3]
+            ee_rot = sm.UnitQuaternion(rotation)
+
+            # NOTE: Ignore orientation until an action message is made with degrees for user convenience
+            step_pose.orientation.w = ee_rot.A[0]
+            step_pose.orientation.x = ee_rot.A[1]
+            step_pose.orientation.y = ee_rot.A[2]
+            step_pose.orientation.z = ee_rot.A[3]
+
+            # IS THE GOAL POSE WITHIN THE BOUNDRY?...
+            if self.pose_within_workspace(step_pose) == False:
+                rospy.logwarn("-- Pose goal outside defined workspace; refusing to move...")
+                self.step_server.set_succeeded(
+                  MoveToPoseResult(success=False), 'Named pose outside defined workspace'
+                )
+                self.executor = None
+                self.moving = False
+                return
+            
+            solution = ikine(self, step_pose, q0=self.q, end=self.gripper)
+
+            # Check for singularity on end solution:
+            # TODO: prevent motion on this bool? Needs to be thought about
+            if self.check_singularity(solution.q):
+                rospy.logwarn(f"IK solution within singularity threshold [{self.singularity_thresh}] -> ill-advised motion")
+            
+            self.executor = TrajectoryExecutor(
+              self,
+              self.traj_generator(self, solution.q, goal.speed if goal.speed else 0.2)
+            )
+
+            while not self.executor.is_finished():
+              rospy.sleep(0.01)
+
+            if self.executor.is_succeeded():
+                self.step_server.set_succeeded(MoveToPoseResult(success=True))
+            else:
+                self.step_server.set_aborted(MoveToPoseResult(success=False))
 
             self.executor = None
             self.moving = False
