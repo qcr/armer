@@ -12,7 +12,7 @@ import roboticstoolbox as rtb
 from roboticstoolbox.tools.trajectory import Trajectory
 
 class TrajectoryExecutor:
-  def __init__(self, robot: rtb.ERobot, traj: Trajectory):
+  def __init__(self, robot: rtb.ERobot, traj: Trajectory, cutoff: float=0.01):
 
     self.robot: rtb.ERobot = robot
     self.traj: Trajectory = traj
@@ -27,6 +27,8 @@ class TrajectoryExecutor:
 
     self._finished = False
     self._success = False
+
+    self.cutoff = cutoff
     
 
     if self.traj.istime and len(self.traj.s) >= 2:
@@ -36,7 +38,7 @@ class TrajectoryExecutor:
 
   def step(self, dt: float):
     # Self termination if within goal space
-    if self._finished or self.is_finished(cutoff=0.01):
+    if self._finished or self.is_finished():
       return np.zeros(self.robot.n)
 
     # Compute current state jacobian
@@ -93,11 +95,20 @@ class TrajectoryExecutor:
     self._finished = True
     self._success = False
 
-  def is_finished(self, cutoff=0.01):
+  def is_finished(self, cutoff=None):
     if self._finished:
       return True
+    
+    # Initial calls use default until a different cutoff is provided
+    if cutoff != None:
+      self.cutoff = cutoff
+    else:
+      cutoff = self.cutoff
 
     if len(self.traj.s) < 2 or np.all(np.fabs(self.traj.s[-1] - self.robot.q) < cutoff):
+      if len(self.traj.s) > 0:
+        link_errors = np.fabs(self.traj.s[-1] - self.robot.q)
+        rospy.loginfo(f'Link errors used to apply cutoff ({cutoff}): \n{link_errors}')
       rospy.loginfo(f'Too close to goal {(self.time_step / self.traj.t)}')
       if self.cartesian_ee_vel_vect:
         rospy.loginfo(f"Max cartesian speed: {np.max(self.cartesian_ee_vel_vect)}")
