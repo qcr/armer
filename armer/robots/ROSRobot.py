@@ -66,6 +66,7 @@ class ROSRobot(rtb.Robot):
                  singularity_thresh=0.02,
                  max_joint_velocity_gain=20.0,
                  max_cartesian_speed=2.0,
+                 trajectory_end_cutoff=0.000001,
                  * args,
                  **kwargs):  # pylint: disable=unused-argument
         
@@ -77,6 +78,7 @@ class ROSRobot(rtb.Robot):
 
         self.max_joint_velocity_gain = max_joint_velocity_gain
         self.max_cartesian_speed = max_cartesian_speed
+        self.trajectory_end_cutoff = trajectory_end_cutoff
 
         self.tfBuffer = tf2_ros.Buffer()
         self.listener = tf2_ros.TransformListener(self.tfBuffer)
@@ -820,7 +822,8 @@ class ROSRobot(rtb.Robot):
                     try:
                         self.executor = TrajectoryExecutor(
                         self,
-                        self.traj_generator(self, solution.q, goal_speed)
+                        self.traj_generator(self, solution.q, goal_speed),
+                        cutoff=self.trajectory_end_cutoff
                         )
                     except:
                         rospy.logwarn("TrackPose - Unable to construct TrajectoryExecutor")
@@ -897,7 +900,8 @@ class ROSRobot(rtb.Robot):
             
             self.executor = TrajectoryExecutor(
               self,
-              self.traj_generator(self, solution.q, goal.speed if goal.speed else 0.2)
+              self.traj_generator(self, solution.q, goal.speed if goal.speed else 0.2),
+              cutoff=self.trajectory_end_cutoff
             )
 
             while not self.executor.is_finished():
@@ -1000,7 +1004,8 @@ class ROSRobot(rtb.Robot):
 
             self.executor = TrajectoryExecutor(
               self,
-              self.traj_generator(self, np.array(goal.joints), goal.speed if goal.speed else 0.2)
+              self.traj_generator(self, np.array(goal.joints), goal.speed if goal.speed else 0.2),
+              cutoff=self.trajectory_end_cutoff
             )
 
             while not self.executor.is_finished():
@@ -1118,7 +1123,8 @@ class ROSRobot(rtb.Robot):
             # NORMAL....            
             self.executor = TrajectoryExecutor(
                 self,
-                self.traj_generator(self, solution.q, goal.speed if goal.speed else 0.2)
+                self.traj_generator(self, solution.q, goal.speed if goal.speed else 0.2),
+                cutoff=self.trajectory_end_cutoff
             )
 
             while not self.executor.is_finished():
@@ -1177,7 +1183,8 @@ class ROSRobot(rtb.Robot):
             
             self.executor = TrajectoryExecutor(
                 self,
-                self.traj_generator(self, qd, goal.speed if goal.speed else 0.2)
+                self.traj_generator(self, qd, goal.speed if goal.speed else 0.2),
+                cutoff=self.trajectory_end_cutoff
             )
 
             while not self.executor.is_finished():
@@ -1242,7 +1249,8 @@ class ROSRobot(rtb.Robot):
             
             self.executor = TrajectoryExecutor(
                 self,
-                self.traj_generator(self, qd, goal.speed if goal.speed else 0.2)
+                self.traj_generator(self, qd, goal.speed if goal.speed else 0.2),
+                cutoff=self.trajectory_end_cutoff
             )
 
             while not self.executor.is_finished():
