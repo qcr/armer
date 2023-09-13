@@ -920,8 +920,12 @@ class ROSRobot(rtb.Robot):
         """
         if self.moving:
             self.preempt()
+            self.moving = False
 
         with self.lock:
+            arrived = False
+            self.moving = True
+            
             goal_pose = goal.pose_stamped
 
             if goal_pose.header.frame_id == '':
@@ -932,7 +936,7 @@ class ROSRobot(rtb.Robot):
                 goal_pose,
             )
             
-            step_pose = goal_pose.pose
+            step_pose = copy.deepcopy(goal_pose.pose)
 
             ee_pose = self.ets(start=self.base_link, end=self.gripper).eval(self.q.tolist())
 
@@ -960,26 +964,78 @@ class ROSRobot(rtb.Robot):
                 self.moving = False
                 return
             
-            solution = ikine(self, step_pose, q0=self.q, end=self.gripper)
-
-            # Check for singularity on end solution:
-            # TODO: prevent motion on this bool? Needs to be thought about
-            if self.check_singularity(solution.q):
-                rospy.logwarn(f"IK solution within singularity threshold [{self.singularity_thresh}] -> ill-advised motion")
+            # TODO: Refactor - this provided as a parameter
+            msg_pose_threshold = 0.005
             
-            self.executor = TrajectoryExecutor(
-              self,
-              self.traj_generator(self, solution.q, goal.speed if goal.speed else 0.2)
-            )
+            if goal.linear_motion:
+                rospy.logwarn('Moving in linear motion mode...')
+                # Method 2: Use Servo to Pose
+                # Handle variables for servo
+                goal_gain = goal.speed * self.max_joint_velocity_gain if goal.speed else 0.02 * self.max_joint_velocity_gain
+                goal_thresh = msg_pose_threshold if msg_pose_threshold else 0.005
 
-            while not self.executor.is_finished():
-              rospy.sleep(0.01)
+                # Target is just the pose delta provided (orientation currently ignored - remains at current orientation)
+                target = SE3(step_pose.position.x, step_pose.position.y, step_pose.position.z) * UnitQuaternion(
+                    ee_rot.A[0],
+                    [ee_rot.A[1],
+                    ee_rot.A[2],
+                    ee_rot.A[3]
+                ]).SE3()
 
-            if self.executor.is_succeeded():
+                rospy.logdebug(f'Goal Pose: {goal_pose.pose}')
+                rospy.logdebug(f'Step Pose: {step_pose}')
+                rospy.logdebug(f'Target Pose: {target}')
+
+                # Block while move is completed
+                while arrived == False and not self.step_server.is_preempt_requested():
+                    # Current end-effector pose
+                    Te = self.ets(start=self.base_link, end=self.gripper).eval(self.q)
+
+                    # Calculate the required end-effector spatial velocity for the robot
+                    # to approach the goal.
+                    velocities, arrived = rtb.p_servo(
+                        Te,
+                        target,
+                        min(20, goal_gain),
+                        threshold=goal_thresh
+                    )
+
+                    # TODO: Investigate / Validate returned arrived boolean from RTB
+                    # - default currently is RPY method
+                    # - arrived is not arrived (sum of errors < threshold)
+                    # - may also mix spatial and angle errors
+
+                    ## TODO: Remove this or NEO Testing...
+                    self.j_v = np.linalg.pinv(self.jacobe(self.q)) @ velocities
+                    self.last_update = rospy.get_time()
+                    rospy.sleep(0.1)
+
+            else:
+                solution = ikine(self, step_pose, q0=self.q, end=self.gripper)
+
+                # Check for singularity on end solution:
+                # TODO: prevent motion on this bool? Needs to be thought about
+                if self.check_singularity(solution.q):
+                    rospy.logwarn(f"IK solution within singularity threshold [{self.singularity_thresh}] -> ill-advised motion")
+                
+                self.executor = TrajectoryExecutor(
+                    self,
+                    self.traj_generator(self, solution.q, goal.speed if goal.speed else 0.2),
+                    cutoff=self.trajectory_end_cutoff
+                    )
+
+                # Block while move is completed
+                while not self.executor.is_finished() and not self.step_server.is_preempt_requested():
+                    rospy.sleep(0.01)
+
+            if (self.executor is not None and self.executor.is_succeeded()) or arrived == True:
                 self.step_server.set_succeeded(MoveToPoseResult(success=True))
+                rospy.logwarn('...Motion Complete!')
             else:
                 self.step_server.set_aborted(MoveToPoseResult(success=False))
+                rospy.logwarn('...Failed Motion!')
 
+            # Clean up
             self.executor = None
             self.moving = False
 
