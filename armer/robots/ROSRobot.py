@@ -1164,8 +1164,6 @@ class ROSRobot(rtb.Robot):
             
             rospy.logdebug(f"Named Pose In Frame ---\nTO JOINTS: {solution.q.tolist()}")
 
-            self.named_pose_in_frame_server.set_succeeded(MoveToNamedPoseResult(success=True))
-        
             # TODO: BOB FIX THIS...
             if self.pose_within_workspace(pose) == False:
                 rospy.logwarn(f"-- Named pose ({goal.pose_name}) goal outside defined workspace; refusing to move...")
