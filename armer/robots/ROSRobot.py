@@ -564,8 +564,8 @@ class ROSRobot(rtb.Robot):
             ee_pose = Pose()
             target_pose_offset = Pose()
             try:
-                self.tf_listener.waitForTransform("link_base", "ee_control_link", rospy.Time.now(), rospy.Duration(1.0))
-                ee_pose = pclu.ROSHelper().tf_to_pose("link_base", "ee_control_link", self.tfBuffer)
+                self.tf_listener.waitForTransform(self.base_link.name, "ee_control_link", rospy.Time.now(), rospy.Duration(1.0))
+                ee_pose = pclu.ROSHelper().tf_to_pose(self.base_link.name, "ee_control_link", self.tfBuffer)
                 self.tf_listener.waitForTransform(goal.ee_frame, goal.target_tf, rospy.Time.now(), rospy.Duration(1.0))
                 target_pose_offset = pclu.ROSHelper().tf_to_pose(goal.ee_frame, goal.target_tf, self.tfBuffer)
             except:
@@ -576,7 +576,7 @@ class ROSRobot(rtb.Robot):
                 elif ee_pose != Pose():
                     previous_pose = PoseStamped()
                     previous_pose.header.stamp = rospy.Time.now()
-                    previous_pose.header.frame_id = 'link_base'
+                    previous_pose.header.frame_id = self.base_link.name
                     previous_pose.pose = ee_pose
                     pub.publish(previous_pose)
                     rospy.logerr(f"...ee_pose available")
@@ -591,7 +591,7 @@ class ROSRobot(rtb.Robot):
                 elif ee_pose != Pose():
                     previous_pose = PoseStamped()
                     previous_pose.header.stamp = rospy.Time.now()
-                    previous_pose.header.frame_id = 'link_base'
+                    previous_pose.header.frame_id = self.base_link.name
                     previous_pose.pose = ee_pose
                     pub.publish(previous_pose)
                 pub_rate.sleep()
@@ -645,7 +645,7 @@ class ROSRobot(rtb.Robot):
 
             goal_pose_msg = PoseStamped()
             goal_pose_msg.header.stamp = rospy.Time.now()
-            goal_pose_msg.header.frame_id = 'link_base'
+            goal_pose_msg.header.frame_id = self.base_link.name
             goal_pose_msg.pose = goal_pose
             pub.publish(goal_pose_msg)
 
