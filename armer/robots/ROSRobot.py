@@ -931,28 +931,47 @@ class ROSRobot(rtb.Robot):
             if goal_pose.header.frame_id == '':
                 goal_pose.header.frame_id = self.base_link.name
 
-            goal_pose = self.tf_listener.transformPose(
-                self.base_link.name,
-                goal_pose,
-            )
-            
-            step_pose = copy.deepcopy(goal_pose.pose)
-
+            # Get the EE pose in the armer defined base_link
             ee_pose = self.ets(start=self.base_link, end=self.gripper).eval(self.q.tolist())
+            ee_pose_stamped = PoseStamped()
+            ee_pose_stamped.header.frame_id = self.base_link.name
 
-            translation = ee_pose[:3, 3]    
-            step_pose.position.x += translation[0]
-            step_pose.position.y += translation[1]
-            step_pose.position.z += translation[2]
+            translation = ee_pose[:3, 3]
+            ee_pose_stamped.pose.position.x = translation[0]
+            ee_pose_stamped.pose.position.y = translation[1]
+            ee_pose_stamped.pose.position.z = translation[2]
 
             rotation = ee_pose[:3, :3]
             ee_rot = sm.UnitQuaternion(rotation)
+            ee_pose_stamped.pose.orientation.w = ee_rot.A[0]
+            ee_pose_stamped.pose.orientation.x = ee_rot.A[1]
+            ee_pose_stamped.pose.orientation.y = ee_rot.A[2]
+            ee_pose_stamped.pose.orientation.z = ee_rot.A[3]
+
+            # Transform EE to goal frame
+            ee_in_goal = self.tf_listener.transformPose(
+                goal.pose_stamped.header.frame_id,
+                ee_pose_stamped,
+            )
+
+            # Apply goal step
+            step_pose_stamped = copy.deepcopy(goal_pose)
+            step_pose_stamped.pose.position.x += ee_in_goal.pose.position.x
+            step_pose_stamped.pose.position.y += ee_in_goal.pose.position.y
+            step_pose_stamped.pose.position.z += ee_in_goal.pose.position.z
 
             # NOTE: Ignore orientation until an action message is made with degrees for user convenience
-            step_pose.orientation.w = ee_rot.A[0]
-            step_pose.orientation.x = ee_rot.A[1]
-            step_pose.orientation.y = ee_rot.A[2]
-            step_pose.orientation.z = ee_rot.A[3]
+            step_pose_stamped.pose.orientation.w = ee_in_goal.pose.orientation.w
+            step_pose_stamped.pose.orientation.x = ee_in_goal.pose.orientation.x
+            step_pose_stamped.pose.orientation.y = ee_in_goal.pose.orientation.y
+            step_pose_stamped.pose.orientation.z = ee_in_goal.pose.orientation.z
+
+            # Transform step_pose to armer base_link
+            step_pose_stamped = self.tf_listener.transformPose(
+                self.base_link.name,
+                step_pose_stamped,
+            )
+            step_pose = step_pose_stamped.pose
 
             # IS THE GOAL POSE WITHIN THE BOUNDRY?...
             if self.pose_within_workspace(step_pose) == False:
