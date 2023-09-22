@@ -34,6 +34,7 @@ def mjtg(robot: rtb.Robot, qf: np.ndarray, max_speed: float=0.2, max_rot: float=
     # This is the average cartesian speed we want the robot to move at
     # NOTE: divided by approx. 2 to make the max speed the approx. peak of the speed achieved
     # TODO: investigate a better approximation strategy here
+    rospy.logwarn("Attempting to produce a mjtg tragectory")
     ave_cart_speed = max_speed / 1.92
 
     start_SE3 = SE3(robot.ets(start=robot.base_link, end=robot.gripper).eval(robot.q))
@@ -51,22 +52,30 @@ def mjtg(robot: rtb.Robot, qf: np.ndarray, max_speed: float=0.2, max_rot: float=
     linear_move_time = D_sum / ave_cart_speed
     angular_move_time = np.arccos((np.trace(np.transpose(end_SE3.R) @ start_SE3.R) - 1) / 2) / max_rot
     move_time = max(linear_move_time, angular_move_time)
+    rospy.logwarn(f'Estimated move time of {move_time} = lin {linear_move_time} + ang {angular_move_time}')
+
+    jtraj = rtb.tools.trajectory.jtraj(robot.q, qf, frequency)
 
     # DEBUGGING
     # print(f"linear time: {linear_move_time} | angular time: {angular_move_time} | move_time: {move_time}")
 
     # Obtain minimum jerk velocity profile of joints based on estimated end effector move time
+    q = []
     qd = []
     qdd = []
 
     # Calculate time frequency - based on the max time required for trajectory and the frequency of operation
     timefreq = int(move_time * frequency)
+    q.append(robot.q)
     for time in range(1, timefreq):
         qd.append(
             robot.q + (qf - robot.q) *
             (10.0 * (time/timefreq)**3
             - 15.0 * (time/timefreq)**4
             + 6.0 * (time/timefreq)**5))
+        
+        if time <= timefreq-2:
+            q.append(q[-1] + time*qd[-1])
 
         qdd.append(
             frequency * (1.0/timefreq) * (qf - robot.q) *
@@ -74,7 +83,9 @@ def mjtg(robot: rtb.Robot, qf: np.ndarray, max_speed: float=0.2, max_rot: float=
             - 60.0 * (time/timefreq)**3.0
             + 30.0 * (time/timefreq)**4.0))
     
-    return Trajectory('minimum-jerk', move_time, qd, qdd, None, True)
+    rospy.logwarn(f"RETURNING a mjtg tragectory - move_time {move_time} - qd {qd} - qdd {qdd}")
+    rospy.logwarn(f"-- len q {len(q)}, len qd {len(qd)}, len qdd {len(qdd)}")
+    return Trajectory(name='minimum-jerk', t=move_time, s=q, sd=qd, sdd=qdd, istime=True)
 
 def populate_transform_stamped(parent_name: str, link_name: str, transform: np.array):
     """

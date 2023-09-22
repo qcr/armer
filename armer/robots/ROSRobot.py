@@ -1319,15 +1319,20 @@ class ROSRobot(rtb.Robot):
             
         with self.lock:
             qd = np.array(self.qr) if hasattr(self, 'qr') else self.q
+
+            rospy.logerr("HOME - pre TrajectoryExecuter loop...")
             
             self.executor = TrajectoryExecutor(
                 self,
                 self.traj_generator(self, qd, goal.speed if goal.speed else 0.2),
-                cutoff=self.trajectory_end_cutoff
+                cutoff=0.01,
             )
+            rospy.logerr("HOME - post TrajectoryExecuter loop...")
 
+            rospy.logerr("HOME - pre is_finished loop...")
             while not self.executor.is_finished():
               rospy.sleep(0.01)
+            rospy.logerr("HOME - post is_finished loop...")
 
             if self.executor.is_succeeded():
                 self.home_server.set_succeeded(
@@ -2076,16 +2081,24 @@ class ROSRobot(rtb.Robot):
             # TODO: Remove?
             # - Need to validate if this is still required
             # - - IF it is required the rounding limit should be a param
-            bob = [v if np.absolute(v) >= 0.0001 else 0 for v in self.j_v]
-            if np.any(self.j_v != bob):
-                self.j_v = bob
+            # if any(False if np.absolute(v) >= 0.000000001 else True for v in self.j_v):
+            #     rospy.logerr(f"We are rounding a joint velocity in the executor...{self.j_v}")
+            
+            # bob = [v if np.absolute(v) >= 0.000000001 else 0 for v in self.j_v]
+            # if np.any(self.j_v != bob):
+            #     rospy.logerr(f"-- overwriting join velocities with rounded version...{bob}")
+            #     self.j_v = bob
         else:
             # TODO: Remove?
             # - Need to validate if this is still required
             # - - IF it is required the rounding limit should be a param
-            bob = [v if np.absolute(v) >= 0.0001 else 0 for v in self.j_v]
-            if np.any(self.j_v != bob):
-                self.j_v = bob
+            # if any(False if np.absolute(v) >= 0.0001 else True for v in self.j_v):
+            #     rospy.logerr(f"We are rounding a joint velocity without executor...{self.j_v}")
+
+            # bob = [v if np.absolute(v) >= 0.0001 else 0 for v in self.j_v]
+            # if np.any(self.j_v != bob):
+            #     rospy.logerr(f"-- overwriting join velocities with rounded version...{bob}")
+            #     self.j_v = bob
 
             # Needed for preempting joint velocity control
             # - this is painfully hard coded...

@@ -107,6 +107,7 @@ class TrajectoryExecutor:
 
     if len(self.traj.s) < 2 or np.all(np.fabs(self.traj.s[-1] - self.robot.q) < cutoff):
       if len(self.traj.s) > 0:
+        rospy.loginfo("Trajectory length is NOT the problem")
         link_errors = np.fabs(self.traj.s[-1] - self.robot.q)
         rospy.loginfo(f'Link errors used to apply cutoff ({cutoff}): \n{link_errors}')
       rospy.loginfo(f'Too close to goal {(self.time_step / self.traj.t)}')
