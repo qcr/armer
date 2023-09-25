@@ -34,58 +34,76 @@ def mjtg(robot: rtb.Robot, qf: np.ndarray, max_speed: float=0.2, max_rot: float=
     # This is the average cartesian speed we want the robot to move at
     # NOTE: divided by approx. 2 to make the max speed the approx. peak of the speed achieved
     # TODO: investigate a better approximation strategy here
-    rospy.logwarn("Attempting to produce a mjtg tragectory")
+    rospy.loginfo("Attempting to produce a mjtg tragectory")
     ave_cart_speed = max_speed / 1.92
 
-    start_SE3 = SE3(robot.ets(start=robot.base_link, end=robot.gripper).eval(robot.q))
-    end_SE3 = SE3(robot.ets(start=robot.base_link, end=robot.gripper).eval(qf))
+    #---------------- Calculate Linear move time estimate (3 point sampling)
+    # Calculate start and end pose linear distance to estimate the expected time
+    current_ee_mat = robot.ets(start=robot.base_link, end=robot.gripper).eval(robot.q)
+    mid_ee_mat = robot.ets(start=robot.base_link, end=robot.gripper).eval(qf - (qf - robot.q) / 2)
+    end_ee_mat = robot.ets(start=robot.base_link, end=robot.gripper).eval(qf)
 
-    # Compute the quintic polynomial scalar representation of trajectory (in cartesian space)
-    ctraj = rtb.tools.trajectory.ctraj(start_SE3, end_SE3, frequency)
-    D_sum = 0
-    for i in range(frequency):
-        if i < frequency-1:
-            delta = ctraj[i].delta(ctraj[i+1])
-            D = np.sqrt((delta[0]**2) + (delta[1]**2) + (delta[2]**2))
-            D_sum += D
+    current_ee_pose = current_ee_mat[:3, 3]
+    mid_ee_pose = mid_ee_mat[:3, 3]
+    end_ee_pose = end_ee_mat[:3, 3]
 
-    linear_move_time = D_sum / ave_cart_speed
-    angular_move_time = np.arccos((np.trace(np.transpose(end_SE3.R) @ start_SE3.R) - 1) / 2) / max_rot
+    # Estimation of time taken based on linear motion from current to end cartesian pose
+    # We may require some optimisation of this given the curved nature of the actual ee trajectory
+    # NOTE / TODO: thanks Andrew investigate using an arc for a worst case estimate
+    D1 = np.sqrt((mid_ee_pose[0] - current_ee_pose[0])**2 +
+        (mid_ee_pose[1] - current_ee_pose[1])**2 +
+        (mid_ee_pose[2] - current_ee_pose[2])**2)
+
+    D2 = np.sqrt((end_ee_pose[0] - mid_ee_pose[0])**2 +
+        (end_ee_pose[1] - mid_ee_pose[1])**2 +
+        (end_ee_pose[2] - mid_ee_pose[2])**2)
+
+    linear_move_time = (D1 + D2) / ave_cart_speed
+    #---------------- End
+    #----------------- Calculate Angular move time estimate (start to end)
+    current_ee_rot = current_ee_mat[:3,:3]
+    end_ee_rot = end_ee_mat[:3,:3]
+
+    angular_move_time = np.arccos((np.trace(np.transpose(end_ee_rot) @ current_ee_rot) - 1) / 2) / max_rot
+    #---------------- End
+
     move_time = max(linear_move_time, angular_move_time)
-    rospy.logwarn(f'Estimated move time of {move_time} = lin {linear_move_time} + ang {angular_move_time}')
-
-    jtraj = rtb.tools.trajectory.jtraj(robot.q, qf, frequency)
-
-    # DEBUGGING
-    # print(f"linear time: {linear_move_time} | angular time: {angular_move_time} | move_time: {move_time}")
+    rospy.loginfo(f'Estimated move time of {move_time} (max of) | lin {linear_move_time} | ang {angular_move_time}')
 
     # Obtain minimum jerk velocity profile of joints based on estimated end effector move time
     q = []
     qd = []
+    # TODO: investigate if this is a useful parameter to provide when running the trajectory
     qdd = []
 
     # Calculate time frequency - based on the max time required for trajectory and the frequency of operation
+    # TODO: compute the max delta in joint space vs the max 'open loop' control delta suitable for the arm...
+    # something like -- max_joint_delta / max_control_joint_delta
+    # telling us for the largest joint movement how many steps we would require to remain accurate...
+    # then make sure we use this as our 'frequency' in the below 'timefreq' calculation
+    # *** this means our number of steps scales with max trajectory velocity rather than a fixed control frequency
+    # NOTE: Impementation taken from
+    # -- PAPER: https://arxiv.org/ftp/arxiv/papers/2102/2102.07459.pdf#:~:text=The%20minimum%20jerk%20trajectory%20as,is%20the%20free-hand%20motion.
+    # -- PYTHON: https://mika-s.github.io/python/control-theory/trajectory-generation/2017/12/06/trajectory-generation-with-a-minimum-jerk-trajectory.html
+    # NOTE: !!! When time permits this implementation should be replaced or at least benchmarked against
+    # -- RoboticsToolBox: https://www.mathworks.com/help/robotics/ug/plan-minimum-jerk-trajectory-for-robot-arm.html
+    # -- RoboticsToolBox: https://www.mathworks.com/help/robotics/ref/minjerkpolytraj.html
     timefreq = int(move_time * frequency)
-    q.append(robot.q)
     for time in range(1, timefreq):
-        qd.append(
+        q.append(
             robot.q + (qf - robot.q) *
             (10.0 * (time/timefreq)**3
             - 15.0 * (time/timefreq)**4
             + 6.0 * (time/timefreq)**5))
-        
-        if time <= timefreq-2:
-            q.append(q[-1] + time*qd[-1])
 
-        qdd.append(
+        qd.append(
             frequency * (1.0/timefreq) * (qf - robot.q) *
             (30.0 * (time/timefreq)**2.0
             - 60.0 * (time/timefreq)**3.0
             + 30.0 * (time/timefreq)**4.0))
     
-    rospy.logwarn(f"RETURNING a mjtg tragectory - move_time {move_time} - qd {qd} - qdd {qdd}")
-    rospy.logwarn(f"-- len q {len(q)}, len qd {len(qd)}, len qdd {len(qdd)}")
-    return Trajectory(name='minimum-jerk', t=move_time, s=q, sd=qd, sdd=qdd, istime=True)
+    rospy.loginfo(f"RETURNING a mjtg tragectory - len q {len(q)}, len qd {len(qd)}")
+    return Trajectory(name='minimum-jerk', t=move_time, s=q, sd=qd, sdd=None, istime=True)
 
 def populate_transform_stamped(parent_name: str, link_name: str, transform: np.array):
     """
