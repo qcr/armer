@@ -26,7 +26,7 @@ import yaml
 import qpsolvers as qp
 import spatialgeometry as sg
 
-from armer.utils import ikine, mjtg
+from armer.utils import ikine, mjtg, trapezoidal
 
 from std_msgs.msg import Header, Bool
 from sensor_msgs.msg import JointState
@@ -67,6 +67,8 @@ class ROSRobot(rtb.Robot):
                  max_joint_velocity_gain=20.0,
                  max_cartesian_speed=2.0,
                  trajectory_end_cutoff=0.000001,
+                 qlim_min=None,
+                 qlim_max=None,
                  * args,
                  **kwargs):  # pylint: disable=unused-argument
         
@@ -86,6 +88,11 @@ class ROSRobot(rtb.Robot):
         # TESTING
         self.collision_obj_list: List[sg.Shape] = list()
         self.backend_reset = False
+
+        # Update with ustom qlim (joint limits) if specified in robot config
+        if qlim_min and qlim_max:
+            self.qlim = np.array([qlim_min, qlim_max])
+            rospy.loginfo(f"Updating Custom qlim: {self.qlim}")
 
         # Singularity index threshold (0 is a sigularity)
         # NOTE: this is a tested value and may require configuration (i.e., speed of robot)
@@ -154,7 +161,7 @@ class ROSRobot(rtb.Robot):
 
         # Trajectory Generation (designed to expect a Trajectory class obj)
         self.executor = None
-        self.traj_generator = mjtg
+        self.traj_generator = trapezoidal #mjtg
 
         self.joint_subscriber = rospy.Subscriber(
             joint_state_topic if joint_state_topic else '/joint_states',
