@@ -31,56 +31,44 @@ def ikine(robot, target, q0, end):
 
     return type('obj', (object,), {'q' : np.array(result[0])})
 
-def trapezoidal(robot: rtb.Robot, qf: np.ndarray, max_speed: float=0.2, max_rot: float=0.5, frequency=500):
+def cartesian_move_time(robot: rtb.Robot, qf: np.ndarray, max_speed: float=0.2, max_rot: float=0.5, frequency=500):
+    """
+    Computes the Cartesian movement time given a start and end joint space state 
+    """
+    pass
+
+def trapezoidal(robot: rtb.Robot, qf: np.ndarray, max_speed: float=0.2, frequency=500, move_time_sec: float=5, linear: bool=True):
     rospy.loginfo(f"TESTING Hotfix 96fd293")
 
-    #---------------- Calculate Linear move time estimate (3 point sampling)
-    # Calculate start and end pose linear distance to estimate the expected time
-    current_ee_mat = robot.ets(start=robot.base_link, end=robot.gripper).eval(robot.q)
-    end_ee_mat = robot.ets(start=robot.base_link, end=robot.gripper).eval(qf)
+    # ------------ NOTE: determine a joint trajectory (curved) or Cartesian (straight) based on request
+    # Solve a trapezoidal trajectory in joint space based on provided solution based on defined number of steps (t)
+    # NOTE: this takes into account the robot's defined joint angle limits (defined in each robot's config as qlim_min and qlim_max)
+    traj: Trajectory() = None
+#    if linear:    
+#        current = SE3(robot.ets(start=robot.base_link, end=robot.gripper).eval(robot.q))
+#        end = SE3(robot.ets(start=robot.base_link, end=robot.gripper).eval(qf))
+#        ctraj = rtb.ctraj(T0=current, T1=end, t=frequency)
+#        traj = robot.ikine(ctraj)
+#    else:
+    traj = rtb.mtraj(rtb.trapezoidal, q0=robot.q, qf=qf, t=frequency)
 
-    current_ee_pose = current_ee_mat[:3, 3]
-    end_ee_pose = end_ee_mat[:3, 3]
+    # Calculate forward kinematic Cartesian trajectory in provided steps (t)
+    # cart_traj_normalised = robot.fkine(jtraj.q)
 
-    # Estimation of time taken based on linear motion from current to end cartesian pose
-    # We may require some optimisation of this given the curved nature of the actual ee trajectory
-    # NOTE / TODO: thanks Andrew investigate using an arc for a worst case estimate
-    D1 = np.sqrt((end_ee_pose[0] - current_ee_pose[0])**2 +
-        (end_ee_pose[1] - current_ee_pose[1])**2 +
-        (end_ee_pose[2] - current_ee_pose[2])**2)
+    # Check if trajectory is valid
+    if np.max(traj.qd) != 0:
+        # Scale the joint trajectories (in steps) to the overall expected move time (sec)
+        scaled_qd = traj.qd*(frequency/move_time_sec)
+        # print(f"max scaled qd: {np.max(scaled_qd)}")
 
-    # Termination on zero division
-    if max_speed == 0 or max_speed == None:
-        rospy.logerr(f"Solution Invalid --> max speed is {max_speed}")
+        # return the generated trajectory scaled with expected speed/time
+        return Trajectory(name='trapezoidal-v1', t=move_time_sec, s=traj.q, sd=scaled_qd, sdd=None, istime=True)
+    else:
+        rospy.logerr(f"Trajectory is invalid --> Cannot Solve.")
         return Trajectory(name='invalid', t=1, s=robot.q, sd=None, sdd=None, istime=False)
 
-    linear_move_time = D1 / max_speed 
-    
-    # Termination condition on zero time.
-    if linear_move_time == 0 or linear_move_time == None:
-        rospy.logerr(f"Solution Invalid --> linear move time is {linear_move_time}")
-        return Trajectory(name='invalid', t=1, s=robot.q, sd=None, sdd=None, istime=False)
-    #---------------- End
-    #----------------- Calculate Angular move time estimate (start to end)
-    current_ee_rot = current_ee_mat[:3,:3]
-    end_ee_rot = end_ee_mat[:3,:3]
 
-    angular_move_time = np.arccos((np.trace(np.transpose(end_ee_rot) @ current_ee_rot) - 1) / 2) / max_rot
-    #---------------- End
-
-    move_time = max(linear_move_time, angular_move_time)
-    rospy.loginfo(f'Estimated move time of {move_time} (max of) | lin {linear_move_time} | ang {angular_move_time}')
-
-    #---------------- Calculate New Trapezoidal Trajectory (RBT Implementation)
-    # Calculate the time array based on the movement time and the frequency (in sec)
-    t = np.arange(0, move_time, 1/frequency)
-    # Solve a trapezoidal trajectory in joint space based on provided solution
-    traj = rtb.mtraj(rtb.trapezoidal, q0=robot.q, qf=qf, t=t)
-    # Return the generated trajectory
-    return Trajectory(name='trapezoidal-v1', t=t, s=traj.q, sd=traj.qd, sdd=None, istime=True)
-
-
-def mjtg(robot: rtb.Robot, qf: np.ndarray, max_speed: float=0.2, max_rot: float=0.5, frequency=500):
+def mjtg(robot: rtb.robot, qf: np.ndarray, max_speed: float=0.2, max_rot: float=0.5, frequency=500):
     # This is the average cartesian speed we want the robot to move at
     # NOTE: divided by approx. 2 to make the max speed the approx. peak of the speed achieved
     # TODO: investigate a better approximation strategy here
@@ -119,6 +107,10 @@ def mjtg(robot: rtb.Robot, qf: np.ndarray, max_speed: float=0.2, max_rot: float=
 
     move_time = max(linear_move_time, angular_move_time)
     rospy.loginfo(f'Estimated move time of {move_time} (max of) | lin {linear_move_time} | ang {angular_move_time}')
+    # Edited as part of branch hotfix/96fd293: termination on invalid trajectory
+    if move_time == 0:
+        rospy.logerr(f"Trajectory is invalid --> Cannot Solve.")
+        return Trajectory(name='invalid', t=1, s=robot.q, sd=None, sdd=None, istime=False)
 
     # Obtain minimum jerk velocity profile of joints based on estimated end effector move time
     q = []

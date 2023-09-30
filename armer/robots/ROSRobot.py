@@ -906,9 +906,9 @@ class ROSRobot(rtb.Robot):
                 rospy.logwarn(f"IK solution within singularity threshold [{self.singularity_thresh}] -> ill-advised motion")
             
             self.executor = TrajectoryExecutor(
-              self,
-              self.traj_generator(self, solution.q, goal.speed if goal.speed else 0.2),
-              cutoff=self.trajectory_end_cutoff
+                self,
+                self.traj_generator(self, qf=solution.q, max_speed=goal.speed if goal.speed else 0.2),
+                cutoff=self.trajectory_end_cutoff
             )
 
             while not self.executor.is_finished():
