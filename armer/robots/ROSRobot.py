@@ -161,7 +161,7 @@ class ROSRobot(rtb.Robot):
 
         # Trajectory Generation (designed to expect a Trajectory class obj)
         self.executor = None
-        self.traj_generator = trapezoidal #mjtg
+        self.traj_generator = mjtg
 
         self.joint_subscriber = rospy.Subscriber(
             joint_state_topic if joint_state_topic else '/joint_states',
