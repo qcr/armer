@@ -1127,7 +1127,7 @@ class ROSRobot(rtb.Robot):
                 )
                 return           
 
-            if not goal.pose_name in named_poses:
+            if goal.pose_name not in named_poses:
                 self.named_pose_in_frame_server.set_aborted(
                     MoveToNamedPoseResult(success=False),
                     'Unknown named pose'
@@ -1160,7 +1160,7 @@ class ROSRobot(rtb.Robot):
             # Transform into the current base_link ready for inv kin
             # TODO: base_link here should come from self.base_link (assuming this is base_link)
             goal_pose = self.tf_listener.transformPose(
-                        '/base_link',
+                        f'/{self.base_link.name}',
                         pose_stamped,
                     )
 
@@ -1171,7 +1171,7 @@ class ROSRobot(rtb.Robot):
 
             solution = None
             try:
-                solution = ikine(self, pose, q0=self.q, end=self.gripper)
+                solution = ikine(self, target=pose, q0=self.q, end=self.gripper)
             except:
                 rospy.logwarn("Failed to get IK Solution...")
                 self.named_pose_in_frame_server.set_succeeded(
@@ -1187,7 +1187,7 @@ class ROSRobot(rtb.Robot):
             if self.pose_within_workspace(pose) == False:
                 rospy.logwarn(f"-- Named pose ({goal.pose_name}) goal outside defined workspace; refusing to move...")
                 self.named_pose_in_frame_server.set_succeeded(
-                  MoveToNamedPoseResult(success=False), f'Named pose ({goal.pose_name}) outside defined workspace using frame: {goal.frame_id}'
+                  MoveToNamedPoseResult(success=False), f'Named pose ({goal.pose_name}) outside defined workspace using frame: {frame_id}'
                 )
                 self.executor = None
                 self.moving = False
@@ -1498,13 +1498,13 @@ class ROSRobot(rtb.Robot):
         config_file = config_file.replace('.yaml', '_in_frame.yaml')
         try:
             config = yaml.load(open(config_file), Loader=yaml.SafeLoader)
-            if config and 'named_poses' in config:
+            if config and 'named_poses' in config and config['named_poses'] != None:
                 named_poses = config['named_poses']
         except IOError:
             rospy.logwarn(
                 'Unable to locate configuration file: {}'.format(config_file))
             return AddNamedPoseInFrameResponse(success=False)            
-            
+           
         if req.name in named_poses and not req.overwrite:
             rospy.logerr('Named pose already exists.')
             return AddNamedPoseInFrameResponse(success=False)
@@ -1512,12 +1512,10 @@ class ROSRobot(rtb.Robot):
         # TODO: transform into frame requested and save PoseStamped
         ## named PoseStamped position
         ee_pose = self.ets(start=self.base_link, end=self.gripper).eval(self.q.tolist())
-        header = Header()
-        header.frame_id = '/base_link' #self.base_link.name
-        # header.stamp = rospy.Time.now()
+        rospy.logerr(f'The self.base_link.name is: {self.base_link.name}')
 
         pose_stamped = PoseStamped()
-        pose_stamped.header = header
+        pose_stamped.header.frame_id = self.base_link.name
 
         translation = ee_pose[:3, 3]    
         pose_stamped.pose.position.x = translation[0]
