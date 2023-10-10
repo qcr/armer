@@ -4,7 +4,6 @@ Armer Driver
 [![QUT Centre for Robotics Open Source](https://github.com/qcr/qcr.github.io/raw/master/misc/badge.svg)](https://qcr.github.io)
 [![License](https://img.shields.io/github/license/qcr/armer)](./LICENSE.txt)
 [![Build Status](https://github.com/qcr/armer/workflows/Build/badge.svg?branch=master)](https://github.com/qcr/armer/actions?query=workflow%3ABuild)
-[![Language grade: Python](https://img.shields.io/lgtm/grade/python/g/qcr/armer.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/qcr/armer/context:python)
 [![codecov](https://codecov.io/gh/qcr/armer/branch/master/graph/badge.svg?token=GERHR5QTOF)](https://codecov.io/gh/qcr/armer)
 
 ![image](https://github.com/qcr/armer/wiki/armer_example.gif)
@@ -60,6 +59,7 @@ require several requirements:
     Python](https://pypi.org/project/roboticstoolbox-python/)
 -   [QCR repos](https://qcr.github.io/armer/add_qcr_repos.html)
 - Chrome browser (for using Swift sim)
+- [pointcloud_utils](https://github.com/qcr/pointcloud_utils) ROS package from QCR
 
 ### Robot specific requirements
 
@@ -78,9 +78,9 @@ terminal is opened. If [RoboStack](https://robostack.github.io/) is preferred, p
 # Install pip 
 sudo apt install python3-pip
 
-# Make the workspace and clone armer and armer_msgs packages
+# Make the workspace and clone armer, armer_msgs, and pointcloud_utils packages
 mkdir -p ~/armer_ws/src && cd ~/armer_ws/src 
-git clone https://github.com/qcr/armer.git && git clone https://github.com/qcr/armer_msgs 
+git clone https://github.com/qcr/armer.git && git clone https://github.com/qcr/armer_msgs && git clone https://github.com/qcr/pointcloud_utils.git
 
 # Install all required packages
 pip install -r ~/armer_ws/src/armer/requirements.txt
@@ -113,8 +113,8 @@ mamba install vs2022_win-64
 mkdir -p ~/armer_ws/src && cd ~/armer_ws/src 
 # FOR WINDOWS: Assumes you are in the home folder
 mkdir armer_ws\src && cd armer_ws\src
-# Clone in armer and armer_msgs
-git clone https://github.com/qcr/armer.git && git clone https://github.com/qcr/armer_msgs 
+# Clone in armer, armer_msgs, and pointcloud_utils
+git clone https://github.com/qcr/armer.git && git clone https://github.com/qcr/armer_msgs && git clone https://github.com/qcr/pointcloud_utils.git
 # Install all required packages (into ros-env) - from current directory
 # FOR LINUX/MACOS
 pip install -r armer/requirements.txt
