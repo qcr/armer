@@ -16,6 +16,7 @@ class TrajectoryExecutor:
 
     self.robot: rtb.ERobot = robot
     self.traj: Trajectory = traj
+    self.traj_max_time = np.max(self.traj.t)
     
     self.last_jp = np.zeros(self.robot.n)
 
@@ -29,7 +30,9 @@ class TrajectoryExecutor:
     self._success = False
 
     self.cutoff = cutoff
-    
+
+    #DEBUGGING
+    print(f"max traj time: {self.traj_max_time}")
 
     if self.traj.istime and len(self.traj.s) >= 2:
       s = np.linspace(0, 1, len(self.traj.s))
@@ -54,8 +57,8 @@ class TrajectoryExecutor:
 
     # Calculate required joint velocity at this point in time based on trajectory
     if self.traj.istime:
-      req_jp = self.qfunc(self.time_step / self.traj.t)
-      req_jv = self.qdfunc(self.time_step / self.traj.t)
+      req_jp = self.qfunc(self.time_step / self.traj_max_time)
+      req_jv = self.qdfunc(self.time_step / self.traj_max_time)
     else:
       req_jp = self.traj.s[self.time_step]
       req_jv = self.traj.sd[self.time_step]
@@ -69,7 +72,16 @@ class TrajectoryExecutor:
     # Calculate corrected error based on error above
     corr_jv = current_jv + erro_jv
     
-    # corr_jv = np.zeros(self.robot.n)
+    # TODO: remove debugging - note that this method is sometimes preempted...
+    # DEBUG
+    # print(f"---")
+    # print(f"time step is: {self.time_step}")
+    # print(f"current jv is: {current_jv} | alt (self.j_v) is: {self.robot.j_v}")
+    # print(f"exp jv is: {req_jv}")
+    # print(f"error in jv is: {erro_jv}")
+    # print(f"corrected jv is: {corr_jv}")
+    # print(f"###")
+
     # TODO: Validate 
     # - has this max delta been checked on xArm and others?
     # - should it be exposed as a parameter?
@@ -80,15 +92,6 @@ class TrajectoryExecutor:
     # Increment time step(s)
     self.time_step += dt if self.traj.istime else 1
 
-    # TODO: remove debugging - note that this method is sometimes preempted...
-    # DEBUG
-    # print(f"---")
-    # print(f"time step is: {self.time_step}")
-    # print(f"current jv is: {current_jv} | alt (self.j_v) is: {self.robot.j_v}")
-    # print(f"exp jv is: {req_jv}")
-    # print(f"error in jv is: {erro_jv}")
-    # print(f"corrected jv is: {corr_jv}")
-    # print(f"###")
     return corr_jv
 
   def abort(self):
@@ -110,13 +113,13 @@ class TrajectoryExecutor:
         rospy.loginfo("Trajectory length is NOT the problem")
         link_errors = np.fabs(self.traj.s[-1] - self.robot.q)
         rospy.loginfo(f'Link errors used to apply cutoff ({cutoff}): \n{link_errors}')
-      rospy.loginfo(f'Too close to goal {(self.time_step / self.traj.t)}')
+      rospy.loginfo(f'Too close to goal {(self.time_step / self.traj_max_time)}')
       if self.cartesian_ee_vel_vect:
         rospy.loginfo(f"Max cartesian speed: {np.max(self.cartesian_ee_vel_vect)}")
       self._finished = True
       self._success = True
     
-    if (self.time_step) >= self.traj.t - (1 if not self.traj.istime else 0):
+    if (self.time_step) >= self.traj_max_time - (1 if not self.traj.istime else 0):
       rospy.loginfo(f'Timed out | End time: {self.time_step}')
       if self.cartesian_ee_vel_vect:
         rospy.loginfo(f"Max cartesian speed: {np.max(self.cartesian_ee_vel_vect)}")

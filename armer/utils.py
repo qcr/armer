@@ -18,6 +18,7 @@ def ikine(robot, target, q0, end):
             UnitQuaternion(target.orientation.w, [target.orientation.x, target.orientation.y, target.orientation.z]).SE3()
             
     # Using the roboticstoolbox Levemberg-Marquadt (LM) Numerical inverse kinematics solver
+    # NOTE: takes into account joint limits of robot (qlim)
     result = robot.ik_LM(
         Tep,
         end=end,
@@ -29,8 +30,27 @@ def ikine(robot, target, q0, end):
         return type('obj', (object,), {'q' : q0})
 
     return type('obj', (object,), {'q' : np.array(result[0])})
-    
-def mjtg(robot: rtb.Robot, qf: np.ndarray, max_speed: float=0.2, max_rot: float=0.5, frequency=500):
+
+def trapezoidal(robot: rtb.Robot, qf: np.ndarray, max_speed=None, frequency=500, move_time_sec: float=5):
+    rospy.loginfo(f"TESTING Hotfix 96fd293")
+
+    # ------------ NOTE: determine a joint trajectory (curved) based on time request
+    # Solve a trapezoidal trajectory in joint space based on provided solution based on defined number of steps (t)
+    # NOTE: this takes into account the robot's defined joint angle limits (defined in each robot's config as qlim_min and qlim_max)
+    traj = rtb.mtraj(rtb.trapezoidal, q0=robot.q, qf=qf, t=frequency)
+
+    # Check if trajectory is valid
+    if np.max(traj.qd) != 0:
+        # Scale the joint trajectories (in steps) to the overall expected move time (sec)
+        scaled_qd = traj.qd*(frequency/move_time_sec)
+        # print(f"max scaled qd: {np.max(scaled_qd)}")
+        # return the generated trajectory scaled with expected speed/time
+        return Trajectory(name='trapezoidal-v1', t=move_time_sec, s=traj.q, sd=scaled_qd, sdd=None, istime=True)
+    else:
+        rospy.logerr(f"Trajectory is invalid --> Cannot Solve.")
+        return Trajectory(name='invalid', t=1, s=robot.q, sd=None, sdd=None, istime=False)
+
+def mjtg(robot: rtb.robot, qf: np.ndarray, max_speed: float=0.2, max_rot: float=0.5, frequency=500):
     # This is the average cartesian speed we want the robot to move at
     # NOTE: divided by approx. 2 to make the max speed the approx. peak of the speed achieved
     # TODO: investigate a better approximation strategy here
@@ -69,6 +89,10 @@ def mjtg(robot: rtb.Robot, qf: np.ndarray, max_speed: float=0.2, max_rot: float=
 
     move_time = max(linear_move_time, angular_move_time)
     rospy.loginfo(f'Estimated move time of {move_time} (max of) | lin {linear_move_time} | ang {angular_move_time}')
+    # Edited as part of branch hotfix/96fd293: termination on invalid trajectory
+    if move_time == 0:
+        rospy.logerr(f"Trajectory is invalid --> Cannot Solve.")
+        return Trajectory(name='invalid', t=1, s=robot.q, sd=None, sdd=None, istime=False)
 
     # Obtain minimum jerk velocity profile of joints based on estimated end effector move time
     q = []
