@@ -178,6 +178,8 @@ class ROSRobot(rtb.Robot):
             self.tf_listener = tf.TransformListener()
 
             # --- Setup Configuration for ARMer --- #
+            # NOTE: this path (if not set in the cfg/ARM_real.yaml) does not find the user when run
+            #       with systemd. This param must be loaded in via the specific robot_real.yaml file.
             self.config_path = config_path if config_path else os.path.join(
                 os.getenv('HOME', '/home'),
                 '.ros/configs/system_named_poses.yaml'
@@ -2138,7 +2140,6 @@ class ROSRobot(rtb.Robot):
                                    Loader=yaml.SafeLoader)
                 if config and 'named_poses' in config:
                     self.named_poses.update(config['named_poses'])
-
             except IOError:
                 pass
 
