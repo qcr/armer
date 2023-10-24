@@ -85,8 +85,7 @@ class ROSRobot(rtb.Robot):
         self.tfBuffer = tf2_ros.Buffer()
         self.listener = tf2_ros.TransformListener(self.tfBuffer)
 
-        # TESTING
-        self.collision_obj_list: List[sg.Shape] = list()
+
         self.backend_reset = False
 
         # Update with ustom qlim (joint limits) if specified in robot config
@@ -105,15 +104,19 @@ class ROSRobot(rtb.Robot):
           self.gripper = self.grippers[0].name if len(self.grippers) > 0 else 'tool0'
           
         sorted_links=[]
-        #sort links by parents starting from gripper
+        # Sort links by parents starting from gripper
         link=self.link_dict[self.gripper]   
         # COLLISION HANDLING TESTING
         # NOTE: needs optimisation in future
         # Loops through links (as read in through URDF parser)
         # Extracts each link's list of collision shapes (of type sg.Shape). TODO: add a validity check on type here
         # Updates a class dictionary (key as link name) -> ideally first entry is our gripper (this can change)
+        # Create a new dictionary of link lookup to ignore overlapping joint/collision objects
+        # NOTE: the theory here is to keep a record of all expected collisions (overlaps) per link so that
+        #       the main self collision check can ignore these cases. 
+        self.overlapped_link_dict = dict()
         self.collision_dict = dict()
-        self.collision_obj_list = list()
+        self.collision_approached = False
         # Iterate through links and sort - add to tracked collision list
         while link is not None:
             # Debugging
@@ -123,12 +126,6 @@ class ROSRobot(rtb.Robot):
             sorted_links.append(link)
             link=link.parent
         sorted_links.reverse()
-
-        # Create a new dictionary of link lookup to ignore overlapping joint/collision objects
-        # NOTE: the theory here is to keep a record of all expected collisions (overlaps) per link so that
-        #       the main self collision check can ignore these cases. 
-        self.overlapped_link_dict = dict()
-        self.collided_flag = False
         # Debugging
         # print(f"Collision dict for links: {self.collision_dict}\n")
         # print(f"Dictionary of expected link collisions: {self.overlapped_link_dict}\n")    
@@ -1689,90 +1686,34 @@ class ROSRobot(rtb.Robot):
         self.Kd = None
 
     # --------------------------------------------------------------------- #
-    # --------- Standard Methods ------------------------------------------ #
+    # --------- Collision and Singularity Checking Methods ---------------- #
     # --------------------------------------------------------------------- #
     def add_collision_obj(self, obj: sg.Shape):
-        self.collision_obj_list.append(obj)
-
-    # def self_collision_check(self, link_name: str = '') -> Bool:
-    #     """
-    #     Checks given link against dictionary of collision objects
-    #     Returns True if collided, or False if not
-    #     """
-
-    #     # TODO: make this more efficient (can grow with size of collision objects)
-    #     # for link_key in self.collision_dict.keys():
-    #         # print(f"<-------- link key: {link_key} --------->")
-
-    #         # Ignore key if it is what we are checking against
-    #         # if link_key == link_name:
-    #             # print(f"Ignoring as it is the main key")
-    #             # print(f"########\n")
-    #             # continue
-
-
-    #         # print(f"TARGET LIST: {check_list}")
-    #         # print(f"CURRENT LIST: {self.collision_dict[link_key]}")
-
-    #         # for tar, curr in [(tar, curr) for tar in check_list for curr in self.collision_dict[link_key]]:
-    #             # print(f"tar {tar} and curr: {curr}")
-    #             # pass
-
-    #         # print(f"########\n")
-
-    #     # The robot class has an iscollided method, which provides an output given a shape
-    #     # pass through the provided link's shape list and check if is collided
-    #     for obj in check_list:
-    #         # d, p1, p2 = self.closest_point(self.q, obj, skip=True)
-    #         # print(f"Distance: {d} | p1: {p1} | p2: {p2}")
-    #         if self.gripper_iscollided(q=self.q, shape=obj, target_link=link_name, check_stop_link='panda_link7'):
-    #             print(f"COLLISION")
-    #             return True
-
-    #     return False
-
-    def resolve_collision_tree(self) -> dict():
         """
-        Attempts to create a new dictionary of link keys with a list of expected link collisions
+        TODO: Implement a way to add to existing collision dictionary at runtime
         """
-        out_dict = dict()
+        pass
 
-        # # DEBUGGING
-        # # NOTE: the last link in self.links stops before the gripper
-        # print(f"Last link: {self.links[-1]}")
-
-        # # Iterate through all links from top to base
-        # for link in self.links:
-        #     collision = True
-        #     links_in_collision_list = []
-        #     while collision:
-        #         # print(f"CHECKING Link name: {link.name}")
-        #         # Check link collision of current link
-        #         col_link, collision = self.check_link_collision(target_link=link.name, stop_link=self.links[-1].name, ignore_list=links_in_collision_list)
-
-        #         if collision:    
-        #             # print(f"INIT: collision found for {link.name} with {col_link.name}")
-        #             links_in_collision_list.append(col_link.name)
-
-        #     print(f"Here having completed collision check for link: {link.name} -> found links in collision: {links_in_collision_list}")
-        #     self.overlapped_link_dict[link.name] = links_in_collision_list
-
-        # # Iterate through all links from top to base
-        # for glink in self.grippers:
-        #     collision = True
-        #     links_in_collision_list = []
-        #     while collision:
-        #         # print(f"CHECKING Link name: {link.name}")
-        #         # Check link collision of current link
-        #         col_link, collision = self.check_link_collision(target_link=glink.name, stop_link=self.grippers[-1].name, ignore_list=links_in_collision_list)
-
-        #         if collision:    
-        #             # print(f"INIT: collision found for {link.name} with {col_link.name}")
-        #             links_in_collision_list.append(col_link.name)
-
-        #     print(f"Here having completed collision check for glink: {glink.name} -> found links in collision: {links_in_collision_list}")
-        #     self.overlapped_link_dict[glink.name] = links_in_collision_list
-
+    def characterise_collision_overlaps(self) -> bool:
+        """
+        Characterises the existing robot tree and tracks overlapped links in collision handling
+        NOTE: needed to do collision checking, when joints are typically (neighboring) overlapped
+        """
+        # Error handling on gripper name
+        if self.gripper == None or self.gripper == "":
+            rospy.logerr(f"Characterise Collision Overlaps -> gripper name is invalid: {self.gripper}")
+            return False 
+        
+        # Error handling on empty lick dictionary (should never happen but just in case)
+        if self.link_dict == dict() or self.link_dict == None:
+            rospy.logerr(f"Characterise Collision Overlaps -> link dictionary is invalid: {self.link_dict}")
+            return False
+        
+        # Error handling on collision object dict
+        if self.collision_dict == dict() or self.collision_dict == None:
+            rospy.logerr(f"Characterise Collision Overlaps -> collision dictionary is invalid: [{self.collision_dict}]")
+            return False
+        
         # Iterate backwards starting with gripper
         link=self.link_dict[self.gripper]   
         while link is not None:
@@ -1787,50 +1728,50 @@ class ROSRobot(rtb.Robot):
                     # print(f"INIT: collision found for {link.name} with {col_link.name}")
                     links_in_collision_list.append(col_link.name)
 
-            print(f"Here having completed collision check for link: {link.name} -> found links in collision: {links_in_collision_list}")
+            rospy.loginfo(f"Characterise Collision Overlaps -> Completed collision check for link: {link.name} -> found links in collision: {links_in_collision_list}")
             self.overlapped_link_dict[link.name] = links_in_collision_list
             link=link.parent
+
+        # Reached end in success
+        return True
 
     def full_collision_check(self):
         """
         Conducts a full check for collisions
         NOTE: takes into account resolved overlaps in current tree
         """
+        # Error handling on gripper name
+        if self.gripper == None or self.gripper == "":
+            rospy.logerr(f"Full Collision Check -> gripper name is invalid: {self.gripper}")
+            return False
+        
+        # Error handling on empty lick dictionary (should never happen but just in case)
+        if self.link_dict == dict() or self.link_dict == None:
+            rospy.logerr(f"Full Collision Check -> link dictionary is invalid: {self.link_dict}")
+            return False
 
-        # # Iteratre through all links from top to base 
-        # for link in self.links:
-        #     col_link, collision = self.check_link_collision(target_link=link.name, stop_link=self.links[-1].name, ignore_list=self.overlapped_link_dict[link.name])
-        #     if collision:
-        #         print(f"Link {col_link.name} in collision with link {link.name}")
-        #         return True
-
-        # for gripper_link in self.grippers:
-        #     # print(f"HERE with link: {gripper_link}")
-        #     col_link, collision = self.check_link_collision(target_link=gripper_link.name, stop_link=self.grippers[-1].name, ignore_list=self.overlapped_link_dict[gripper_link.name])
-        #     if collision:
-        #         print(f"Gripper Link {col_link.name} in collision with link {gripper_link.name}")
-        #         return True
-
+        # Error handling on collision object dict and overlap dict
+        if self.overlapped_link_dict == dict() or self.overlapped_link_dict == None or \
+            self.collision_dict == dict() or self.collision_dict == None:
+            rospy.logerr(f"Full Collision Check -> collision or overlap dictionaries invalid: [{self.collision_dict}] | [{self.overlapped_link_dict}]")
+            return False
+        
         # Iterate backwards starting with gripper
         link=self.link_dict[self.gripper]   
         while link is not None:
             col_link, collision = self.check_link_collision(target_link=link.name, stop_link=self.gripper, ignore_list=self.overlapped_link_dict[link.name])
             if collision:
-                print(f"Link {col_link.name} in collision with link {link.name}")
+                rospy.logwarn(f"Full Collision Check -> Link {col_link.name} in collision with link {link.name}")
                 return True
             link=link.parent
 
+        # No collisions found with no errors identified.
         return False
     
     def check_link_collision(self, target_link: str, stop_link: str, ignore_list: list = []):
         """
         This method is similar to roboticstoolbox.robot.Robot.iscollided
-        NOTE: updated to ignore gripper for self checking
-        NOTE: as the gripper link is technically already in collision with its immediate neighbor, more thought is needed
-                to characterise self collision handling. Usually the gripper, its next attachment 
-                (and in some cases the next one as well) may be in collision depending on each
-                robot's case. For example, the panda arm, if checking the panda_hand link, is already in collision with panda_link8 
-                and panda_link7. 
+        NOTE: ignore list used to ignore known overlapped collisions (i.e., neighboring link collisions)
         """
         # Handle invalid link name input
         if target_link == '' or target_link == None or not isinstance(target_link, str):
@@ -1856,11 +1797,6 @@ class ROSRobot(rtb.Robot):
             if link.name in ignore_list:
                 # print(f"Link {link.name} is in list: {ignore_list}")
                 continue
-
-            # # Terminate at check stop link
-            # if link.name == stop_link:
-            #     # rospy.logwarn(f"Self Collision Check -> Terminating iteration")
-            #     return None, False
 
             # Ignore check if the target link is the same
             if link.name == target_link:
@@ -1993,6 +1929,28 @@ class ROSRobot(rtb.Robot):
             self.singularity_approached = False
             return False
 
+    def check_collision(self) -> bool:
+        """
+        High-level check of collision
+        NOTE: this is called by loop to verify preempt of robot
+        """
+        # Check for collisions
+        # NOTE: optimise this as much as possible
+        # NOTE: uncomment below Timer line to verify frequency of operation
+        # with Timer(name="Collision Check"):
+        collision = self.full_collision_check()
+
+        # Handle checking
+        if collision and self.preempted == False:
+            self.collision_approached = True
+            return True
+        else:
+            self.collision_approached = False
+            return False
+        
+    # --------------------------------------------------------------------- #
+    # --------- Standard Methods ------------------------------------------ #
+    # --------------------------------------------------------------------- #
     def close(self):
         """
         Closes the action servers associated with this robot
@@ -2014,9 +1972,9 @@ class ROSRobot(rtb.Robot):
             rospy.logwarn(f"PREEMPTED: Approaching singularity (index: {self.manip_scalar}) --> please home to fix")
             self.singularity_approached = False
 
-        if self.collided_flag:
+        if self.collision_approached:
             rospy.logwarn(f"PREEMPTED: Collision Found --> please home to fix")
-            self.collided_flag = False
+            self.collision_approached = False
 
         self.preempted = True
         self._controller_mode = ControlMode.JOINTS
@@ -2248,17 +2206,17 @@ class ROSRobot(rtb.Robot):
         #   (1) characterise each link and their existing collision points under standard use (i.e., in ready pose)
         #   (2) search throughout robot links, checking each link and ignoring expected collections
         #   (3) preempt on UNEXPECTED collisions.
-        if not self.preempted:
-            # print(f"gripper: {self.gripper}")
-            # self.resolve_collision_tree()
-            # self.collided_flag = True
-            self.collided_flag = self.full_collision_check()
+        # if not self.preempted:
+        #     # print(f"gripper: {self.gripper}")
+        #     # self.resolve_collision_tree()
+        #     # self.collided_flag = True
+        #     self.collided_flag = self.full_collision_check()
             # _, self.collided_flag = self.check_link_collision(target_link=self.gripper, stop_link="panda_link7") 
 
         # PREEMPT motion on any detected state errors or singularity approach
         if self.state.errors != 0 \
             or self.check_singularity(self.q) \
-            or self.collided_flag:
+            or self.check_collision():
             # print(f"preempting...")
             self.preempt()
 
@@ -2342,6 +2300,10 @@ class ROSRobot(rtb.Robot):
             if any(self.j_v) and current_time - self.last_update > 0.1:
                 self.j_v = [v * 0.9 if np.absolute(v) > 0 else 0 for v in self.j_v]
             
+        # NOTE: Current preempt method sets the control mode to ControlMode.JOINTS
+        #       This allows the arm to still be controllable via a traj move (i.e., home) in the event of an issue
+        #       HOWEVER, pure joint control preempt does not work, because it does not stop the motion of the arm.
+        # TODO: Add an implementation that preempts ONLY to a re-homing state (for recovery). On home, preempt should release
         self.qd = self.j_v
         self.last_tick = current_time
 

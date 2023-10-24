@@ -86,7 +86,7 @@ class Armer:
             # Resolve robot links for collision checking
             # NOTE: must be done after adding to backend
             # TODO: confirm with ROS backend
-            robot.resolve_collision_tree()
+            robot.characterise_collision_overlaps()
 
 
             # # TESTING
