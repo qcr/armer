@@ -101,7 +101,7 @@ class URDFRobot(Robot):
 
       node = tree.getroot()
       urdf = URDF._from_xml(node, '/')
-
+      
       return urdf.elinks, urdf.name, urdf_string, '/'
     else:
       return None, None, None, None

@@ -80,8 +80,14 @@ class Armer:
 
         # print(f"init links:")
         for robot in self.robots:
-            # print(f"{robot.links}")
-            self.backend.add(robot)
+            # Add robot to the backend
+            self.backend.add(robot, collision_alpha=0.2)
+            
+            # Resolve robot links for collision checking
+            # NOTE: must be done after adding to backend
+            # TODO: confirm with ROS backend
+            robot.resolve_collision_tree()
+
 
             # # TESTING
             # # Add dummy object for testing
