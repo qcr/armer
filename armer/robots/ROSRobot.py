@@ -126,6 +126,16 @@ class ROSRobot(rtb.Robot):
             sorted_links.append(link)
             link=link.parent
         sorted_links.reverse()
+ 
+        # Check for external links (from robot tree)
+        # TODO: This is required to add any other links (not specifically part of the robot tree) to our collision dictionary for checking
+        for link in self.links:
+            # print(f"links: {link.name}")
+            if link.name in self.collision_dict.keys():
+                continue
+
+            self.collision_dict[link.name] = link.collision.data if link.collision.data else []
+
         # Debugging
         # print(f"Collision dict for links: {self.collision_dict}\n")
         # print(f"Dictionary of expected link collisions: {self.overlapped_link_dict}\n")    
@@ -1715,6 +1725,8 @@ class ROSRobot(rtb.Robot):
             return False
         
         # Iterate backwards starting with gripper
+        # NOTE: starts at gripper and ends at robot base
+        #       the assumption here is that other external links are not 'part' of the arm
         link=self.link_dict[self.gripper]   
         while link is not None:
             collision = True
@@ -1757,6 +1769,7 @@ class ROSRobot(rtb.Robot):
             return False
         
         # Iterate backwards starting with gripper
+        # NOTE: this only iterates over the length of the robot links, but compares against all links in collision dictionary
         link=self.link_dict[self.gripper]   
         while link is not None:
             col_link, collision = self.check_link_collision(target_link=link.name, stop_link=self.gripper, ignore_list=self.overlapped_link_dict[link.name])
@@ -1792,6 +1805,7 @@ class ROSRobot(rtb.Robot):
         check_list = self.collision_dict[target_link]
         # rospy.loginfo(f"{target_link} has the following collision objects: {check_list}")
         
+        # NOTE iterates over all configured links 
         for link in self.links:
             # Check against ignore list and continue if inside
             if link.name in ignore_list:
@@ -1936,9 +1950,9 @@ class ROSRobot(rtb.Robot):
         """
         # Check for collisions
         # NOTE: optimise this as much as possible
-        # NOTE: uncomment below Timer line to verify frequency of operation
-        # with Timer(name="Collision Check"):
-        collision = self.full_collision_check()
+        # NOTE: enabled in below Timer line to True for debugging print of frequency of operation
+        with Timer(name="Collision Check",enabled=False):
+            collision = self.full_collision_check()
 
         # Handle checking
         if collision and self.preempted == False:
