@@ -9,5 +9,6 @@ __path__ = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
 
 if __name__ == '__main__':
     rospy.init_node('armer_node')
+    print(f"path: {rospy.get_param('~config')}")
     armer = Armer.load(rospy.get_param('~config', os.path.join(__path__, 'cfg/panda_sim.yaml')))
     armer.run()

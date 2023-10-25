@@ -45,6 +45,7 @@ from armer_msgs.srv import *
 import tf2_ros
 
 class ControlMode:
+   ERROR=0
    JOINTS=1
    CARTESIAN=2
 
@@ -457,7 +458,12 @@ class ROSRobot(rtb.Robot):
         :param msg: [description]
         :type msg: TwistStamped
         """
+        if self._controller_mode == ControlMode.ERROR:
+            rospy.logerr(f"CART VEL CB: [{self.name}] in Error Control Mode...")
+            return None
+
         if self.moving:
+            print(f"HERE because moving (CART)")
             self.preempt()
 
         with self.lock:
@@ -472,7 +478,12 @@ class ROSRobot(rtb.Robot):
         :param msg: [description]
         :type msg: JointVelocity
         """
-        if self.moving:
+        if self._controller_mode == ControlMode.ERROR:
+            rospy.logerr(f"JOINT VEL CB: [{self.name}] in Error Control Mode...")
+            return None
+        
+        if self.moving:            
+            print(f"HERE because moving (JOINT)")
             self.preempt()
 
         with self.lock:
@@ -1380,6 +1391,12 @@ class ROSRobot(rtb.Robot):
                   HomeResult(success=False)
                 )
 
+            # Recover from Error if set
+            if self._controller_mode == ControlMode.ERROR:
+                rospy.loginfo(f"Resetting from ERROR state to JOINTS [Default]")
+                self._controller_mode = ControlMode.JOINTS
+                self.preempted = False
+
             self.executor = None
             self.moving = False
 
@@ -1703,6 +1720,13 @@ class ROSRobot(rtb.Robot):
         TODO: Implement a way to add to existing collision dictionary at runtime
         """
         pass
+    
+    def get_link_collision_dict(self) -> dict():
+        """
+        Returns a dictionary of all associated links (names) which lists their respective collision data
+        To be used by high-level armer class for collision handling
+        """
+        return self.collision_dict
 
     def characterise_collision_overlaps(self) -> bool:
         """
@@ -1734,7 +1758,7 @@ class ROSRobot(rtb.Robot):
             while collision:
                 # print(f"CHECKING Link name: {link.name}")
                 # Check link collision of current link
-                col_link, collision = self.check_link_collision(target_link=link.name, stop_link=self.gripper, ignore_list=links_in_collision_list)
+                col_link, collision = self.check_link_collision(target_link=link.name, stop_link=self.gripper, check_list=self.collision_dict[link.name], ignore_list=links_in_collision_list)
 
                 if collision:    
                     # print(f"INIT: collision found for {link.name} with {col_link.name}")
@@ -1747,41 +1771,44 @@ class ROSRobot(rtb.Robot):
         # Reached end in success
         return True
 
-    def full_collision_check(self):
-        """
-        Conducts a full check for collisions
-        NOTE: takes into account resolved overlaps in current tree
-        """
-        # Error handling on gripper name
-        if self.gripper == None or self.gripper == "":
-            rospy.logerr(f"Full Collision Check -> gripper name is invalid: {self.gripper}")
-            return False
+    # def full_collision_check(self):
+    #     """
+    #     Conducts a full check for collisions
+    #     NOTE: takes into account resolved overlaps in current tree
+    #     NOTE: NOT NEEDED AS HIGH-LEVEL CHECK IS RUNNING
+    #     """
+    #     # Error handling on gripper name
+    #     if self.gripper == None or self.gripper == "":
+    #         rospy.logerr(f"Full Collision Check -> gripper name is invalid: {self.gripper}")
+    #         return False
         
-        # Error handling on empty lick dictionary (should never happen but just in case)
-        if self.link_dict == dict() or self.link_dict == None:
-            rospy.logerr(f"Full Collision Check -> link dictionary is invalid: {self.link_dict}")
-            return False
+    #     # Error handling on empty lick dictionary (should never happen but just in case)
+    #     if self.link_dict == dict() or self.link_dict == None:
+    #         rospy.logerr(f"Full Collision Check -> link dictionary is invalid: {self.link_dict}")
+    #         return False
 
-        # Error handling on collision object dict and overlap dict
-        if self.overlapped_link_dict == dict() or self.overlapped_link_dict == None or \
-            self.collision_dict == dict() or self.collision_dict == None:
-            rospy.logerr(f"Full Collision Check -> collision or overlap dictionaries invalid: [{self.collision_dict}] | [{self.overlapped_link_dict}]")
-            return False
+    #     # Error handling on collision object dict and overlap dict
+    #     if self.overlapped_link_dict == dict() or self.overlapped_link_dict == None or \
+    #         self.collision_dict == dict() or self.collision_dict == None:
+    #         rospy.logerr(f"Full Collision Check -> collision or overlap dictionaries invalid: [{self.collision_dict}] | [{self.overlapped_link_dict}]")
+    #         return False
         
-        # Iterate backwards starting with gripper
-        # NOTE: this only iterates over the length of the robot links, but compares against all links in collision dictionary
-        link=self.link_dict[self.gripper]   
-        while link is not None:
-            col_link, collision = self.check_link_collision(target_link=link.name, stop_link=self.gripper, ignore_list=self.overlapped_link_dict[link.name])
-            if collision:
-                rospy.logwarn(f"Full Collision Check -> Link {col_link.name} in collision with link {link.name}")
-                return True
-            link=link.parent
+    #     # Iterate backwards starting with gripper
+    #     # NOTE: this only iterates over the length of the robot links, but compares against all links in collision dictionary
+    #     link=self.link_dict[self.gripper]   
+    #     while link is not None:
+    #         col_link, collision = self.check_link_collision(target_link=link.name, stop_link=self.gripper, ignore_list=self.overlapped_link_dict[link.name])
+    #         if collision:
+    #             rospy.logwarn(f"Full Collision Check -> Link {col_link.name} in collision with link {link.name}")
+    #             return True
+    #         link=link.parent
 
-        # No collisions found with no errors identified.
-        return False
+    #     # No collisions found with no errors identified.
+    #     return False
+
+    # def alt_check_link_collision(self, target_link: str, )
     
-    def check_link_collision(self, target_link: str, stop_link: str, ignore_list: list = []):
+    def check_link_collision(self, target_link: str, stop_link: str, ignore_list: list = [], check_list: list = []):
         """
         This method is similar to roboticstoolbox.robot.Robot.iscollided
         NOTE: ignore list used to ignore known overlapped collisions (i.e., neighboring link collisions)
@@ -1797,18 +1824,37 @@ class ROSRobot(rtb.Robot):
             return None, False
 
         # Handle invalid name in links
-        if target_link not in self.collision_dict.keys() or stop_link not in self.collision_dict.keys():
-            rospy.logwarn(f"Self Collision Check -> Link name [{target_link}] or search stop link [{stop_link}] is not in [{self.collision_dict.keys()}]")
+        if stop_link not in self.collision_dict.keys():
+            rospy.logwarn(f"Self Collision Check -> Stop Link name [{stop_link}] is not in [{self.collision_dict.keys()}]")
             return None, False
         
-        # Extract collision objects associated with link name
-        check_list = self.collision_dict[target_link]
+        # Handle check list empty scenario
+        if check_list == []:
+            return None, False
+        #     # Default to self checking if empty
+        #     check_list = self.collision_dict[target_link]
+
+        # Check if current target link is in robot's configured overlapped dict (if self checking)
+        if target_link in self.overlapped_link_dict.keys():
+            ignore_list = self.overlapped_link_dict[target_link]
+            # print(f"Populating Ignore List: {ignore_list} for target link: {target_link}")
+
+        # DEBUGGING
         # rospy.loginfo(f"{target_link} has the following collision objects: {check_list}")
         
-        # NOTE iterates over all configured links 
-        for link in self.links:
+        # NOTE iterates over all configured links and compares against provided list of check shapes 
+        # NOTE: the less objects in a check list, the better
+        #       this is to handle cases (like with the panda) that has multiple shapes per link defining its collision geometry
+        #       any custom descriptions should aim to limit the geometry per link as robot geometry is controlled by the vendor
+        # NOTE: ignore list is initiased at start up and is meant to handle cases where a mounted table (in collision with the base) is ignored
+        #       i.e., does not throw a collision for base_link in collision with table (as it is to be ignored) but will trigger for end-effector link
+        for link in reversed(self.links):
             # Check against ignore list and continue if inside
-            if link.name in ignore_list:
+            # NOTE: this assumes that the provided target link (dictating the ignore list) is unique
+            #       in some cases the robot's links (if multiple are being checked) may have the same named links
+            #       TODO: uncertain if this is scalable (currently working on two pandas with the same link names), but check this
+            # NOTE: ignore any links that are expected to be overlapped with current link (inside current robot object)
+            if link.name in ignore_list: 
                 # print(f"Link {link.name} is in list: {ignore_list}")
                 continue
 
@@ -1817,8 +1863,10 @@ class ROSRobot(rtb.Robot):
                 # rospy.logwarn(f"Self Collision Check -> Skipping the current link")
                 continue
 
+            # NOTE: as per note above, ideally this loop should be a oneshot (in most instances)
+            # TODO: does it make sense to only check the largest shape in this list? 
             for obj in check_list:
-                # print(f"Checking link: {link.name} against shape: {obj} of target link: {target_link}")
+                # print(f"LOCAL CHECK for [{self.name}] -> Checking link: {link.name} against shape: {obj} of target link: {target_link}")
                 if link.iscollided(obj, skip=True):
                     # rospy.logerr(f"Self Collision Check -> Link that is collided: {link.name}")
                     return link, True
@@ -1947,6 +1995,7 @@ class ROSRobot(rtb.Robot):
         """
         High-level check of collision
         NOTE: this is called by loop to verify preempt of robot
+        NOTE: This may not be needed as main armer class (high-level) will check collisions per robot
         """
         # Check for collisions
         # NOTE: optimise this as much as possible
@@ -1990,8 +2039,12 @@ class ROSRobot(rtb.Robot):
             rospy.logwarn(f"PREEMPTED: Collision Found --> please home to fix")
             self.collision_approached = False
 
+        # NOTE: put robot object into ERROR state as we have been preempted
+        #       currently only the Home action resets this back to ControlMode.Joints
+        # TODO: need to ensure this is checked for most control inputs (currently handled in Cartesian and Joint Velocity callbacks)
+        # TODO: need to check other methods of reset if needed.
         self.preempted = True
-        self._controller_mode = ControlMode.JOINTS
+        self._controller_mode = ControlMode.ERROR
         self.last_update = 0
 
     def preempt_tracking(self, *args: list) -> None:
@@ -2048,7 +2101,7 @@ class ROSRobot(rtb.Robot):
 
         self.e_v = e_v
         self.e_v_frame = twist_stamped.header.frame_id
-
+        
         self._controller_mode = ControlMode.CARTESIAN
         self.last_update = rospy.get_time()
 
@@ -2214,23 +2267,9 @@ class ROSRobot(rtb.Robot):
         current_time = rospy.get_time()
         self.state = self.get_state()
 
-        # TESTING COLLISION CHECKING
-        # TODO: add stop link as input? Needed to stop the search at a link that may already be in collision
-        # TODO: check if this makes sense as a way forward? Might be better to: 
-        #   (1) characterise each link and their existing collision points under standard use (i.e., in ready pose)
-        #   (2) search throughout robot links, checking each link and ignoring expected collections
-        #   (3) preempt on UNEXPECTED collisions.
-        # if not self.preempted:
-        #     # print(f"gripper: {self.gripper}")
-        #     # self.resolve_collision_tree()
-        #     # self.collided_flag = True
-        #     self.collided_flag = self.full_collision_check()
-            # _, self.collided_flag = self.check_link_collision(target_link=self.gripper, stop_link="panda_link7") 
-
         # PREEMPT motion on any detected state errors or singularity approach
         if self.state.errors != 0 \
-            or self.check_singularity(self.q) \
-            or self.check_collision():
+            or self.check_singularity(self.q):
             # print(f"preempting...")
             self.preempt()
 
@@ -2282,6 +2321,7 @@ class ROSRobot(rtb.Robot):
               self.preempt()
 
         # apply desired joint velocity to robot
+        # NOTE: this should be allowed to run even in ControlMode.ERROR to recover (i.e., Home action)
         if self.executor:
             self.j_v = self.executor.step(dt)
 
@@ -2314,10 +2354,6 @@ class ROSRobot(rtb.Robot):
             if any(self.j_v) and current_time - self.last_update > 0.1:
                 self.j_v = [v * 0.9 if np.absolute(v) > 0 else 0 for v in self.j_v]
             
-        # NOTE: Current preempt method sets the control mode to ControlMode.JOINTS
-        #       This allows the arm to still be controllable via a traj move (i.e., home) in the event of an issue
-        #       HOWEVER, pure joint control preempt does not work, because it does not stop the motion of the arm.
-        # TODO: Add an implementation that preempts ONLY to a re-homing state (for recovery). On home, preempt should release
         self.qd = self.j_v
         self.last_tick = current_time
 

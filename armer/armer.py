@@ -75,6 +75,10 @@ class Armer:
 
         self.last_tick = rospy.get_time()
 
+        # TESTING
+        # This is a global dictionary of dictionaries (per robot) for multi robot scenarios
+        self.global_collision_dict = dict()
+
         # Launch backend
         self.backend.launch(**(backend_args if backend_args else dict()))
 
@@ -85,8 +89,18 @@ class Armer:
             
             # Resolve robot links for collision checking
             # NOTE: must be done after adding to backend
+            # NOTE: this gets an understanding of the current robot's overlapped self collisions
             # TODO: confirm with ROS backend
             robot.characterise_collision_overlaps()
+
+            # NOTE: current collision implementation is per robot only
+            #       meaning if the description and links are known to a robot then collision checks will work
+            #       Currently creating more than one robot instance cannot check collisions between each other
+            #       as there are no common links identified. 
+            # NOTE: all robot instances read the same robot description param, so all robots will get the same description
+            #       this may not be the preferred implementation for future use cases.
+            self.global_collision_dict[robot.name] = robot.get_link_collision_dict()
+            # print(f"Current robot [{robot.name}] has collision dictionary of: {self.global_collision_dict[robot.name]}")
 
 
             # # TESTING
@@ -245,6 +259,50 @@ class Armer:
             logging=logging
         )
 
+    def global_collision_check(self, robot: ROSRobot):
+        """
+        Conducts a full check for collisions
+        NOTE: takes a given robot object and runs its collision check (of its own dictionary) against the global dictionary
+                the global dictionary may have collision data from multiple robots (with different link data)
+        TODO: currently each robot is checked against its own link data. This is needed for self collision checking
+            but could be possibly optimised in some way as to not
+        """
+        # Error handling on gripper name
+        if robot.gripper == None or robot.gripper == "":
+            rospy.logerr(f"Global Collision Check -> gripper name is invalid: {robot.gripper}")
+            return False
+        
+        # Error handling on empty lick dictionary (should never happen but just in case)
+        if robot.link_dict == dict() or robot.link_dict == None:
+            rospy.logerr(f"Global Collision Check -> link dictionary is invalid: {robot.link_dict}")
+            return False
+
+        # Error handling on collision object dict and overlap dict
+        if robot.overlapped_link_dict == dict() or robot.overlapped_link_dict == None or \
+            robot.collision_dict == dict() or robot.collision_dict == None:
+            rospy.logerr(f"Global Collision Check -> collision or overlap dictionaries invalid: [{robot.collision_dict}] | [{robot.overlapped_link_dict}]")
+            return False
+        
+        # Iterate through global dictionary and check current robot for collisions
+        # NOTE: THIS NEEDS OPTIMISING
+        for robot_name in self.global_collision_dict.keys():
+            # print(f"Checking {robot.name} against robot in dict: {robot_name}")
+            for link_name in self.global_collision_dict[robot_name]:
+                # Get out check robot (in dictionary) details
+                collision_shape_list = self.global_collision_dict[robot_name][link_name]
+                # print(f"[{robot.name}] checking against [{robot_name}] with link name: {link_name}")
+                # This is a reverse search from top to bottom. The rationale is to configure our stop point from the start of the tree to its root
+                # NOTE: the longer we traverse, the more of the robot's links are checked and the longer this will take
+                #       optimising our tree like this is based on the assumption that the leading tree links will be most likely in contact with the environment
+                # NOTE: defaults stop link to base_link of robot
+                col_link, collision = robot.check_link_collision(target_link=link_name, stop_link=robot.base_link.name, check_list=collision_shape_list)
+                if collision:
+                    rospy.logwarn(f"Global Collision Check -> Robot [{robot.name}] link {col_link.name} in collision with robot [{robot_name}] link {link_name}")
+                    return True
+
+        # No collisions found with no errors identified.
+        return False
+
     def run(self) -> None:
         """
         Runs the driver. This is a blocking call.
@@ -260,6 +318,17 @@ class Armer:
 
                 # Step the robot(s)
                 for robot in self.robots:
+                    # NOTE: this is currently in ideation
+                    # Should the collision checking occur at this level? Makes sense for global setups and would also work for single setups
+                    # TODO: Each robot performs its own self check (possibly saves some time?)
+                    # Each robot is then checked with a global collision check (environment and other robots)
+                    # If collisions are found (self or with global) preemption signal sent to each robot object.
+                    with Timer('Global Collision Check', enabled=False):
+                        if self.global_collision_check(robot=robot) and robot.preempted == False:
+                            # Current robot found to be in collision so preempt
+                            robot.collision_approached = True
+                            robot.preempt()
+
                     robot.step(dt=dt)
 
                     # Check if requested (resets overall for all robots in scene)
