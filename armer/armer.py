@@ -288,6 +288,7 @@ class Armer:
         for robot_name in self.global_collision_dict.keys():
             # print(f"Checking {robot.name} against robot in dict: {robot_name}")
             for link_name in self.global_collision_dict[robot_name]:
+                # Handle Self Checking with known Overlaps
                 if robot.name == robot_name and link_name in robot.overlapped_link_dict.keys():
                     ignore_list = robot.overlapped_link_dict[link_name]
                 else:
