@@ -288,6 +288,11 @@ class Armer:
         for robot_name in self.global_collision_dict.keys():
             # print(f"Checking {robot.name} against robot in dict: {robot_name}")
             for link_name in self.global_collision_dict[robot_name]:
+                if robot.name == robot_name and link_name in robot.overlapped_link_dict.keys():
+                    ignore_list = robot.overlapped_link_dict[link_name]
+                else:
+                    ignore_list = []
+
                 # Get out check robot (in dictionary) details
                 collision_shape_list = self.global_collision_dict[robot_name][link_name]
                 # print(f"[{robot.name}] checking against [{robot_name}] with link name: {link_name}")
@@ -295,7 +300,13 @@ class Armer:
                 # NOTE: the longer we traverse, the more of the robot's links are checked and the longer this will take
                 #       optimising our tree like this is based on the assumption that the leading tree links will be most likely in contact with the environment
                 # NOTE: defaults stop link to base_link of robot
-                col_link, collision = robot.check_link_collision(target_link=link_name, stop_link=robot.base_link.name, check_list=collision_shape_list)
+                col_link, collision = robot.check_link_collision(
+                    target_link=link_name, 
+                    stop_link=robot.base_link.name, 
+                    ignore_list=ignore_list,
+                    check_list=collision_shape_list
+                )
+                
                 if collision:
                     rospy.logwarn(f"Global Collision Check -> Robot [{robot.name}] link {col_link.name} in collision with robot [{robot_name}] link {link_name}")
                     return True

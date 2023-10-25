@@ -1751,8 +1751,9 @@ class ROSRobot(rtb.Robot):
         # Iterate backwards starting with gripper
         # NOTE: starts at gripper and ends at robot base
         #       the assumption here is that other external links are not 'part' of the arm
-        link=self.link_dict[self.gripper]   
-        while link is not None:
+        #link=self.link_dict[self.gripper]   
+        #while link is not None:
+        for link in self.links:
             collision = True
             links_in_collision_list = []
             while collision:
@@ -1766,7 +1767,7 @@ class ROSRobot(rtb.Robot):
 
             rospy.loginfo(f"Characterise Collision Overlaps -> Completed collision check for link: {link.name} -> found links in collision: {links_in_collision_list}")
             self.overlapped_link_dict[link.name] = links_in_collision_list
-            link=link.parent
+            # link=link.parent
 
         # Reached end in success
         return True
@@ -1835,8 +1836,8 @@ class ROSRobot(rtb.Robot):
         #     check_list = self.collision_dict[target_link]
 
         # Check if current target link is in robot's configured overlapped dict (if self checking)
-        if target_link in self.overlapped_link_dict.keys():
-            ignore_list = self.overlapped_link_dict[target_link]
+        # if target_link in self.overlapped_link_dict.keys():
+            # ignore_list = self.overlapped_link_dict[target_link]
             # print(f"Populating Ignore List: {ignore_list} for target link: {target_link}")
 
         # DEBUGGING
