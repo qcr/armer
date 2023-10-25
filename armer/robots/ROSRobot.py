@@ -26,7 +26,7 @@ import yaml
 import qpsolvers as qp
 import spatialgeometry as sg
 
-from armer.utils import ikine, mjtg, trapezoidal
+from armer.utils import ikine, mjtg, trapezoidal, ompl_planned
 
 from std_msgs.msg import Header, Bool
 from sensor_msgs.msg import JointState
@@ -92,7 +92,8 @@ class ROSRobot(rtb.Robot):
         # Update with ustom qlim (joint limits) if specified in robot config
         if qlim_min and qlim_max:
             self.qlim = np.array([qlim_min, qlim_max])
-            rospy.loginfo(f"Updating Custom qlim: {self.qlim}")
+            rospy.loginfo(f"Low limits: {self.qlim[0,:]}")
+            rospy.loginfo(f"High limits: {self.qlim[1,:]}")
 
         # Singularity index threshold (0 is a sigularity)
         # NOTE: this is a tested value and may require configuration (i.e., speed of robot)

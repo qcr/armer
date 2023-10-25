@@ -12,6 +12,9 @@ from geometry_msgs.msg import TransformStamped
 import roboticstoolbox as rtb
 from roboticstoolbox.tools.trajectory import Trajectory
 from scipy.interpolate import interp1d
+from armer.timer import Timer
+# TESTING
+from armer.ompl_planner import OMPLInterface
 
 def ikine(robot, target, q0, end):
     Tep = SE3(target.position.x, target.position.y, target.position.z) * \
@@ -31,6 +34,50 @@ def ikine(robot, target, q0, end):
 
     return type('obj', (object,), {'q' : np.array(result[0])})
 
+def ompl_planned(robot: rtb.Robot, qf: np.ndarray, max_speed=None, frequency=500):
+    # TESTING OMPL METHOD
+    rospy.loginfo(f"TESTING OMPL Implementation")
+
+    # TODO: setup obstacles from toolbox (scene objects)
+
+    # Create the ompl interface
+    ompl_interface = OMPLInterface(robot=robot, obstacles=[], iterations=frequency)
+    # Setup the planner
+    ompl_interface.set_planner("BITstar")
+
+    # Use default planning time of 5 seconds
+    with Timer(name='ARMer OMPL Timer'):
+        result, path = ompl_interface.plan(start=robot.q, goal=qf)
+
+    rospy.loginfo(f"result of plan: {result}")
+    rospy.loginfo(f"size of path: {np.size(path)}")
+    # rospy.loginfo(f"found path: {path}")
+
+    if result:
+        # Estimate velocity with traj robotics toolbox method (trapezoidal)
+        # traj = rtb.mtraj(rtb.trapezoidal, q0=robot.q, qf=qf, t=frequency)
+        y=np.array([np.array(x) for x in path])
+        mstraj = rtb.mstraj(viapoints=y, 
+                    dt=5/frequency, 
+                    tacc=0, 
+                    qdmax=2.1750,
+                    verbose=False)
+        traj = rtb.mtraj(rtb.trapezoidal, q0=mstraj.q[0], qf=mstraj.q[-1], t=mstraj.t)
+        print(f"size of mstraj.q: {np.size(mstraj.q)} | traj.qd: {np.size(traj.qd)}")
+        print(f"mstraj.qd: {mstraj.qd}")
+        # print(f"traj.q: {traj.q}")
+        # print(f"mstraj.s: {mstraj.s}")
+        # Check if trajectory is valid
+        # if np.max(traj.qd) != 0:
+        #     # Scale the joint trajectories (in steps) to the overall expected move time (sec)
+            # scaled_qd = traj.qd*(frequency/5)
+        return Trajectory(name='opml', t=5, s=mstraj.q, sd=traj.qd, sdd=None, istime=True)
+        # else:
+            # rospy.logerr(f"Trajectory is invalid --> Cannot Solve.")
+            # return Trajectory(name='invalid', t=1, s=robot.q, sd=None, sdd=None, istime=False)
+    else:
+        return Trajectory(name='invalid', t=1, s=robot.q, sd=None, sdd=None, istime=False)
+
 def trapezoidal(robot: rtb.Robot, qf: np.ndarray, max_speed=None, frequency=500, move_time_sec: float=5):
     rospy.loginfo(f"TESTING Hotfix 96fd293")
 
@@ -38,6 +85,8 @@ def trapezoidal(robot: rtb.Robot, qf: np.ndarray, max_speed=None, frequency=500,
     # Solve a trapezoidal trajectory in joint space based on provided solution based on defined number of steps (t)
     # NOTE: this takes into account the robot's defined joint angle limits (defined in each robot's config as qlim_min and qlim_max)
     traj = rtb.mtraj(rtb.trapezoidal, q0=robot.q, qf=qf, t=frequency)
+    print(f"size of traj.q: {np.size(traj.q)} | type: {type(traj.q)}")
+    print(f"traj.q: {traj.q}")
 
     # Check if trajectory is valid
     if np.max(traj.qd) != 0:
