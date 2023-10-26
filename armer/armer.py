@@ -26,7 +26,6 @@ from armer.models import URDFRobot
 from armer.robots import ROSRobot
 from armer.timer import Timer
 
-
 class Armer:
     """
     The Armer Driver.
@@ -93,15 +92,12 @@ class Armer:
             # TODO: confirm with ROS backend
             robot.characterise_collision_overlaps()
 
-            # NOTE: current collision implementation is per robot only
-            #       meaning if the description and links are known to a robot then collision checks will work
-            #       Currently creating more than one robot instance cannot check collisions between each other
-            #       as there are no common links identified. 
+            # This method extracts all captured collision objects (dict) from each robot
+            # Needed to conduct global collision checking (if more than one robot instance is in play)
             # NOTE: all robot instances read the same robot description param, so all robots will get the same description
             #       this may not be the preferred implementation for future use cases.
             self.global_collision_dict[robot.name] = robot.get_link_collision_dict()
             # print(f"Current robot [{robot.name}] has collision dictionary of: {self.global_collision_dict[robot.name]}")
-
 
             # # TESTING
             # # Add dummy object for testing
@@ -297,10 +293,12 @@ class Armer:
                 # Get out check robot (in dictionary) details
                 collision_shape_list = self.global_collision_dict[robot_name][link_name]
                 # print(f"[{robot.name}] checking against [{robot_name}] with link name: {link_name}")
-                # This is a reverse search from top to bottom. The rationale is to configure our stop point from the start of the tree to its root
+                # This is a reverse search from top (ee) to bottom (base). 
+                # The rationale is to configure our stop point from the start of the tree to its root
                 # NOTE: the longer we traverse, the more of the robot's links are checked and the longer this will take
-                #       optimising our tree like this is based on the assumption that the leading tree links will be most likely in contact with the environment
-                # NOTE: defaults stop link to base_link of robot
+                #       optimising our tree like this is based on the assumption that the 
+                #       leading tree links will be most likely in contact with the environment
+                # NOTE: defaults stop link to base_link of robot. TODO: add a config param for updating this
                 col_link, collision = robot.check_link_collision(
                     target_link=link_name, 
                     stop_link=robot.base_link.name, 

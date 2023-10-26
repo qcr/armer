@@ -481,7 +481,12 @@ class ROSRobot(rtb.Robot):
         if self._controller_mode == ControlMode.ERROR:
             rospy.logerr(f"JOINT VEL CB: [{self.name}] in Error Control Mode...")
             return None
-        
+
+        # Check for vector length and terminate if invalid
+        if len(msg.joints) != len(self.j_v):
+            rospy.logerr(f"JOINT VEL CB: [{self.name}] provided input vector length invalid [{len(msg.joints)}]. Expecting len [{len(self.j_v)}]")
+            return None
+         
         if self.moving:            
             print(f"HERE because moving (JOINT)")
             self.preempt()
