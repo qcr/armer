@@ -44,13 +44,12 @@ class URDFRobot(Robot):
       gripper_link[0].tool = spatialmath.SE3(ets.compile()[0].A())
       
     # DEBUGGING
-    # print(f"links:")
+    # print(f"URDFRobot links:")
     # for link in links:
-    #   print(link)
-    # print(f"gripper: {self.gripper} | gripper link: {gripper_link}")
+    #   print(f"link {link.name} is type {type(link)}. Is joint? {link.isjoint}")
 
     super().__init__(
-        links,
+        arg=links,
         name=name,
         gripper_links=gripper_link,
         urdf_string=urdf_string,

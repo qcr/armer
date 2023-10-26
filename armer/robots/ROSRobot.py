@@ -85,8 +85,6 @@ class ROSRobot(rtb.Robot):
 
         self.tfBuffer = tf2_ros.Buffer()
         self.listener = tf2_ros.TransformListener(self.tfBuffer)
-
-
         self.backend_reset = False
 
         # Update with ustom qlim (joint limits) if specified in robot config
@@ -118,7 +116,7 @@ class ROSRobot(rtb.Robot):
         self.overlapped_link_dict = dict()
         self.collision_dict = dict()
         self.collision_approached = False
-        # Iterate through links and sort - add to tracked collision list
+        # Iterate through robot links and sort - add to tracked collision list
         while link is not None:
             # Debugging
             # print(f"link name in sort: {link.name}")
@@ -129,12 +127,17 @@ class ROSRobot(rtb.Robot):
         sorted_links.reverse()
  
         # Check for external links (from robot tree)
+        # TESTING
+        # Get a read of description for current links
+        # self.total_links = []
+        # self.total_links, _, _, _ = URDFRobot.URDF_read_description()
         # TODO: This is required to add any other links (not specifically part of the robot tree) to our collision dictionary for checking
         for link in self.links:
             # print(f"links: {link.name}")
             if link.name in self.collision_dict.keys():
                 continue
 
+            # print(f"adding link: {link.name} which is type: {type(link)} with collision data: {link.collision.data}")
             self.collision_dict[link.name] = link.collision.data if link.collision.data else []
 
         # Debugging
@@ -1754,7 +1757,9 @@ class ROSRobot(rtb.Robot):
             return False
         
         # Iterate forwards starting at base of tree
-        for link in self.links:
+        # NOTE: self.links are resolved links from base to ee
+        #       self.total_links are based on a URDF read of the available links
+        for link in reversed(self.links):
             collision = True
             links_in_collision_list = []
             while collision:
@@ -1762,7 +1767,7 @@ class ROSRobot(rtb.Robot):
                 # Check link collision of current link
                 col_link, collision = self.check_link_collision(
                     target_link=link.name, 
-                    stop_link=self.gripper, 
+                    stop_link=self.base_link.name, # self.gripper, 
                     check_list=self.collision_dict[link.name], 
                     ignore_list=links_in_collision_list
                 )
@@ -1771,7 +1776,7 @@ class ROSRobot(rtb.Robot):
                     # print(f"INIT: collision found for {link.name} with {col_link.name}")
                     links_in_collision_list.append(col_link.name)
 
-            rospy.loginfo(f"Characterise Collision Overlaps -> Completed collision check for link: {link.name} -> found links in collision: {links_in_collision_list}")
+            rospy.loginfo(f"Characterise Collision Overlaps -> link: {link.name} found links in collision: {links_in_collision_list}")
             self.overlapped_link_dict[link.name] = links_in_collision_list
 
         # Iterate over gripper links
@@ -1793,48 +1798,11 @@ class ROSRobot(rtb.Robot):
                     # print(f"INIT: collision found for {link.name} with {col_link.name}")
                     links_in_collision_list.append(col_link.name)
 
-            rospy.loginfo(f"Characterise Collision Overlaps -> Completed collision check for glink: {glink.name} -> found links in collision: {links_in_collision_list}")
+            rospy.loginfo(f"Characterise Collision Overlaps -> glink: {glink.name} found links in collision: {links_in_collision_list}")
             self.overlapped_link_dict[glink.name] = links_in_collision_list
 
         # Reached end in success
         return True
-
-    # def full_collision_check(self):
-    #     """
-    #     Conducts a full check for collisions
-    #     NOTE: takes into account resolved overlaps in current tree
-    #     NOTE: NOT NEEDED AS HIGH-LEVEL CHECK IS RUNNING
-    #     """
-    #     # Error handling on gripper name
-    #     if self.gripper == None or self.gripper == "":
-    #         rospy.logerr(f"Full Collision Check -> gripper name is invalid: {self.gripper}")
-    #         return False
-        
-    #     # Error handling on empty lick dictionary (should never happen but just in case)
-    #     if self.link_dict == dict() or self.link_dict == None:
-    #         rospy.logerr(f"Full Collision Check -> link dictionary is invalid: {self.link_dict}")
-    #         return False
-
-    #     # Error handling on collision object dict and overlap dict
-    #     if self.overlapped_link_dict == dict() or self.overlapped_link_dict == None or \
-    #         self.collision_dict == dict() or self.collision_dict == None:
-    #         rospy.logerr(f"Full Collision Check -> collision or overlap dictionaries invalid: [{self.collision_dict}] | [{self.overlapped_link_dict}]")
-    #         return False
-        
-    #     # Iterate backwards starting with gripper
-    #     # NOTE: this only iterates over the length of the robot links, but compares against all links in collision dictionary
-    #     link=self.link_dict[self.gripper]   
-    #     while link is not None:
-    #         col_link, collision = self.check_link_collision(target_link=link.name, stop_link=self.gripper, ignore_list=self.overlapped_link_dict[link.name])
-    #         if collision:
-    #             rospy.logwarn(f"Full Collision Check -> Link {col_link.name} in collision with link {link.name}")
-    #             return True
-    #         link=link.parent
-
-    #     # No collisions found with no errors identified.
-    #     return False
-
-    # def alt_check_link_collision(self, target_link: str, )
     
     def check_link_collision(self, target_link: str, stop_link: str, ignore_list: list = [], check_list: list = []):
         """
@@ -1858,9 +1826,8 @@ class ROSRobot(rtb.Robot):
         
         # Handle check list empty scenario
         if check_list == []:
+            # print(f"Check list is empty so terminate.")
             return None, False
-        #     # Default to self checking if empty
-        #     check_list = self.collision_dict[target_link]
 
         # Check if current target link is in robot's configured overlapped dict (if self checking)
         # if target_link in self.overlapped_link_dict.keys():
@@ -1877,24 +1844,25 @@ class ROSRobot(rtb.Robot):
         # NOTE: ignore list is initiased at start up and is meant to handle cases where a mounted table (in collision with the base) is ignored
         #       i.e., does not throw a collision for base_link in collision with table (as it is to be ignored) but will trigger for end-effector link
         for link in reversed(self.links):
+            # print(f"Link being checked: {link.name}")
             # Check against ignore list and continue if inside
             # NOTE: this assumes that the provided target link (dictating the ignore list) is unique
             #       in some cases the robot's links (if multiple are being checked) may have the same named links
             #       TODO: uncertain if this is scalable (currently working on two pandas with the same link names), but check this
             # NOTE: ignore any links that are expected to be overlapped with current link (inside current robot object)
             if link.name in ignore_list: 
-                # print(f"Link {link.name} is in list: {ignore_list}")
+                # print(f"{link.name} is in list: {ignore_list}, so skipping")
                 continue
 
             # Ignore check if the target link is the same
             if link.name == target_link:
-                # rospy.logwarn(f"Self Collision Check -> Skipping the current link")
+                # rospy.logwarn(f"Self Collision Check -> Skipping the current target: {link.name}")
                 continue
 
             # NOTE: as per note above, ideally this loop should be a oneshot (in most instances)
             # TODO: does it make sense to only check the largest shape in this list? 
             for obj in check_list:
-                # print(f"LOCAL CHECK for [{self.name}] -> Checking link: {link.name} against shape: {obj} of target link: {target_link}")
+                # print(f"LOCAL CHECK for [{self.name}] -> Checking: {link.name}")
                 if link.iscollided(obj, skip=True):
                     # rospy.logerr(f"Self Collision Check -> Link that is collided: {link.name}")
                     return link, True
@@ -1902,7 +1870,7 @@ class ROSRobot(rtb.Robot):
             # Terminate at check stop link
             # NOTE: have this happen afterwards so we still inclusively check for this link
             if link.name == stop_link:
-                # rospy.logwarn(f"Self Collision Check -> Terminating iteration")
+                # rospy.logwarn(f"Self Collision Check -> Terminating iteration at {link.name}")
                 return None, False
             
         return None, False
