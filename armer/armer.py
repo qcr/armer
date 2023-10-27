@@ -74,7 +74,6 @@ class Armer:
 
         self.last_tick = rospy.get_time()
 
-        # TESTING
         # This is a global dictionary of dictionaries (per robot) for multi robot scenarios
         self.global_collision_dict = dict()
 

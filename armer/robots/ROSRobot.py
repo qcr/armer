@@ -138,6 +138,11 @@ class ROSRobot(rtb.Robot):
                 continue
 
             # print(f"adding link: {link.name} which is type: {type(link)} with collision data: {link.collision.data}")
+            # TESTING ET UPDATE
+            # if link.name == "conveyor_base_link":
+            #     link.ets = rtb.ETS(rtb.ET.tx(0.1) * rtb.ET.ty(-0.5) * rtb.ET.Rz(-1.5708))
+                # link.ets = rtb.ETS(rtb.ET.tx(0.1) * rtb.ET.ty(-0.1))
+                # link.ets = rtb.ETS(sm.SE3())
             self.collision_dict[link.name] = link.collision.data if link.collision.data else []
 
         # Debugging
@@ -1487,37 +1492,59 @@ class ROSRobot(rtb.Robot):
             return UpdateDescriptionResponse(success=False)
 
     def calibrate_transform_cb(self, req: CalibrateTransformRequest) -> CalibrateTransformResponse: # pylint: disable=no-self-use
-        # OFFSET UPDATING (IN PROGRESS)
+        """[summary]
+        ROS Service callback:
+        Attempts to calibrate the location of a link if applicable
+        NOTE: links that are associated to robot joints are ignored
+
+        :param req: a request to calibrate a link, contains the transform and link name 
+        :type req: CalibrateTransformRequest
+        :return: a success bool, where True is if the link was found and applicable, then set; otherwise False
+        :rtype: CalibrateTransformResponse
+        """
         link_found = False
 
-        rospy.logwarn(f"IN DEVELOPMENT")
         rospy.loginfo(f"Got req for transform: {req.transform} | offset: {req.link_name}")
 
+        # Early termination on input error
         if req.link_name == None or req.transform == Transform():
             rospy.logerr(f"Input values are None or Empty")
             return CalibrateTransformResponse(success=False)
         
-        # Convert Pose input to SE3
-        transform = SE3(req.transform.translation.x, req.transform.translation.y,
-               req.transform.translation.z) * UnitQuaternion(req.transform.rotation.w, [
-                   req.transform.rotation.x, req.transform.rotation.y,
-                   req.transform.rotation.z
-               ]).SE3()
-        # transform = SE3(req.transform.position.x, req.transform.position.y,
-        #        req.transform.position.z)
+        # Convert transform quaternion to rpy for updating Elementary Transform Sequence (ETS) of link
+        # NOTE: the order is required to set correctly
+        rpy = sm.UnitQuaternion(
+                req.transform.rotation.w, [
+                req.transform.rotation.x,
+                req.transform.rotation.y,
+                req.transform.rotation.z
+            ]).rpy(order='zyx')
 
         # Update any transforms as requested on main robot (that is not a joint)
         # NOTE: joint tf's are to be immutable (as this is assumed the robot)
+        # TODO: check if parent is base link 
         for link in self.links:
-            # print(f"current link: {link.name} | is joint: {link.isjoint}")
+            # Update if found and applicable
             if link.name == req.link_name and not link.isjoint:
                 rospy.loginfo(f"LINK -> {link.name} | PARENT: {link.parent_name} | BASE: {self.base_link}")
-                # Update if found
-                # TODO: check if parent is base link 
-                link._Ts = transform.A
+                # NOTE: the Elementary Transform Sequence (ETS) needs the orientation
+                #       in (rpy) to be applied in required order. In this case, the
+                #       order is 'zyx' (see above), therefore, apply in this order
+                link.ets = rtb.ET.tx(req.transform.translation.x) \
+                    * rtb.ET.ty(req.transform.translation.y) \
+                    * rtb.ET.tz(req.transform.translation.z) \
+                    * rtb.ET.Rz(rpy[2]) \
+                    * rtb.ET.Ry(rpy[1]) \
+                    * rtb.ET.Rx(rpy[0]) \
+                
                 link_found = True
-                # rospy.loginfo(f"UPDATED LINK -> {link.name} | POSE: {link._Ts}")
+                break
 
+        # Re-run the collision overlap dictionary update for this robot as some links may have changed
+        if link_found:
+            self.characterise_collision_overlaps()
+
+        rospy.loginfo(f"Transform Calibration Pipeline Completed.")
         return CalibrateTransformResponse(success=link_found)
 
     def set_cartesian_impedance_cb(  # pylint: disable=no-self-use
@@ -1740,66 +1767,71 @@ class ROSRobot(rtb.Robot):
         """
         Characterises the existing robot tree and tracks overlapped links in collision handling
         NOTE: needed to do collision checking, when joints are typically (neighboring) overlapped
+        NOTE: this is quite an intensive run at the moment, 
+            however, it is only expected to be run in single intervals (not continuous)
+            [2023-10-27] approx. time frequency is 1hz
         """
-        # Error handling on gripper name
-        if self.gripper == None or self.gripper == "":
-            rospy.logerr(f"Characterise Collision Overlaps -> gripper name is invalid: {self.gripper}")
-            return False 
-        
-        # Error handling on empty lick dictionary (should never happen but just in case)
-        if self.link_dict == dict() or self.link_dict == None:
-            rospy.logerr(f"Characterise Collision Overlaps -> link dictionary is invalid: {self.link_dict}")
-            return False
-        
-        # Error handling on collision object dict
-        if self.collision_dict == dict() or self.collision_dict == None:
-            rospy.logerr(f"Characterise Collision Overlaps -> collision dictionary is invalid: [{self.collision_dict}]")
-            return False
-        
-        # Iterate forwards starting at base of tree
-        # NOTE: self.links are resolved links from base to ee
-        #       self.total_links are based on a URDF read of the available links
-        for link in reversed(self.links):
-            collision = True
-            links_in_collision_list = []
-            while collision:
-                # print(f"CHECKING Link name: {link.name}")
-                # Check link collision of current link
-                col_link, collision = self.check_link_collision(
-                    target_link=link.name, 
-                    stop_link=self.base_link.name, # self.gripper, 
-                    check_list=self.collision_dict[link.name], 
-                    ignore_list=links_in_collision_list
-                )
+        # Running timer to get frequency of run. Set enabled to True for debugging output to stdout
+        with Timer(name="Characterise Collision Overlaps", enabled=False):
+            # Error handling on gripper name
+            if self.gripper == None or self.gripper == "":
+                rospy.logerr(f"Characterise Collision Overlaps -> gripper name is invalid: {self.gripper}")
+                return False 
+            
+            # Error handling on empty lick dictionary (should never happen but just in case)
+            if self.link_dict == dict() or self.link_dict == None:
+                rospy.logerr(f"Characterise Collision Overlaps -> link dictionary is invalid: {self.link_dict}")
+                return False
+            
+            # Error handling on collision object dict
+            if self.collision_dict == dict() or self.collision_dict == None:
+                rospy.logerr(f"Characterise Collision Overlaps -> collision dictionary is invalid: [{self.collision_dict}]")
+                return False
+            
+            # Iterate forwards starting at base of tree
+            # NOTE: self.links are resolved links from base to ee
+            #       self.total_links are based on a URDF read of the available links
+            for link in reversed(self.links):
+                collision = True
+                links_in_collision_list = []
+                while collision:
+                    # print(f"CHECKING Link name: {link.name}")
+                    # Check link collision of current link
+                    col_link, collision = self.check_link_collision(
+                        target_link=link.name, 
+                        stop_link=self.base_link.name, # self.gripper, 
+                        check_list=self.collision_dict[link.name], 
+                        ignore_list=links_in_collision_list
+                    )
 
-                if collision:    
-                    # print(f"INIT: collision found for {link.name} with {col_link.name}")
-                    links_in_collision_list.append(col_link.name)
+                    if collision:    
+                        # print(f"INIT: collision found for {link.name} with {col_link.name}")
+                        links_in_collision_list.append(col_link.name)
 
-            rospy.loginfo(f"Characterise Collision Overlaps -> link: {link.name} found links in collision: {links_in_collision_list}")
-            self.overlapped_link_dict[link.name] = links_in_collision_list
+                rospy.loginfo(f"Characterise Collision Overlaps -> link: {link.name} found links in collision: {links_in_collision_list}")
+                self.overlapped_link_dict[link.name] = links_in_collision_list
 
-        # Iterate over gripper links
-        # TODO: need a better way over two sequential loops, but not really a big issue as only at initialisation is this run
-        for glink in self.grippers:
-            collision = True
-            links_in_collision_list = []
-            while collision:
-                # print(f"CHECKING Link name: {link.name}")
-                # Check link collision of current link
-                col_link, collision = self.check_link_collision(
-                    target_link=glink.name, 
-                    stop_link=self.gripper, 
-                    check_list=self.collision_dict[glink.name], 
-                    ignore_list=links_in_collision_list
-                )
+            # Iterate over gripper links
+            # TODO: need a better way over two sequential loops, but not really a big issue as only at initialisation is this run
+            for glink in self.grippers:
+                collision = True
+                links_in_collision_list = []
+                while collision:
+                    # print(f"CHECKING Link name: {link.name}")
+                    # Check link collision of current link
+                    col_link, collision = self.check_link_collision(
+                        target_link=glink.name, 
+                        stop_link=self.gripper, 
+                        check_list=self.collision_dict[glink.name], 
+                        ignore_list=links_in_collision_list
+                    )
 
-                if collision:    
-                    # print(f"INIT: collision found for {link.name} with {col_link.name}")
-                    links_in_collision_list.append(col_link.name)
+                    if collision:    
+                        # print(f"INIT: collision found for {link.name} with {col_link.name}")
+                        links_in_collision_list.append(col_link.name)
 
-            rospy.loginfo(f"Characterise Collision Overlaps -> glink: {glink.name} found links in collision: {links_in_collision_list}")
-            self.overlapped_link_dict[glink.name] = links_in_collision_list
+                rospy.loginfo(f"Characterise Collision Overlaps -> glink: {glink.name} found links in collision: {links_in_collision_list}")
+                self.overlapped_link_dict[glink.name] = links_in_collision_list
 
         # Reached end in success
         return True
@@ -1828,11 +1860,6 @@ class ROSRobot(rtb.Robot):
         if check_list == []:
             # print(f"Check list is empty so terminate.")
             return None, False
-
-        # Check if current target link is in robot's configured overlapped dict (if self checking)
-        # if target_link in self.overlapped_link_dict.keys():
-            # ignore_list = self.overlapped_link_dict[target_link]
-            # print(f"Populating Ignore List: {ignore_list} for target link: {target_link}")
 
         # DEBUGGING
         # rospy.loginfo(f"{target_link} has the following collision objects: {check_list}")
