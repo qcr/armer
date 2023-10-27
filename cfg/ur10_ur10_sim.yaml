@@ -1,0 +1,17 @@
+robots:
+  - name: ur10_1
+    model: 
+      urdf_file: ur_description/urdf/ur10_robot.urdf.xacro
+      qr: [-1.57, -0.96, -2.18, -1.57, 1.57, 3.14]
+      gripper: tool0
+    singularity_thresh: 0.02
+  - name: ur10_2
+    model: 
+      urdf_file: ur_description/urdf/ur10_robot.urdf.xacro
+      qr: [-1.57, -0.96, -2.18, -1.57, 1.57, 3.14]
+      gripper: tool0
+    singularity_thresh: 0.02
+    origin: [1, 0, 0, 0, 0, 3.14] # (xyzrpy)
+publish_transforms: true
+backend:
+  type: roboticstoolbox.backends.swift.Swift
