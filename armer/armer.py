@@ -332,7 +332,7 @@ class Armer:
                     # TODO: Each robot performs its own self check (possibly saves some time?)
                     # Each robot is then checked with a global collision check (environment and other robots)
                     # If collisions are found (self or with global) preemption signal sent to each robot object.
-                    with Timer('Global Collision Check', enabled=False):
+                    with Timer('Global Collision Check', enabled=True):
                         if self.global_collision_check(robot=robot) and robot.preempted == False:
                             # Current robot found to be in collision so preempt
                             robot.collision_approached = True
