@@ -108,9 +108,9 @@ class ROSRobot(rtb.Robot):
         self.sorted_links=[]
         # Check if the existing gripper name exists (Error handling) otherwise default to top of dict stack
         if self.gripper not in self.link_dict.keys():
-            default_top_link = sorted(self.link_dict.keys())[-1]
-            rospy.logwarn(f"Configured gripper name {self.gripper} not in link tree -> defaulting to top of stack: {default_top_link.name}")
-            self.gripper = default_top_link.name
+            default_top_link_name = sorted(self.link_dict.keys())[-1]
+            rospy.logwarn(f"Configured gripper name {self.gripper} not in link tree -> defaulting to top of stack: {default_top_link_name}")
+            self.gripper = default_top_link_name
 
         # Sort links by parents starting from gripper
         link=self.link_dict[self.gripper]   
@@ -1779,8 +1779,8 @@ class ROSRobot(rtb.Robot):
         NOTE: needed to do collision checking, when joints are typically (neighboring) overlapped
         NOTE: this is quite an intensive run at the moment, 
             however, it is only expected to be run in single intervals (not continuous)
-            [2023-10-27] approx. time frequency is 1hz (panda simulated)
-            [2023-10-31] approx. time frequency is 40Hz (UR10 simulated on NUC with better method)
+            [2023-10-27] approx. time frequency is 1hz (Panda simulated)
+            [2023-10-31] approx. time frequency is 40Hz and 21Hz (UR10 and Panda simulated with better method, respectively)
         """
         # Running timer to get frequency of run. Set enabled to True for debugging output to stdout
         with Timer(name="Characterise Collision Overlaps", enabled=True):
