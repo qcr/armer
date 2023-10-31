@@ -14,6 +14,7 @@ import rospy
 import tf2_ros
 import yaml
 
+import numpy as np
 import roboticstoolbox as rtb
 import spatialgeometry as sg
 import spatialmath as sm
@@ -278,36 +279,55 @@ class Armer:
             rospy.logerr(f"Global Collision Check -> collision or overlap dictionaries invalid: [{robot.collision_dict}] | [{robot.overlapped_link_dict}]")
             return False
         
-        # Iterate through global dictionary and check current robot for collisions
-        # NOTE: THIS NEEDS OPTIMISING
-        for robot_name in self.global_collision_dict.keys():
-            # print(f"Checking {robot.name} against robot in dict: {robot_name}")
-            for link_name in self.global_collision_dict[robot_name]:
-                # Handle Self Checking with known Overlaps
-                if robot.name == robot_name and link_name in robot.overlapped_link_dict.keys():
-                    ignore_list = robot.overlapped_link_dict[link_name]
-                else:
-                    ignore_list = []
+        # Alternative Method
+        with Timer("NEW GLOBAL CHECK", enabled=False):
+            out = [(robot_name, link_name) \
+                for robot_name in self.global_collision_dict.keys() \
+                for link_name in self.global_collision_dict[robot_name] \
+                if len(robot.get_links_in_collision(
+                    target_link=link_name,
+                    check_list=self.global_collision_dict[robot_name][link_name],
+                    ignore_list=robot.overlapped_link_dict[link_name] \
+                        if (robot.name == robot_name) \
+                            and (link_name in robot.overlapped_link_dict.keys())\
+                        else [],
+                )) > 0]
+            
+            if len(out) > 0:
+                rospy.logwarn(f"Collision Detected [<Robot>, <Link>]: {out}")
+                return True
+        
+        # # Iterate through global dictionary and check current robot for collisions
+        # # NOTE: THIS NEEDS OPTIMISING
+        # with Timer("OLD GLOBAL CHECK", enabled=False):
+        #     for robot_name in self.global_collision_dict.keys():
+        #         # print(f"Checking {robot.name} against robot in dict: {robot_name}")
+        #         for link_name in self.global_collision_dict[robot_name]:
+        #             # Handle Self Checking with known Overlaps
+        #             if robot.name == robot_name and link_name in robot.overlapped_link_dict.keys():
+        #                 ignore_list = robot.overlapped_link_dict[link_name]
+        #             else:
+        #                 ignore_list = []
 
-                # Get out check robot (in dictionary) details
-                collision_shape_list = self.global_collision_dict[robot_name][link_name]
-                # print(f"[{robot.name}] checking against [{robot_name}] with link name: {link_name}")
-                # This is a reverse search from top (ee) to bottom (base). 
-                # The rationale is to configure our stop point from the start of the tree to its root
-                # NOTE: the longer we traverse, the more of the robot's links are checked and the longer this will take
-                #       optimising our tree like this is based on the assumption that the 
-                #       leading tree links will be most likely in contact with the environment
-                # NOTE: defaults stop link to base_link of robot. TODO: add a config param for updating this
-                col_link, collision = robot.check_link_collision(
-                    target_link=link_name, 
-                    stop_link=robot.base_link.name, 
-                    ignore_list=ignore_list,
-                    check_list=collision_shape_list
-                )
-                
-                if collision:
-                    rospy.logwarn(f"Global Collision Check -> Robot [{robot.name}] link {col_link.name} in collision with robot [{robot_name}] link {link_name}")
-                    return True
+        #             # Get out check robot (in dictionary) details
+        #             collision_shape_list = self.global_collision_dict[robot_name][link_name]
+        #             # print(f"[{robot.name}] checking against [{robot_name}] with link name: {link_name}")
+        #             # This is a reverse search from top (ee) to bottom (base). 
+        #             # The rationale is to configure our stop point from the start of the tree to its root
+        #             # NOTE: the longer we traverse, the more of the robot's links are checked and the longer this will take
+        #             #       optimising our tree like this is based on the assumption that the 
+        #             #       leading tree links will be most likely in contact with the environment
+        #             # NOTE: defaults stop link to base_link of robot. TODO: add a config param for updating this
+        #             col_link, collision = robot.check_link_collision(
+        #                 target_link=link_name, 
+        #                 stop_link=robot.base_link.name, 
+        #                 ignore_list=ignore_list,
+        #                 check_list=collision_shape_list
+        #             )
+                    
+        #             if collision:
+        #                 rospy.logwarn(f"Global Collision Check -> Robot [{robot.name}] link {col_link.name} in collision with robot [{robot_name}] link {link_name}")
+        #                 return True
 
         # No collisions found with no errors identified.
         return False
