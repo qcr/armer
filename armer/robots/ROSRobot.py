@@ -103,14 +103,19 @@ class ROSRobot(rtb.Robot):
         if not hasattr(self, 'gripper'):
           self.gripper = self.grippers[0].name if len(self.grippers) > 0 else 'tool0'
           
-        sorted_links=[]
-        # Sort links by parents starting from gripper
-        # Check if the existing gripper name exists (Error handling)
+        # Global list of links
+        # NOTE: we currently only consider all links up to our configured self.gripper
+        self.sorted_links=[]
+        # Check if the existing gripper name exists (Error handling) otherwise default to top of dict stack
         if self.gripper not in self.link_dict.keys():
-            rospy.logwarn(f"Configured gripper name {self.gripper} not in link tree -> defaulting to top of stack: {self.links[-1].name}")
-            self.gripper = self.links[-1].name
+            default_top_link = sorted(self.link_dict.keys())[-1]
+            rospy.logwarn(f"Configured gripper name {self.gripper} not in link tree -> defaulting to top of stack: {default_top_link.name}")
+            self.gripper = default_top_link.name
 
+        # Sort links by parents starting from gripper
         link=self.link_dict[self.gripper]   
+        # print(f"link dict: {sorted(self.link_dict.keys())[-1]}")
+        
         # COLLISION HANDLING TESTING
         # NOTE: needs optimisation in future
         # Loops through links (as read in through URDF parser)
@@ -128,9 +133,9 @@ class ROSRobot(rtb.Robot):
             # print(f"link name in sort: {link.name}")
             # Add current link to overall dictionary
             self.collision_dict[link.name] = link.collision.data if link.collision.data else []
-            sorted_links.append(link)
+            self.sorted_links.append(link)
             link=link.parent
-        sorted_links.reverse()
+        self.sorted_links.reverse()
  
         # Check for external links (from robot tree)
         # This is required to add any other links (not specifically part of the robot tree) 
@@ -148,7 +153,7 @@ class ROSRobot(rtb.Robot):
         # print(f"Dictionary of expected link collisions: {self.overlapped_link_dict}\n")    
 
         self.joint_indexes = []
-        self.joint_names = list(map(lambda link: link._joint_name, filter(lambda link: link.isjoint, sorted_links)))
+        self.joint_names = list(map(lambda link: link._joint_name, filter(lambda link: link.isjoint, self.sorted_links)))
         
         if origin:
             self.base = SE3(origin[:3]) @ SE3.RPY(origin[3:])
@@ -1778,7 +1783,7 @@ class ROSRobot(rtb.Robot):
             [2023-10-31] approx. time frequency is 40Hz (UR10 simulated on NUC with better method)
         """
         # Running timer to get frequency of run. Set enabled to True for debugging output to stdout
-        with Timer(name="Characterise Collision Overlaps", enabled=False):
+        with Timer(name="Characterise Collision Overlaps", enabled=True):
             # Error handling on gripper name
             if self.gripper == None or self.gripper == "":
                 rospy.logerr(f"Characterise Collision Overlaps -> gripper name is invalid: {self.gripper}")
@@ -1802,68 +1807,33 @@ class ROSRobot(rtb.Robot):
                     ignore_list=[],
                     output_name_list=True)
                 )
-                for link in reversed(self.links)])
-            
-            glink_dict = dict([
-                (link.name, self.get_links_in_collision(
-                    target_link=link.name, 
-                    check_list=self.collision_dict[link.name], 
-                    ignore_list=[],
-                    output_name_list=True)
-                )
-                for link in reversed(self.grippers)])
-        
-            # Merge and update to one dictionary in class O(1) time complexity
-            self.overlapped_link_dict.update(glink_dict)
+                for link in reversed(self.sorted_links)])
 
             # using json.dumps() to Pretty Print O(n) time complexity
             rospy.loginfo(f"Characterise Collision Overlaps per link: {json.dumps(self.overlapped_link_dict, indent=4)}")
 
-            # with Timer(name="OLD Check Link Collisions"):
-            #     # Iterate forwards starting at base of tree
-            #     # NOTE: self.links are resolved links from base to ee
-            #     #       self.total_links are based on a URDF read of the available links
-            #     for link in reversed(self.links):
-            #         collision = True
-            #         links_in_collision_list = []
-            #         while collision:
-            #             # print(f"CHECKING Link name: {link.name}")
-            #             # Check link collision of current link with full robot
-            #             col_link, collision = self.check_link_collision(
-            #                 target_link=link.name, 
-            #                 stop_link=self.base_link.name,
-            #                 check_list=self.collision_dict[link.name], 
-            #                 ignore_list=links_in_collision_list
-            #             )
+            # # Iterate forwards starting at base of tree
+            # # NOTE: self.links are resolved links from base to ee
+            # #       self.total_links are based on a URDF read of the available links
+            # for link in reversed(self.sorted_links):
+            #     collision = True
+            #     links_in_collision_list = []
+            #     while collision:
+            #         # print(f"CHECKING Link name: {link.name}")
+            #         # Check link collision of current link with full robot
+            #         col_link, collision = self.check_link_collision(
+            #             target_link=link.name, 
+            #             stop_link=self.base_link.name,
+            #             check_list=self.collision_dict[link.name], 
+            #             ignore_list=links_in_collision_list
+            #         )
 
-            #             if collision:    
-            #                 # print(f"INIT: collision found for {link.name} with {col_link.name}")
-            #                 links_in_collision_list.append(col_link.name)
+            #         if collision:    
+            #             # print(f"INIT: collision found for {link.name} with {col_link.name}")
+            #             links_in_collision_list.append(col_link.name)
 
-            #         rospy.loginfo(f"Characterise Collision Overlaps -> link: {link.name} found links in collision: {links_in_collision_list}")
-            #         self.overlapped_link_dict[link.name] = links_in_collision_list
-
-            #     # Iterate over gripper links
-            #     # TODO: need a better way over two sequential loops, but not really a big issue as only at initialisation is this run
-            #     for glink in reversed(self.grippers):
-            #         collision = True
-            #         links_in_collision_list = []
-            #         while collision:
-            #             # print(f"CHECKING Link name: {link.name}")
-            #             # Check link collision of current link
-            #             col_link, collision = self.check_link_collision(
-            #                 target_link=glink.name, 
-            #                 stop_link=self.gripper, 
-            #                 check_list=self.collision_dict[glink.name], 
-            #                 ignore_list=links_in_collision_list
-            #             )
-
-            #             if collision:    
-            #                 # print(f"INIT: collision found for {link.name} with {col_link.name}")
-            #                 links_in_collision_list.append(col_link.name)
-
-            #         rospy.loginfo(f"Characterise Collision Overlaps -> glink: {glink.name} found links in collision: {links_in_collision_list}")
-            #         self.overlapped_link_dict[glink.name] = links_in_collision_list
+            #     rospy.loginfo(f"Characterise Collision Overlaps -> link: {link.name} found links in collision: {links_in_collision_list}")
+            #     self.overlapped_link_dict[link.name] = links_in_collision_list
 
         # Reached end in success
         return True
