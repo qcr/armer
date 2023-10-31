@@ -50,11 +50,20 @@ class ROS(Connector):  # pragma nocover
     #  Methods to interface with the robots created in other environemnts
     #
 
-    def add(self, ob): # pylint: disable=arguments-differ
+    def add(self, ob, collision_alpha=0.0): # pylint: disable=arguments-differ
         """
         Add a robot to the environment
+        NOTE: added default un-used collision alpha to align with swift
         """
         if isinstance(ob, armer.robots.ROSRobot):
+            # NOTE: the following lines are needed to update the links and check for collisions
+            # Update robot transforms
+            ob._update_link_tf()
+            ob._propogate_scene_tree()
+
+            # Update robot qlim
+            # ob._qlim = ob.qlim
+
             self.robots[ob.name] = ob
 
         super().add()
@@ -74,6 +83,10 @@ class ROS(Connector):  # pragma nocover
 
         '''
         for robot_name in self.robots:
+            # NOTE: the following two lines are needed in order for collision checking to work
+            self.robots[robot_name]._update_link_tf()
+            self.robots[robot_name]._propogate_scene_tree()
+            # Publishes out to ROS via configured control topic (joint_group_vel_controller)
             self.robots[robot_name].publish()
 
     def reset(self):

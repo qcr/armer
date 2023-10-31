@@ -1783,7 +1783,7 @@ class ROSRobot(rtb.Robot):
             [2023-10-31] approx. time frequency is 40Hz and 21Hz (UR10 and Panda simulated with better method, respectively)
         """
         # Running timer to get frequency of run. Set enabled to True for debugging output to stdout
-        with Timer(name="Characterise Collision Overlaps", enabled=True):
+        with Timer(name="Characterise Collision Overlaps", enabled=False):
             # Error handling on gripper name
             if self.gripper == None or self.gripper == "":
                 rospy.logerr(f"Characterise Collision Overlaps -> gripper name is invalid: {self.gripper}")
@@ -1812,7 +1812,7 @@ class ROSRobot(rtb.Robot):
             # using json.dumps() to Pretty Print O(n) time complexity
             rospy.loginfo(f"Characterise Collision Overlaps per link: {json.dumps(self.overlapped_link_dict, indent=4)}")
 
-            # Older method (METHOD 1)
+            # # Older method (METHOD 1)
             # # Iterate forwards starting at base of tree
             # # NOTE: self.links are resolved links from base to ee
             # #       self.total_links are based on a URDF read of the available links
