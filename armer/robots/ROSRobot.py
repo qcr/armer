@@ -901,6 +901,32 @@ class ROSRobot(rtb.Robot):
             
             solution = ikine(self, pose, q0=self.q, end=self.gripper)
 
+            if all(solution.q == self.q):
+                # Get the current pose
+                ## end-effector position
+                ee_pose_mat = self.ets(start=self.base_link, end=self.gripper).eval(self.q)
+                ee_pose = Pose()
+
+                translation = ee_pose_mat[:3, 3]    
+                ee_pose.position.x = translation[0]
+                ee_pose.position.y = translation[1]
+                ee_pose.position.z = translation[2]
+
+                rotation = ee_pose_mat[:3, :3]
+                ee_rot = sm.UnitQuaternion(rotation)
+
+                ee_pose.orientation.w = ee_rot.A[0]
+                ee_pose.orientation.x = ee_rot.A[1]
+                ee_pose.orientation.y = ee_rot.A[2]
+                ee_pose.orientation.z = ee_rot.A[3]
+
+                if goal_pose.pose.position != ee_pose.position and goal_pose.pose.orientation != ee_pose.orientation:
+                    rospy.logerr('-- Unable to generate inverse kinematic solution..')
+                    self.pose_server.set_succeeded(MoveToPoseResult(success=False), 'Unable to generate inverse kinematic solution')
+                    self.executor = None
+                    self.moving = False
+                    return
+
             # Check for singularity on end solution:
             # TODO: prevent motion on this bool? Needs to be thought about
             if self.check_singularity(solution.q):
