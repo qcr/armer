@@ -1869,7 +1869,7 @@ class ROSRobot(rtb.Robot):
             #       i.e., does not throw a collision for base_link in collision with table (as it is to be ignored) but will trigger for end-effector link
             check_dict = dict([(link.name, link) \
                 for obj in check_list \
-                for link in reversed(self.links) \
+                for link in reversed(self.sorted_links) \
                 if (link.name not in ignore_list) and (link.name != target_link) and (link.iscollided(obj, skip=True))
             ])
             
@@ -1883,7 +1883,7 @@ class ROSRobot(rtb.Robot):
             else:
                 return list(check_dict.values())
     
-    def check_link_collision(self, target_link: str, stop_link: str, ignore_list: list = [], check_list: list = []):
+    def check_link_collision(self, target_link: str, sliced_links: list = [], ignore_list: list = [], check_list: list = []):
         """
         This method is similar to roboticstoolbox.robot.Robot.iscollided
         NOTE: ignore list used to ignore known overlapped collisions (i.e., neighboring link collisions)
@@ -1895,15 +1895,15 @@ class ROSRobot(rtb.Robot):
                 rospy.logwarn(f"Self Collision Check -> Link name [{target_link}] is invalid.")
                 return None, False
 
-            # Handle invalid link name input
-            if stop_link == '' or stop_link == None or not isinstance(stop_link, str):
-                rospy.logwarn(f"Self Collision Check -> Search stop link name [{stop_link}] is invalid.")
-                return None, False
+            # # Handle invalid link name input
+            # if stop_link == '' or stop_link == None or not isinstance(stop_link, str):
+            #     rospy.logwarn(f"Self Collision Check -> Search stop link name [{stop_link}] is invalid.")
+            #     return None, False
 
-            # Handle invalid name in links
-            if stop_link not in self.collision_dict.keys():
-                rospy.logwarn(f"Self Collision Check -> Stop Link name [{stop_link}] is not in [{self.collision_dict.keys()}]")
-                return None, False
+            # # Handle invalid name in links
+            # if stop_link not in self.collision_dict.keys():
+            #     rospy.logwarn(f"Self Collision Check -> Stop Link name [{stop_link}] is not in [{self.collision_dict.keys()}]")
+            #     return None, False
             
             # Handle check list empty scenario
             if check_list == []:
@@ -1919,7 +1919,7 @@ class ROSRobot(rtb.Robot):
             #       any custom descriptions should aim to limit the geometry per link as robot geometry is controlled by the vendor
             # NOTE: ignore list is initiased at start up and is meant to handle cases where a mounted table (in collision with the base) is ignored
             #       i.e., does not throw a collision for base_link in collision with table (as it is to be ignored) but will trigger for end-effector link
-            for link in reversed(self.links):
+            for link in reversed(sliced_links):
                 # print(f"Link being checked: {link.name}")
                 # Check against ignore list and continue if inside
                 # NOTE: this assumes that the provided target link (dictating the ignore list) is unique
@@ -1938,16 +1938,19 @@ class ROSRobot(rtb.Robot):
                 # NOTE: as per note above, ideally this loop should be a oneshot (in most instances)
                 # TODO: does it make sense to only check the largest shape in this list? 
                 for obj in check_list:
+                    # pass
                     # rospy.logwarn(f"LOCAL CHECK for [{self.name}] -> Checking: {link.name}")
                     if link.iscollided(obj, skip=True):
                         # rospy.logerr(f"Self Collision Check -> Link that is collided: {link.name}")
                         return link, True
                     
-                # Terminate at check stop link
-                # NOTE: have this happen afterwards so we still inclusively check for this link
-                if link.name == stop_link:
-                    # rospy.logwarn(f"Self Collision Check -> Terminating iteration at {link.name}")
-                    return None, False
+                    # break
+                    
+                # # Terminate at check stop link
+                # # NOTE: have this happen afterwards so we still inclusively check for this link
+                # if link.name == stop_link:
+                #     # rospy.logwarn(f"Self Collision Check -> Terminating iteration at {link.name}")
+                #     return None, False
                 
             return None, False
 

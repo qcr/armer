@@ -6,3 +6,4 @@ swift-sim>=1.1.0
 qpsolvers>=3.4.0
 pyyaml
 pybullet>=3.2.5
+Cython>=3.0.5
