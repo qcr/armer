@@ -283,15 +283,23 @@ class Armer:
             rospy.logerr(f"Global Collision Check -> collision or overlap dictionaries invalid: [{robot.collision_dict}] | [{robot.overlapped_link_dict}]")
             return False
         
-        # Prepare sliced link based on a defined stop link 
-        # TODO: parameterise stop link
-        sliced_link_idx = [i for i, link in enumerate(robot.links) if link.name == "panda_link8"]
-        # NOTE: the assumption here is that each link is unique (which is handled low level by rtb) so we take the first element if found
-        # NOTE: sorted links is from base link upwards tree. We want to slice from stop link to end
-        if len(sliced_link_idx) > 0:
-            sliced_links = robot.sorted_links[sliced_link_idx[0]:]
-        else:
-            sliced_links = robot.sorted_links
+        with Timer("Link Slicing Check", enabled=False):
+            # Prepare sliced link based on a defined stop link 
+            # TODO: this could be update-able for interesting collision checks based on runtime requirements
+            col_start_link_idx = [i for i, link in enumerate(robot.sorted_links) if link.name == robot.collision_start_link]
+            col_stop_link_idx = [i for i, link in enumerate(robot.sorted_links) if link.name == robot.collision_stop_link]
+            # NOTE: the assumption here is that each link is unique (which is handled low level by rtb) so we take the first element if found
+            # NOTE: sorted links is from base link upwards tree. We want to slice from stop link to end
+            # print(f"start_idx: {col_start_link_idx} | stop_idx: {col_stop_link_idx}")
+            if len(col_start_link_idx) > 0 and len(col_stop_link_idx) > 0:
+                if col_start_link_idx[0] == len(robot.sorted_links):
+                    sliced_links = robot.sorted_links[col_stop_link_idx[0]:None]
+                else:
+                    sliced_links = robot.sorted_links[col_stop_link_idx[0]:col_start_link_idx[0] + 1]
+            else:
+                sliced_links = robot.sorted_links
+
+            # print(f"sliced links: {sliced_links}")
 
         # Alternative Method
         with Timer("NEW GLOBAL CHECK", enabled=True):
