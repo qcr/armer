@@ -881,6 +881,9 @@ class ROSRobot(rtb.Robot):
             self.preempt()
 
         with self.lock:
+            # TODO: Refactor - this provided as a parameter
+            goal_pose_joint_threshold = 0.005
+
             goal_pose = goal.pose_stamped
 
             if goal_pose.header.frame_id == '':
@@ -906,6 +909,7 @@ class ROSRobot(rtb.Robot):
             # TODO: where is the linear motion implementation? (copy from step_cb)
             
             solution = ikine(self, pose, q0=self.q, end=self.gripper)
+            rospy.logwarn("---Solution in hand...")
 
             if all(solution.q == self.q):
                 # Get the current pose
@@ -938,6 +942,7 @@ class ROSRobot(rtb.Robot):
             if self.check_singularity(solution.q):
                 rospy.logwarn(f"IK solution within singularity threshold [{self.singularity_thresh}] -> ill-advised motion")
             
+            rospy.logwarn('---Starting trajectory')
             self.executor = TrajectoryExecutor(
               self,
               self.traj_generator(self, solution.q, goal.speed if goal.speed else 0.2),
@@ -947,9 +952,13 @@ class ROSRobot(rtb.Robot):
             while not self.executor.is_finished():
               rospy.sleep(0.01)
 
-            if self.executor.is_succeeded():
+            rospy.logwarn('---Trajectory complete...')
+            if self.executor.is_succeeded() and not any(a-b > goal_pose_joint_threshold for a,b in list(zip(solution.q, self.q))):
+                rospy.logwarn('--- Success')
                 self.pose_server.set_succeeded(MoveToPoseResult(success=True))
             else:
+                rospy.logwarn('--- Failure')
+                rospy.logerr(f'Solution: {solution.q}....Self: {self.q}')
                 self.pose_server.set_aborted(MoveToPoseResult(success=False))
 
             self.executor = None
