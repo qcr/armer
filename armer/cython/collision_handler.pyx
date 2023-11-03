@@ -40,7 +40,7 @@ cpdef int global_check(str robot_name,
       # Extract the evaluation robot link's collision object list for checking
       c_check_list = global_dict[r_name][l_name]
       # Handle self checking and populate overlap links for ignoring
-      if robot_name == r_name:
+      if robot_name == r_name and l_name in overlap_dict:
         c_ignore_list = overlap_dict[l_name]
       else:
         c_ignore_list = list()
@@ -77,9 +77,11 @@ cpdef int global_check(str robot_name,
             d, _, _ = t_obj.closest_point(obj)
             # print(f"d is: {d}")
             if d is not None and d <= 0:
-              return 1
+              # Returns the link idx in collision
+              return l_idx
+
   # Got here without issue
-  return 0
+  return -1
 
 cpdef int test (int val1, int val2):
   return val1 + val2

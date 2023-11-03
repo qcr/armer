@@ -136,7 +136,11 @@ class ROSRobot(rtb.Robot):
             self.sorted_links.append(link)
             link=link.parent
         self.sorted_links.reverse()
- 
+        # Handle collision link window slicing
+        # Checks error of input from configuration file (note that default is current sorted links)
+        self.collision_sliced_links = self.sorted_links
+        self.update_link_collision_window()
+
         # Check for external links (from robot tree)
         # This is required to add any other links (not specifically part of the robot tree) 
         # to our collision dictionary for checking
@@ -1772,6 +1776,43 @@ class ROSRobot(rtb.Robot):
         To be used by high-level armer class for collision handling
         """
         return self.collision_dict
+    
+    def update_link_collision_window(self):
+        """
+        This method updates a sliced list of links (member variable)
+        as determined by the class method variables:
+            collision_start_link
+            collision_stop_link
+        """
+        with Timer("Link Slicing Check", enabled=False):
+            # Prepare sliced link based on a defined stop link 
+            # TODO: this could be update-able for interesting collision checks based on runtime requirements
+            # NOTE: the assumption here is that each link is unique (which is handled low level by rtb) so we take the first element if found
+            # NOTE: sorted links is from base link upwards to end-effector. We want to slice from stop link to start in rising index order
+            col_start_link_idx = [i for i, link in enumerate(self.sorted_links) if link.name == self.collision_start_link]
+            col_stop_link_idx = [i for i, link in enumerate(self.sorted_links) if link.name == self.collision_stop_link]
+            # print(f"start_idx: {col_start_link_idx} | stop_idx: {col_stop_link_idx}")
+
+            # NOTE: slice indexes are lists, so confirm data inside
+            if len(col_start_link_idx) > 0 and len(col_stop_link_idx) > 0:
+                start_idx = col_start_link_idx[0]
+                end_idx = col_stop_link_idx[0]
+
+                # Terminate early on invalid indexes
+                if start_idx < end_idx or start_idx > len(self.sorted_links):
+                    rospy.logwarn(f"Start and End idx are incompatible, defaulting to full link list")
+                    return 
+
+                # Handle end point
+                if start_idx == len(self.sorted_links):
+                    self.collision_sliced_links = self.sorted_links[end_idx:None]
+                else:
+                    self.collision_sliced_links = self.sorted_links[end_idx:start_idx + 1]
+
+                rospy.loginfo(f"Collision Link Window Set: {self.sorted_links[start_idx].name} to {self.sorted_links[end_idx].name}")
+            else:
+                # Defaul to the current list of sorted links (full)
+                self.collision_sliced_links = self.sorted_links
 
     def characterise_collision_overlaps(self) -> bool:
         """
@@ -1811,30 +1852,6 @@ class ROSRobot(rtb.Robot):
 
             # using json.dumps() to Pretty Print O(n) time complexity
             rospy.loginfo(f"Characterise Collision Overlaps per link: {json.dumps(self.overlapped_link_dict, indent=4)}")
-
-            # # Older method (METHOD 1)
-            # # Iterate forwards starting at base of tree
-            # # NOTE: self.links are resolved links from base to ee
-            # #       self.total_links are based on a URDF read of the available links
-            # for link in reversed(self.sorted_links):
-            #     collision = True
-            #     links_in_collision_list = []
-            #     while collision:
-            #         # print(f"CHECKING Link name: {link.name}")
-            #         # Check link collision of current link with full robot
-            #         col_link, collision = self.check_link_collision(
-            #             target_link=link.name, 
-            #             stop_link=self.base_link.name,
-            #             check_list=self.collision_dict[link.name], 
-            #             ignore_list=links_in_collision_list
-            #         )
-
-            #         if collision:    
-            #             # print(f"INIT: collision found for {link.name} with {col_link.name}")
-            #             links_in_collision_list.append(col_link.name)
-
-            #     rospy.loginfo(f"Characterise Collision Overlaps -> link: {link.name} found links in collision: {links_in_collision_list}")
-            #     self.overlapped_link_dict[link.name] = links_in_collision_list
 
         # Reached end in success
         return True
@@ -1887,6 +1904,7 @@ class ROSRobot(rtb.Robot):
         """
         This method is similar to roboticstoolbox.robot.Robot.iscollided
         NOTE: ignore list used to ignore known overlapped collisions (i.e., neighboring link collisions)
+        NOTE: Deprecated and archived (for debugging purposes)
         """
         with Timer(name="OLD Check Link Collision", enabled=False):
             # rospy.loginfo(f"Target link requested is: {target_link}")
@@ -1894,16 +1912,6 @@ class ROSRobot(rtb.Robot):
             if target_link == '' or target_link == None or not isinstance(target_link, str):
                 rospy.logwarn(f"Self Collision Check -> Link name [{target_link}] is invalid.")
                 return None, False
-
-            # # Handle invalid link name input
-            # if stop_link == '' or stop_link == None or not isinstance(stop_link, str):
-            #     rospy.logwarn(f"Self Collision Check -> Search stop link name [{stop_link}] is invalid.")
-            #     return None, False
-
-            # # Handle invalid name in links
-            # if stop_link not in self.collision_dict.keys():
-            #     rospy.logwarn(f"Self Collision Check -> Stop Link name [{stop_link}] is not in [{self.collision_dict.keys()}]")
-            #     return None, False
             
             # Handle check list empty scenario
             if check_list == []:
@@ -1938,19 +1946,10 @@ class ROSRobot(rtb.Robot):
                 # NOTE: as per note above, ideally this loop should be a oneshot (in most instances)
                 # TODO: does it make sense to only check the largest shape in this list? 
                 for obj in check_list:
-                    # pass
                     # rospy.logwarn(f"LOCAL CHECK for [{self.name}] -> Checking: {link.name}")
                     if link.iscollided(obj, skip=True):
                         # rospy.logerr(f"Self Collision Check -> Link that is collided: {link.name}")
                         return link, True
-                    
-                    # break
-                    
-                # # Terminate at check stop link
-                # # NOTE: have this happen afterwards so we still inclusively check for this link
-                # if link.name == stop_link:
-                #     # rospy.logwarn(f"Self Collision Check -> Terminating iteration at {link.name}")
-                #     return None, False
                 
             return None, False
 

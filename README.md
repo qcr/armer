@@ -91,6 +91,10 @@ catkin_make
 echo "source ~/armer_ws/devel/setup.bash" >> ~/.bashrc 
 source ~/armer_ws/devel/setup.bash
 echo "Installation complete!"
+
+# Build the collision checking package from within the 
+roscd armer
+python setup.py build_ext --build-lib=armer/cython/
 ```
 
 ###  macOS and Windows (10/11)
