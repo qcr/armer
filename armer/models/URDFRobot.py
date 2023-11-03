@@ -21,8 +21,8 @@ class URDFRobot(Robot):
                qz=None,
                qr=None,
                gripper=None,
-               collision_start_link=None,
-               collision_stop_link=None,
+               collision_check_start_link=None,
+               collision_check_stop_link=None,
                tool=None,
                urdf_file=None,
                *args,
@@ -47,19 +47,19 @@ class URDFRobot(Robot):
 
     # Handle collision stopping link if invalid
     link_names = [link.name for link in links]
-    if not collision_start_link or collision_start_link not in link_names:
-      self.collision_start_link = self.gripper
-      rospy.logwarn(f"Invalid collision start link {collision_start_link} -> defaulting to gripper: {self.collision_start_link}")
+    if not collision_check_start_link or collision_check_start_link not in link_names:
+      self.collision_check_start_link = self.gripper
+      rospy.logwarn(f"Invalid collision start link {collision_check_start_link} -> defaulting to gripper: {self.collision_check_start_link}")
     else:
-      self.collision_start_link = collision_start_link
+      self.collision_check_start_link = collision_check_start_link
 
-    if not collision_stop_link or collision_stop_link not in link_names:
-      self.collision_stop_link = links[0].name
-      rospy.logwarn(f"Invalid collision stop link {collision_stop_link} -> defaulting to base: {self.collision_stop_link}")
+    if not collision_check_stop_link or collision_check_stop_link not in link_names:
+      self.collision_check_stop_link = links[0].name
+      rospy.logwarn(f"Invalid collision stop link {collision_check_stop_link} -> defaulting to base: {self.collision_check_stop_link}")
     else:
-      self.collision_stop_link = collision_stop_link
+      self.collision_check_stop_link = collision_check_stop_link
     
-    rospy.loginfo(f"Collision Link Window on Initialisation: {self.collision_start_link} to {self.collision_stop_link}")
+    rospy.loginfo(f"Collision Link Window on Initialisation: {self.collision_check_start_link} to {self.collision_check_stop_link}")
       
     # DEBUGGING
     # print(f"URDFRobot links:")

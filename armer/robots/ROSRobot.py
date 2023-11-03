@@ -1789,8 +1789,8 @@ class ROSRobot(rtb.Robot):
             # TODO: this could be update-able for interesting collision checks based on runtime requirements
             # NOTE: the assumption here is that each link is unique (which is handled low level by rtb) so we take the first element if found
             # NOTE: sorted links is from base link upwards to end-effector. We want to slice from stop link to start in rising index order
-            col_start_link_idx = [i for i, link in enumerate(self.sorted_links) if link.name == self.collision_start_link]
-            col_stop_link_idx = [i for i, link in enumerate(self.sorted_links) if link.name == self.collision_stop_link]
+            col_start_link_idx = [i for i, link in enumerate(self.sorted_links) if link.name == self.collision_check_start_link]
+            col_stop_link_idx = [i for i, link in enumerate(self.sorted_links) if link.name == self.collision_check_stop_link]
             # print(f"start_idx: {col_start_link_idx} | stop_idx: {col_stop_link_idx}")
 
             # NOTE: slice indexes are lists, so confirm data inside
@@ -1841,6 +1841,7 @@ class ROSRobot(rtb.Robot):
                 return False
             
             # Alternative Method (METHOD 2) that is getting the list in a faster iterative method
+            # NOTE: this has to course through ALL links in space (sorted_links is just the robot arm tree)
             self.overlapped_link_dict = dict([
                 (link.name, self.get_links_in_collision(
                     target_link=link.name, 
@@ -1848,7 +1849,7 @@ class ROSRobot(rtb.Robot):
                     ignore_list=[],
                     output_name_list=True)
                 )
-                for link in reversed(self.sorted_links)])
+                for link in reversed(self.links)])
 
             # using json.dumps() to Pretty Print O(n) time complexity
             rospy.loginfo(f"Characterise Collision Overlaps per link: {json.dumps(self.overlapped_link_dict, indent=4)}")
