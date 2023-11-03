@@ -12,9 +12,9 @@ import roboticstoolbox as rtb
 from roboticstoolbox.tools.trajectory import Trajectory
 
 class TrajectoryExecutor:
-  def __init__(self, robot: rtb.ERobot, traj: Trajectory, cutoff: float=0.01):
+  def __init__(self, robot: rtb.Robot, traj: Trajectory, cutoff: float=0.01):
 
-    self.robot: rtb.ERobot = robot
+    self.robot: rtb.Robot = robot
     self.traj: Trajectory = traj
     self.traj_max_time = np.max(self.traj.t)
     

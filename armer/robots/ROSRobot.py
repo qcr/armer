@@ -965,6 +965,67 @@ class ROSRobot(rtb.Robot):
             # TODO: prevent motion on this bool? Needs to be thought about
             if self.check_singularity(solution.q):
                 rospy.logwarn(f"IK solution within singularity threshold [{self.singularity_thresh}] -> ill-advised motion")
+
+            # TESTING
+            # Check for collision throughout trajectory
+            # Step 1: get a copy of the current robot object (to step phantomly over trajectory)
+            # robot_obj_copy = self.copy()
+            # print(f"copied robot object: {robot_obj_copy}")
+            # Step 2: set robot object q to end goal
+            # self.q = solution.q
+            print(f"solution.q: {solution.q}")
+            copied_links=[]
+            # Check if the existing gripper name exists (Error handling) otherwise default to top of dict stack
+            
+            for link in self.links:
+                if link.isjoint:
+                    print(f"solution q applied: {link.A(q=solution.q[link.jindex])} with index: {link.jindex}")
+                    t_se3 = sm.SE3(link.A(q=solution.q[link.jindex]))
+                    rpy = t_se3.rpy(order='zyx')
+
+                    link_cp = link.copy()
+                    link_cp.ets = rtb.ET.tx(t_se3.t[0]) \
+                    * rtb.ET.ty(t_se3.t[1]) \
+                    * rtb.ET.tz(t_se3.t[2]) \
+                    * rtb.ET.Rz(rpy[2]) \
+                    * rtb.ET.Ry(rpy[1]) \
+                    * rtb.ET.Rx(rpy[0]) \
+                    
+                else:
+                    link_cp = link.copy()
+
+                copied_links.append(link_cp)
+            
+            print(f"copied links: {[link.name for link in copied_links]}")
+            print(f"original links: {[link.name for link in self.links]}")
+
+            new_dict = dict([
+                (link.name, self.get_links_in_collision(
+                    target_link=link.name, 
+                    check_list=link.collision.data if link.collision.data else [], 
+                    ignore_list=[],
+                    link_list=copied_links,
+                    output_name_list=True)
+                )
+                for link in self.links])
+
+            # for link in self.links:
+            #     out = self.get_links_in_collision(
+            #         target_link=link.name,
+            #         ignore_list=self.overlapped_link_dict[link.name],
+            #         check_list=self.collision_dict[link.name],
+            #         link_list=robot_obj_copy.links,
+            #         output_name_list=True)
+                
+            #     print(f"link: {link.name} has collision list: {out}")
+
+            # print(f"current robot's q: {self.q} | predicted q: {robot_obj_copy.q}")
+
+            # print(f"current robot's links: {self.links}")
+            # print(f"copied robot's links: {robot_obj_copy.links}")
+
+            return
+
             
             self.executor = TrajectoryExecutor(
                 self,
@@ -1760,6 +1821,25 @@ class ROSRobot(rtb.Robot):
         self.Kp = None
         self.Ki = None
         self.Kd = None
+    # --------------------------------------------------------------------- #
+    # --------- Collision and Singularity Checking Services --------------- #
+    # --------------------------------------------------------------------- #
+    def get_collision_check_window(self, req: EmptyRequest) -> EmptyResponse:
+        """
+        TODO: add this
+        Expected input: None
+        Expected output: string list of links in window
+        """
+        pass
+
+    def update_collision_check_window(self, req: EmptyRequest) -> EmptyResponse:
+        """
+        TODO: add this
+        Expected input: string name for start link, string name for stop link
+        Expected output: bool success on setting
+        NOTE: check failure modes (i.e., not in link dict, etc.)
+        """
+        pass
 
     # --------------------------------------------------------------------- #
     # --------- Collision and Singularity Checking Methods ---------------- #
@@ -1781,8 +1861,8 @@ class ROSRobot(rtb.Robot):
         """
         This method updates a sliced list of links (member variable)
         as determined by the class method variables:
-            collision_start_link
-            collision_stop_link
+            collision_check_start_link
+            collision_check_stop_link
         """
         with Timer("Link Slicing Check", enabled=False):
             # Prepare sliced link based on a defined stop link 
@@ -1857,14 +1937,20 @@ class ROSRobot(rtb.Robot):
         # Reached end in success
         return True
     
-    def get_links_in_collision(self, target_link: str, ignore_list: list = [], check_list: list = [], output_name_list: bool = False):
+    def get_links_in_collision(self, target_link: str, 
+                               ignore_list: list = [], 
+                               check_list: list = [], 
+                               link_list: list = [], 
+                               output_name_list: bool = False):
         """
         An alternative method that returns a list of links in collision with target link.
         NOTE: ignore list used to ignore known overlapped collisions (i.e., neighboring link collisions)
         NOTE: check_list is a list of Shape objects to check against.
         """
         with Timer("NEW Get Link Collision", enabled=False):
-            # rospy.loginfo(f"Target link requested is: {target_link}")
+            rospy.loginfo(f"Target link requested is: {target_link}")
+            if link_list == []:
+                link_list = self.sorted_links
             
             # Handle invalid link name input
             if target_link == '' or target_link == None or not isinstance(target_link, str):
@@ -1887,12 +1973,12 @@ class ROSRobot(rtb.Robot):
             #       i.e., does not throw a collision for base_link in collision with table (as it is to be ignored) but will trigger for end-effector link
             check_dict = dict([(link.name, link) \
                 for obj in check_list \
-                for link in reversed(self.sorted_links) \
+                for link in reversed(link_list) \
                 if (link.name not in ignore_list) and (link.name != target_link) and (link.iscollided(obj, skip=True))
             ])
             
             # print(f"links: {[link.name for link in self.links]}")
-            # print(f"Collision Keys: {list(check_dict.keys())}")     
+            print(f"Collision Keys: {list(check_dict.keys())}")     
             # print(f"Collision Values: {list(check_dict.values())}")    
 
             # Output list of collisions or name of links based on input bool
@@ -1905,7 +1991,7 @@ class ROSRobot(rtb.Robot):
         """
         This method is similar to roboticstoolbox.robot.Robot.iscollided
         NOTE: ignore list used to ignore known overlapped collisions (i.e., neighboring link collisions)
-        NOTE: Deprecated and archived (for debugging purposes)
+        NOTE: archived for main usage, but available for one shot checks if needed
         """
         with Timer(name="OLD Check Link Collision", enabled=False):
             # rospy.loginfo(f"Target link requested is: {target_link}")
