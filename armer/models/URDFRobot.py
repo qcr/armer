@@ -25,13 +25,14 @@ class URDFRobot(Robot):
                collision_check_stop_link=None,
                tool=None,
                urdf_file=None,
+               wait_for_description=True,
                *args,
                **kwargs):
 
     if urdf_file:
       links, name, urdf_string, urdf_filepath = self.URDF_read(urdf_file)
     else:
-      links, name, urdf_string, urdf_filepath = URDFRobot.URDF_read_description()
+      links, name, urdf_string, urdf_filepath = URDFRobot.URDF_read_description(wait=wait_for_description)
     
     self.gripper = gripper if gripper else URDFRobot.resolve_gripper(links)
     gripper_link = list(filter(lambda link: link.name == self.gripper, links))

@@ -968,81 +968,53 @@ class ROSRobot(rtb.Robot):
 
             # TESTING
             # Check for collision throughout trajectory
-            # Step 1: get a copy of the current robot object (to step phantomly over trajectory)
-            # robot_obj_copy = self.copy()
-            # print(f"copied robot object: {robot_obj_copy}")
-            # Step 2: set robot object q to end goal
-            # self.q = solution.q
-            print(f"solution.q: {solution.q}")
-            copied_links=[]
-            # Check if the existing gripper name exists (Error handling) otherwise default to top of dict stack
-            
-            for link in self.links:
-                if link.isjoint:
-                    print(f"solution q applied: {link.A(q=solution.q[link.jindex])} with index: {link.jindex}")
-                    t_se3 = sm.SE3(link.A(q=solution.q[link.jindex]))
-                    rpy = t_se3.rpy(order='zyx')
+            # new_ro = rtb.models.Panda()
+            # new_ro = copy.deepcopy(self)
+            with Timer(name="Initialising new robot object"):
+                new_ro = URDFRobot(wait_for_description=False,\
+                    collision_check_start_link="panda_hand", 
+                    collision_check_stop_link="panda_link8")
 
-                    link_cp = link.copy()
-                    link_cp.ets = rtb.ET.tx(t_se3.t[0]) \
-                    * rtb.ET.ty(t_se3.t[1]) \
-                    * rtb.ET.tz(t_se3.t[2]) \
-                    * rtb.ET.Rz(rpy[2]) \
-                    * rtb.ET.Ry(rpy[1]) \
-                    * rtb.ET.Rx(rpy[0]) \
-                    
-                else:
-                    link_cp = link.copy()
 
-                copied_links.append(link_cp)
-            
-            print(f"copied links: {[link.name for link in copied_links]}")
-            print(f"original links: {[link.name for link in self.links]}")
-
-            new_dict = dict([
-                (link.name, self.get_links_in_collision(
-                    target_link=link.name, 
-                    check_list=link.collision.data if link.collision.data else [], 
-                    ignore_list=[],
-                    link_list=copied_links,
-                    output_name_list=True)
-                )
-                for link in self.links])
-
-            # for link in self.links:
-            #     out = self.get_links_in_collision(
-            #         target_link=link.name,
-            #         ignore_list=self.overlapped_link_dict[link.name],
-            #         check_list=self.collision_dict[link.name],
-            #         link_list=robot_obj_copy.links,
-            #         output_name_list=True)
+            with Timer(name="setup backend and state"):    
+                env = new_ro._get_graphical_backend()
+                new_ro.q = solution.q
+                env.launch(headless=True)
+                env.add(new_ro, readonly=True)
                 
-            #     print(f"link: {link.name} has collision list: {out}")
-
-            # print(f"current robot's q: {self.q} | predicted q: {robot_obj_copy.q}")
-
-            # print(f"current robot's links: {self.links}")
-            # print(f"copied robot's links: {robot_obj_copy.links}")
-
-            return
-
+            go_signal = True
+            with Timer(f"Get collision per state:"):
+                # new_ro.q = solution.q
+                for link in reversed(new_ro.links):
+                    if len(self.get_links_in_collision(
+                        target_link=link.name, 
+                        check_list=link.collision.data if link.collision.data else [], 
+                        ignore_list=self.overlapped_link_dict[link.name],
+                        link_list=new_ro.links,
+                        output_name_list=True,
+                        skip=True)) > 0:
+                        rospy.logerr(f"Collision at end of trajectory")
+                        go_signal = False
+                        break 
             
-            self.executor = TrajectoryExecutor(
-                self,
-                self.traj_generator(self, qf=solution.q, max_speed=goal.speed if goal.speed else 0.2),
-                cutoff=self.trajectory_end_cutoff
-            )
+            if go_signal:
+                self.executor = TrajectoryExecutor(
+                    self,
+                    self.traj_generator(self, qf=solution.q, max_speed=goal.speed if goal.speed else 0.2),
+                    cutoff=self.trajectory_end_cutoff
+                )
 
-            while not self.executor.is_finished():
-              rospy.sleep(0.01)
+                while not self.executor.is_finished():
+                    rospy.sleep(0.01)
 
-            if self.executor.is_succeeded():
-                self.pose_server.set_succeeded(MoveToPoseResult(success=True))
+                if self.executor.is_succeeded():
+                    self.pose_server.set_succeeded(MoveToPoseResult(success=True))
+                else:
+                    self.pose_server.set_aborted(MoveToPoseResult(success=False))
             else:
-                self.pose_server.set_aborted(MoveToPoseResult(success=False))
 
-            self.executor = None
-            self.moving = False
+                self.executor = None
+                self.moving = False
 
     def step_cb(self, goal: MoveToPoseGoal) -> None:
         """
@@ -1930,6 +1902,17 @@ class ROSRobot(rtb.Robot):
                     output_name_list=True)
                 )
                 for link in reversed(self.links)])
+            
+            gripper_dict = dict([
+                (link.name, self.get_links_in_collision(
+                    target_link=link.name, 
+                    check_list=self.collision_dict[link.name], 
+                    ignore_list=[],
+                    output_name_list=True)
+                )
+                for link in reversed(self.grippers)])
+            
+            self.overlapped_link_dict.update(gripper_dict)
 
             # using json.dumps() to Pretty Print O(n) time complexity
             rospy.loginfo(f"Characterise Collision Overlaps per link: {json.dumps(self.overlapped_link_dict, indent=4)}")
@@ -1941,7 +1924,8 @@ class ROSRobot(rtb.Robot):
                                ignore_list: list = [], 
                                check_list: list = [], 
                                link_list: list = [], 
-                               output_name_list: bool = False):
+                               output_name_list: bool = False,
+                               skip: bool = True):
         """
         An alternative method that returns a list of links in collision with target link.
         NOTE: ignore list used to ignore known overlapped collisions (i.e., neighboring link collisions)
@@ -1974,7 +1958,7 @@ class ROSRobot(rtb.Robot):
             check_dict = dict([(link.name, link) \
                 for obj in check_list \
                 for link in reversed(link_list) \
-                if (link.name not in ignore_list) and (link.name != target_link) and (link.iscollided(obj, skip=True))
+                if (link.name not in ignore_list) and (link.name != target_link) and (link.iscollided(obj, skip=skip))
             ])
             
             # print(f"links: {[link.name for link in self.links]}")
@@ -1994,7 +1978,7 @@ class ROSRobot(rtb.Robot):
         NOTE: archived for main usage, but available for one shot checks if needed
         """
         with Timer(name="OLD Check Link Collision", enabled=False):
-            # rospy.loginfo(f"Target link requested is: {target_link}")
+            rospy.loginfo(f"Target link requested is: {target_link}")
             # Handle invalid link name input
             if target_link == '' or target_link == None or not isinstance(target_link, str):
                 rospy.logwarn(f"Self Collision Check -> Link name [{target_link}] is invalid.")
@@ -2035,7 +2019,7 @@ class ROSRobot(rtb.Robot):
                 for obj in check_list:
                     # rospy.logwarn(f"LOCAL CHECK for [{self.name}] -> Checking: {link.name}")
                     if link.iscollided(obj, skip=True):
-                        # rospy.logerr(f"Self Collision Check -> Link that is collided: {link.name}")
+                        rospy.logerr(f"Self Collision Check -> Link that is collided: {link.name}")
                         return link, True
                 
             return None, False
