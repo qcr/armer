@@ -985,11 +985,16 @@ class ROSRobot(rtb.Robot):
             go_signal = True
             with Timer(f"Get collision per state:"):
                 # new_ro.q = solution.q
-                for link in reversed(new_ro.links):
+                for link in reversed(self.sorted_links):
+                    # copy target link in new object
+                    new_link = new_ro.link_dict[link.name] if link.name in new_ro.link_dict.keys() else None
+                    if new_link == None:
+                        continue
+
                     if len(self.get_links_in_collision(
-                        target_link=link.name, 
-                        check_list=link.collision.data if link.collision.data else [], 
-                        ignore_list=self.overlapped_link_dict[link.name],
+                        target_link=new_link.name, 
+                        check_list=new_link.collision.data if new_link.collision.data else [], 
+                        ignore_list=self.overlapped_link_dict[new_link.name],
                         link_list=new_ro.links,
                         output_name_list=True,
                         skip=True)) > 0:
@@ -1932,7 +1937,7 @@ class ROSRobot(rtb.Robot):
         NOTE: check_list is a list of Shape objects to check against.
         """
         with Timer("NEW Get Link Collision", enabled=False):
-            rospy.loginfo(f"Target link requested is: {target_link}")
+            # rospy.loginfo(f"Target link requested is: {target_link}")
             if link_list == []:
                 link_list = self.sorted_links
             
@@ -1962,7 +1967,7 @@ class ROSRobot(rtb.Robot):
             ])
             
             # print(f"links: {[link.name for link in self.links]}")
-            print(f"Collision Keys: {list(check_dict.keys())}")     
+            print(f"Collision Keys: {list(check_dict.keys())}") if len(check_dict.keys()) > 0 else None   
             # print(f"Collision Values: {list(check_dict.values())}")    
 
             # Output list of collisions or name of links based on input bool
