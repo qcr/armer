@@ -1010,10 +1010,15 @@ class ROSRobot(rtb.Robot):
             step_pose_stamped.pose.position.z += ee_in_goal.pose.position.z
 
             # NOTE: Ignore orientation until an action message is made with degrees for user convenience
-            step_pose_stamped.pose.orientation.w = ee_in_goal.pose.orientation.w
-            step_pose_stamped.pose.orientation.x = ee_in_goal.pose.orientation.x
-            step_pose_stamped.pose.orientation.y = ee_in_goal.pose.orientation.y
-            step_pose_stamped.pose.orientation.z = ee_in_goal.pose.orientation.z
+            if step_pose_stamped.pose.orientation.x == 0 and step_pose_stamped.pose.orientation.y == 0 and step_pose_stamped.pose.orientation.z == 0 and step_pose_stamped.pose.orientation.w == 0:
+                rospy.logwarn('STEP - Setting orientation to existing orientation')
+                step_pose_stamped.pose.orientation.w = ee_in_goal.pose.orientation.w
+                step_pose_stamped.pose.orientation.x = ee_in_goal.pose.orientation.x
+                step_pose_stamped.pose.orientation.y = ee_in_goal.pose.orientation.y
+                step_pose_stamped.pose.orientation.z = ee_in_goal.pose.orientation.z
+            else:
+                rospy.logwarn(f'STEP - orientation being set to goal')
+                rospy.logdebug(f'--> Step Goal {step_pose_stamped.pose.orientation} current gripper {ee_in_goal.pose.orientation}')
 
             # Transform step_pose to armer base_link
             step_pose_stamped = self.tf_listener.transformPose(
@@ -1338,6 +1343,7 @@ class ROSRobot(rtb.Robot):
 
             rospy.logdebug(f"Named Pose In Frame ---\nFROM: {pose_stamped}")
             rospy.logdebug(f"Named Pose In Frame ---\nTO POSE: {goal_pose}")
+            rospy.logdebug(f'WITH GRIPPER -> {self.gripper}')
 
             solution = None
             try:
