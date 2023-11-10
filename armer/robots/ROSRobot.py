@@ -359,15 +359,21 @@ class ROSRobot(rtb.Robot):
             )
 
             rospy.Service(
-                '{}/get_named_pose_list'.format(self.name.lower()),
+                '{}/get_named_pose_in_frame_list'.format(self.name.lower()),
                 GetNamedPoseArray,
                 self.get_named_pose_in_frame_list_cb
             )
 
             rospy.Service(
-                '{}/get_named_pose'.format(self.name.lower()),
+                '{}/get_named_pose_in_frame'.format(self.name.lower()),
                 GetNamedPose,
                 self.get_named_pose_in_frame_cb
+            )
+
+            rospy.Service(
+                '{}/get_named_pose'.format(self.name.lower()),
+                GetNamedPose,
+                self.get_named_pose_cb
             )
             
             rospy.Service(
@@ -882,7 +888,7 @@ class ROSRobot(rtb.Robot):
 
         with self.lock:
             # TODO: Refactor - this provided as a parameter
-            goal_pose_joint_threshold = 0.005
+            goal_pose_joint_threshold = 0.0075
 
             goal_pose = goal.pose_stamped
 
@@ -1272,6 +1278,48 @@ class ROSRobot(rtb.Robot):
 
         return goal_pose
 
+    def get_named_pose_cb(self, req: GetNamedPoseRequest) -> GetNamedPoseResponse:
+
+        named_poses = {}
+
+        # TODO: clean this up...
+        # Defaults to /home/qcr/.ros/configs/system_named_poses.yaml
+        # config_file = self.config_path if not self.custom_configs else self.custom_configs[-1]
+        config_file = '/home/qcr/armer_ws/src/armer_descriptions/data/custom/cgras_descriptions/config/named_poses.yaml'
+
+        try:
+            config = yaml.load(open(config_file), Loader=yaml.SafeLoader)
+            if config and 'named_poses' in config:
+                named_poses = config['named_poses']
+        except IOError:
+            rospy.logwarn(
+                'Unable to locate configuration file: {}'.format(config_file))
+            return None # TODO: service error      
+
+        if req.pose_name not in named_poses:
+            rospy.logwarn(f"-- Named pose goal ({req.pose_name}) is unknown; refusing to move...")
+            return None # TODO: service error
+
+        qd = np.array(named_poses[req.pose_name])
+        named_location = self.ets(start=self.base_link, end=self.gripper).eval(qd)
+
+        pose_stamped = PoseStamped()
+        pose_stamped.header.frame_id = f'/{self.base_link.name}'
+
+        translation = named_location[:3, 3]    
+        pose_stamped.pose.position.x = translation[0]
+        pose_stamped.pose.position.y = translation[1]
+        pose_stamped.pose.position.z = translation[2]
+
+        rotation = named_location[:3, :3]
+        named_rot = sm.UnitQuaternion(rotation)
+
+        pose_stamped.pose.orientation.w = named_rot.A[0]
+        pose_stamped.pose.orientation.x = named_rot.A[1]
+        pose_stamped.pose.orientation.y = named_rot.A[2]
+        pose_stamped.pose.orientation.z = named_rot.A[3]
+
+        return pose_stamped
 
     def named_pose_in_frame_cb(self, goal: MoveToNamedPoseGoal) -> None:
         """
