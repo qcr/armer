@@ -26,7 +26,7 @@ import yaml
 # Required for NEO
 import qpsolvers as qp
 import spatialgeometry as sg
-
+from dataclasses import dataclass
 from armer.utils import ikine, mjtg, trapezoidal
 
 from std_msgs.msg import Header, Bool
@@ -51,6 +51,13 @@ class ControlMode:
    ERROR=0
    JOINTS=1
    CARTESIAN=2
+
+# Test class of dynamic objects
+@dataclass
+class DynamicCollisionObj:
+    obj: sg.Shape
+    is_added: bool = False
+    removal_requested: bool = False
 
 class ROSRobot(rtb.Robot):
     """
@@ -151,6 +158,9 @@ class ROSRobot(rtb.Robot):
         self.robot_ghost = URDFRobot(wait_for_description=False,\
             collision_check_start_link=self.collision_sliced_links[0].name, 
             collision_check_stop_link=self.collision_sliced_links[-1].name)
+        
+        # Define a list of dynamic objects (to be added in at runtime)
+        self.dynamic_collision_list = list()
 
         # Check for external links (from robot tree)
         # This is required to add any other links (not specifically part of the robot tree) 
@@ -473,6 +483,11 @@ class ROSRobot(rtb.Robot):
                 self.get_named_pose_configs_cb
             )
 
+            rospy.Service(
+                '{}/add_collision_object'.format(self.name.lower()),
+                AddCollisionObj,
+                self.add_collision_obj_cb
+            )
     # --------------------------------------------------------------------- #
     # --------- ROS Topic Callback Methods -------------------------------- #
     # --------------------------------------------------------------------- #
@@ -1849,16 +1864,51 @@ class ROSRobot(rtb.Robot):
         NOTE: check failure modes (i.e., not in link dict, etc.)
         """
         pass
+    
+    def add_collision_obj_cb(self, req: AddCollisionObjRequest) -> AddCollisionObjResponse:
+        """
+        TODO: Implement a way to add to existing collision dictionary at runtime
+        Expected input:
+            -> TODO: name (string): to define the key within the collision dictionary
+            -> TODO: type (string): to define basic primatives (as part of the sg.Shape class)
+            -> TODO: base_link (string): link name to attach object to
+            -> TODO: pose (Pose): to define the shape's location
+        """
+        print(f"req: is {req}")
 
+        # TEMP SETUP
+        # Add a simple sphere to the scene
+        obj = sg.Sphere(radius=0.05, pose=sm.SE3(0.65, 0, 0.5))
+        dynamic_obj = DynamicCollisionObj(
+            obj=obj, 
+            is_added=False,
+            removal_requested=False
+        )
+        self.dynamic_collision_list.append(dynamic_obj)
+
+        # Test adding to collision dictionary for checking
+        self.collision_dict[req.name] = [dynamic_obj.obj]
+        
+        # s0 = sg.Sphere(radius=0.05, pose=sm.SE3(0.5, 0, 0.5))
+        # s1 = sg.Sphere(radius=0.05, pose=sm.SE3(0.5, 0, 0.1))
+        # robot.add_collision_obj(s0)
+        # robot.add_collision_obj(s1)
+        # self.backend.add(s0)
+        # self.backend.add(s1)
+        # Get the current robot object's 'graphical' backend to add object to
+        # env = self._get_graphical_backend()
+        # print(f"got graphical backend: {env}")
+        # Add the object to the backend
+        # print(f"Adding obj: {obj}")
+        # env.restart()
+        # env.add(obj)
+        # print(f"Here after adding object")
+        # env.reset()
+
+        return AddCollisionObjResponse(success=True)
     # --------------------------------------------------------------------- #
     # --------- Collision and Singularity Checking Methods ---------------- #
     # --------------------------------------------------------------------- #
-    def add_collision_obj(self, obj: sg.Shape):
-        """
-        TODO: Implement a way to add to existing collision dictionary at runtime
-        """
-        pass
-    
     def get_link_collision_dict(self) -> dict():
         """
         Returns a dictionary of all associated links (names) which lists their respective collision data
