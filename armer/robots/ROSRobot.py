@@ -41,7 +41,7 @@ from armer_msgs.srv import *
 
 # TESTING NEW IMPORTS FOR TRAJ DISPLAY (MOVEIT)
 from trajectory_msgs.msg import JointTrajectoryPoint, JointTrajectory
-from moveit_msgs.msg import RobotState, AttachedCollisionObject, CollisionObject, RobotTrajectory
+from moveit_msgs.msg import RobotState, AttachedCollisionObject, CollisionObject, RobotTrajectory, DisplayTrajectory
 
 # pylint: disable=too-many-instance-attributes
 
@@ -128,6 +128,7 @@ class ROSRobot(rtb.Robot):
         #       the main self collision check can ignore these cases. 
         self.overlapped_link_dict = dict()
         self.collision_dict = dict()
+        self.collision_obj_list = list()
         self.collision_approached = False
         # Iterate through robot links and sort - add to tracked collision list
         while link is not None:
@@ -135,6 +136,8 @@ class ROSRobot(rtb.Robot):
             # print(f"link name in sort: {link.name}")
             # Add current link to overall dictionary
             self.collision_dict[link.name] = link.collision.data if link.collision.data else []
+            [self.collision_obj_list.append(data) for data in link.collision.data]
+
             self.sorted_links.append(link)
             link=link.parent
         self.sorted_links.reverse()
@@ -159,8 +162,10 @@ class ROSRobot(rtb.Robot):
 
             # print(f"adding link: {link.name} which is type: {type(link)} with collision data: {link.collision.data}")
             self.collision_dict[link.name] = link.collision.data if link.collision.data else []
+            [self.collision_obj_list.append(data) for data in link.collision.data]
 
         # Debugging
+        print(f"All collision objects in main list: {self.collision_obj_list}")
         # print(f"Collision dict for links: {self.collision_dict}\n")
         # print(f"Dictionary of expected link collisions: {self.overlapped_link_dict}\n")    
 
@@ -238,6 +243,13 @@ class ROSRobot(rtb.Robot):
             )
             self.custom_configs: List[str] = []
             self.__load_config()
+
+            # --- TEST GHOST PUBLISHER --- #
+            self.display_traj_publisher: rospy.Publisher = rospy.Publisher(
+                '{}/armer_traj_display'.format(self.name.lower()),
+                DisplayTrajectory,
+                queue_size=1
+            )
 
             # --- ROS Publisher Setup --- #
             self.joint_publisher: rospy.Publisher = rospy.Publisher(
@@ -978,13 +990,46 @@ class ROSRobot(rtb.Robot):
             # Check for collision throughout trajectory
             go_signal = True
             traj = self.traj_generator(self, qf=solution.q, max_speed=goal.speed if goal.speed else 0.2)
-            print(f"Traj len: {len(traj.s)}")
+            # Attempt to slice the trajectory into bit-size chuncks to speed up collision check
+            # NOTE: doesn't need to check every state in trajectory, as spatially stepping will find links in collision
+            # TODO: check this assumption holds true
+            step_thresh = 50
+            step_value = int(len(traj.s) / step_thresh) if int(len(traj.s) / step_thresh) > 0 else 1
+
+            jt_traj_point = JointTrajectoryPoint()
+            jt_traj_point.time_from_start = np.max(traj.t)
+            print(f"Traj len: {len(traj.s)} | with step value: {step_value}")
             with Timer("Full Trajectory Collision Check"):
-                for idx in range(0,len(traj.s),50):
+                for idx in range(0,len(traj.s),step_value):
                     # print(f"q: {q}")
+                    jt_traj_point.positions = traj.s[idx]
+                    jt_traj_point.velocities = traj.sd[idx]
                     if self.check_collision_per_state(q=traj.s[idx]) == False:
                         go_signal = False
                         break
+
+            jt_traj = JointTrajectory()
+            jt_traj.joint_names = self.joint_names
+            jt_traj.points = jt_traj_point
+
+            robot_traj = RobotTrajectory()
+            robot_traj.joint_trajectory = jt_traj
+            print(f"jt_traj: {jt_traj}")
+
+            robot_state = RobotState()
+            state = JointState()
+            state.position = list(self.q)
+            state.velocity = list(self.qd)
+            state.effort = np.zeros(self.n)
+            robot_state.joint_state = state
+            robot_state.is_diff = False
+
+            display_traj = DisplayTrajectory()
+            display_traj.model_id = self.name
+            display_traj.trajectory = robot_traj
+            display_traj.trajectory_start = robot_state
+
+            # self.display_traj_publisher.publish(display_traj)
 
             # Check for collision only at end for speed
             # go_signal = self.check_collision_per_state(q=solution.q)
@@ -992,7 +1037,7 @@ class ROSRobot(rtb.Robot):
             if go_signal:
                 self.executor = TrajectoryExecutor(
                     self,
-                    self.traj_generator(self, qf=solution.q, max_speed=goal.speed if goal.speed else 0.2),
+                    traj=traj,
                     cutoff=self.trajectory_end_cutoff
                 )
 
@@ -2115,15 +2160,15 @@ class ROSRobot(rtb.Robot):
                 0.3,
                 0.05,
                 1.0,
-                start=self.link_dict["link1"],
-                end=self.link_dict["link_eef"],
+                start=self.link_dict["panda_hand"],
+                end=self.link_dict["panda_link0"],
             )
 
             # print(f"c_Ain: {np.shape(c_Ain)} | Ain: {np.shape(Ain)}")
             # If there are any parts of the robot within the influence distance
             # to the collision in the scene
             if c_Ain is not None and c_bin is not None:
-                c_Ain = np.c_[c_Ain, np.zeros((c_Ain.shape[0], 5))]
+                c_Ain = np.c_[c_Ain, np.zeros((c_Ain.shape[0], 6))]
 
                 # print(f"c_Ain (in prob area): {np.shape(c_Ain)} | Ain: {np.shape(Ain)}")
                 # Stack the inequality constraints
@@ -2131,12 +2176,12 @@ class ROSRobot(rtb.Robot):
                 bin = np.r_[bin, c_bin]
 
         # Linear component of objective function: the manipulability Jacobian
-        c = np.r_[-self.jacobm(self.q).reshape((len(self.q),)), np.zeros(6)]
+        c = np.r_[-self.jacobm(self.q).reshape((len(self.q),)), np.zeros(7)]
 
         # The lower and upper bounds on the joint velocity and slack variable
         if np.any(self.qdlim):
-            lb = -np.r_[self.qdlim[:len(self.q)], 10 * np.ones(6)]
-            ub = np.r_[self.qdlim[:len(self.q)], 10 * np.ones(6)]
+            lb = -np.r_[self.qdlim[:len(self.q)], 10 * np.ones(7)]
+            ub = np.r_[self.qdlim[:len(self.q)], 10 * np.ones(7)]
 
             # Solve for the joint velocities dq
             qd = qp.solve_qp(Q, c, Ain, bin, Aeq, beq, lb=lb, ub=ub, solver='daqp')
