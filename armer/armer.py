@@ -398,6 +398,7 @@ class Armer:
         """
         self.last_tick = rospy.get_time()
         rospy.loginfo(f"ARMer Node Running...")
+        added = False
         
         while not rospy.is_shutdown():
             with Timer('ROS', self.log_frequency):
@@ -416,6 +417,31 @@ class Armer:
                         # Current robot found to be in collision so preempt
                         robot.collision_approached = True
                         robot.preempt()
+
+                    # if robot.check_for_dynamic_collisions():
+                    for dynamic_obj in robot.dynamic_collision_list:
+                        if dynamic_obj.is_added == False:
+                            print(f"Adding Dynamic Object: {dynamic_obj}")
+                            self.backend.add(dynamic_obj.obj)
+                            dynamic_obj.is_added = True
+                        else:
+                            # Check for removal
+                            if dynamic_obj.removal_requested == True:
+                                print(f"Removing Dynamic Object: {dynamic_obj}")
+                                dynamic_obj.is_added = False
+                                dynamic_obj.removal_requested = False
+                                self.backend.remove(dynamic_obj.obj)
+                    
+                    # # TESTING
+                    # # Add dummy object for testing
+                    # if not added:
+                    #     s0 = sg.Sphere(radius=0.05, pose=sm.SE3(0.5, 0, 0.5))
+                    #     s1 = sg.Sphere(radius=0.05, pose=sm.SE3(0.5, 0, 0.1))
+                    #     # robot.add_collision_obj(s0)
+                    #     # robot.add_collision_obj(s1)
+                    #     self.backend.add(s0)
+                    #     self.backend.add(s1)
+                    #     added = True
 
                     robot.step(dt=dt)
 
