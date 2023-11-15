@@ -7,8 +7,10 @@ import subprocess
 import os
 
 from roboticstoolbox.backends.Connector import Connector
+import spatialgeometry as sg
 
 import armer
+import rospy
 
 class ROS(Connector):  # pragma nocover
     """
@@ -19,7 +21,10 @@ class ROS(Connector):  # pragma nocover
         super().__init__()
 
         self.roscore = None
+        # Main robot (and description defined objects) go here
         self.robots = {}
+        # Dynamically added objects go here
+        self.dynamic_objects = []
 
     #
     #  Basic methods to do with the state of the external program
@@ -65,6 +70,12 @@ class ROS(Connector):  # pragma nocover
             # ob._qlim = ob.qlim
 
             self.robots[ob.name] = ob
+        elif isinstance(ob, sg.Shape):
+            # TODO: test with real robot
+            # NOTE: this is to keep track of added objects to this backend (dynamically added)
+            ob._propogate_scene_tree()
+            # ob._added_to_swift = True
+            self.dynamic_objects.append(ob)
 
         super().add()
 
@@ -88,6 +99,12 @@ class ROS(Connector):  # pragma nocover
             self.robots[robot_name]._propogate_scene_tree()
             # Publishes out to ROS via configured control topic (joint_group_vel_controller)
             self.robots[robot_name].publish()
+
+        # Update world transforms of dynamic objects
+        # TODO: test with real robot
+        for obj in self.dynamic_objects:
+            if obj is not None:
+                obj._propogate_scene_tree()
 
     def reset(self):
         '''
@@ -119,13 +136,28 @@ class ROS(Connector):  # pragma nocover
     #  Methods to interface with the robots created in other environemnts
     #
 
-    def remove(self):
+    def remove(self, id):
         '''
         remove(id) removes the object from the external environment.
 
         '''
+        # NOTE: this should remove from the dynamic list (similar to how it is handled in Swift)
+        # TODO: test with real robot
+        # ob to remove
+        idd = None
 
-        pass
+        if isinstance(id, sg.Shape):
+            for i in range(len(self.dynamic_objects)):
+                if self.dynamic_objects[i] is not None and id == self.dynamic_objects[i]:
+                    idd = i
+                    # NOTE: might be better to fully remove this?
+                    self.dynamic_objects[idd] = None
+                    break
+
+        if idd is None:
+            raise ValueError(
+                "the id argument does not correspond with a known shape in backend"
+            )
 
     def hold(self):    # pragma nocover
         '''

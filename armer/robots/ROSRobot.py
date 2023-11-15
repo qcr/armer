@@ -57,7 +57,6 @@ class ControlMode:
 class DynamicCollisionObj:
     obj: sg.Shape
     is_added: bool = False
-    removal_requested: bool = False
 
 class ROSRobot(rtb.Robot):
     """
@@ -160,7 +159,8 @@ class ROSRobot(rtb.Robot):
             collision_check_stop_link=self.collision_sliced_links[-1].name)
         
         # Define a list of dynamic objects (to be added in at runtime)
-        self.dynamic_collision_list = list()
+        self.dynamic_collision_dict = dict()
+        self.dynamic_collision_removal_dict = dict()
 
         # Check for external links (from robot tree)
         # This is required to add any other links (not specifically part of the robot tree) 
@@ -175,7 +175,7 @@ class ROSRobot(rtb.Robot):
             [self.collision_obj_list.append(data) for data in link.collision.data]
 
         # Debugging
-        print(f"All collision objects in main list: {self.collision_obj_list}")
+        # print(f"All collision objects in main list: {self.collision_obj_list}")
         # print(f"Collision dict for links: {self.collision_dict}\n")
         # print(f"Dictionary of expected link collisions: {self.overlapped_link_dict}\n")    
 
@@ -485,8 +485,14 @@ class ROSRobot(rtb.Robot):
 
             rospy.Service(
                 '{}/add_collision_object'.format(self.name.lower()),
-                AddCollisionObj,
+                AddCollisionObject,
                 self.add_collision_obj_cb
+            )
+
+            rospy.Service(
+                '{}/get_collision_objects'.format(self.name.lower()),
+                GetCollisionObjects,
+                self.get_collision_obj_cb
             )
     # --------------------------------------------------------------------- #
     # --------- ROS Topic Callback Methods -------------------------------- #
@@ -1865,47 +1871,102 @@ class ROSRobot(rtb.Robot):
         """
         pass
     
-    def add_collision_obj_cb(self, req: AddCollisionObjRequest) -> AddCollisionObjResponse:
+    def add_collision_obj_cb(self, req: AddCollisionObjectRequest) -> AddCollisionObjectResponse:
         """
         TODO: Implement a way to add to existing collision dictionary at runtime
         Expected input:
-            -> TODO: name (string): to define the key within the collision dictionary
-            -> TODO: type (string): to define basic primatives (as part of the sg.Shape class)
+            -> name (string): to define the key within the collision dictionary
+            -> type (string): to define basic primatives (as part of the sg.Shape class)
             -> TODO: base_link (string): link name to attach object to
-            -> TODO: pose (Pose): to define the shape's location
+            -> radius (float): used to define radius of sphere or cylinder
+            -> length (float): used to define length of cylinder
+            -> pose (Pose): to define the shape's location
+            -> overwrite (bool): True means the same key name (if in the dictionary) can be overwritten
         """
-        print(f"req: is {req}")
-
-        # TEMP SETUP
-        # Add a simple sphere to the scene
-        obj = sg.Sphere(radius=0.05, pose=sm.SE3(0.65, 0, 0.5))
-        dynamic_obj = DynamicCollisionObj(
-            obj=obj, 
-            is_added=False,
-            removal_requested=False
-        )
-        self.dynamic_collision_list.append(dynamic_obj)
-
-        # Test adding to collision dictionary for checking
-        self.collision_dict[req.name] = [dynamic_obj.obj]
+        # Handle early termination on input error for name and type
+        if req.name == None or req.name == ''\
+            or req.type == None or req.type == '':
+            rospy.logerr(f"Add collision object service input error: name [{req.name}] | type [{req.type}]")
+            return AddCollisionObjectResponse(success=False)
         
-        # s0 = sg.Sphere(radius=0.05, pose=sm.SE3(0.5, 0, 0.5))
-        # s1 = sg.Sphere(radius=0.05, pose=sm.SE3(0.5, 0, 0.1))
-        # robot.add_collision_obj(s0)
-        # robot.add_collision_obj(s1)
-        # self.backend.add(s0)
-        # self.backend.add(s1)
-        # Get the current robot object's 'graphical' backend to add object to
-        # env = self._get_graphical_backend()
-        # print(f"got graphical backend: {env}")
-        # Add the object to the backend
-        # print(f"Adding obj: {obj}")
-        # env.restart()
-        # env.add(obj)
-        # print(f"Here after adding object")
-        # env.reset()
+        # Handle radius and length defaulting on 0
+        radius = req.radius if req.radius else 0.05 #default in m
+        length = req.length if req.length else 0.1 #default in m
+        rospy.loginfo(f"radius is: {radius} | length is: {length}")
+        
+        # Handle pose input error
+        if req.pose == None or req.pose == Pose():
+            rospy.logerr(f"Pose is empty or None: [{req.pose}]")
+            return AddCollisionObjectResponse(success=False)
+        
+        # Convert geometry_msgs/Pose to SE3 object
+        # NOTE: only the translation component is actually used
+        pose_se3 = SE3(req.pose.position.x, 
+                        req.pose.position.y,
+                        req.pose.position.z) * UnitQuaternion(req.pose.orientation.w, [
+                                                                req.pose.orientation.x, 
+                                                                req.pose.orientation.y,
+                                                                req.pose.orientation.z]).SE3()
+        # Handle type selection or error
+        obj: sg.Shape = None
+        if req.type == "sphere":
+            obj = sg.Sphere(radius=radius, pose=pose_se3)
+        elif req.type == "cylinder":
+            obj = sg.Cylinder(radius=radius, length=length, pose=pose_se3)
+        elif req.type == "mesh":
+            rospy.logwarn(f"In progress -> not yet implemented. Exiting...")
+            return AddCollisionObjectResponse(success=False)
+        else:
+            rospy.logerr(f"Collision shape type [{req.type}] is invalid -> exiting...")
+            return AddCollisionObjectResponse(success=False)
+        
+        # Test adding to collision dictionary for checking
+        # NOTE: perform error checking on name key (unless a replace flag was set)
+        if req.name in self.collision_dict.keys() and not req.overwrite:
+            rospy.logerr(f"Requested name [{req.name}] already exists in collision list and not asked to overwrite [{req.overwrite}]")
+            return AddCollisionObjectResponse(success=False)
+        elif req.name in self.collision_dict.keys() and req.overwrite:
+            # TODO: remove previous dynamic object with current key from dynamic collision list
+            #       done by retrieving object with matching name and setting removal_requested to True
+            rospy.logwarn(f"[NOT YET FULLY IMPLEMENTED] Here attempting to remove existing shape")
+            removed_obj = self.dynamic_collision_dict.pop(req.name)
+            self.dynamic_collision_removal_dict[req.name] = removed_obj
+    
+        # Create a Dynamic Collision Object and add the configured shape to the scene
+        dynamic_obj = DynamicCollisionObj(obj=obj, is_added=False)
+        # NOTE: these dictionaries are accessed and checked by Armer's main loop for addition to a backend.
+        self.dynamic_collision_dict[req.name] = dynamic_obj
+        self.collision_dict[req.name] = [dynamic_obj.obj]
 
-        return AddCollisionObjResponse(success=True)
+        return AddCollisionObjectResponse(success=True)
+    
+    def update_collision_obj_cb(self, req: AddCollisionObjectRequest) -> AddCollisionObjectResponse:
+        """
+        This will take a given key and (if it exists) updates the object's pose with given pose value
+        NOTE: currently expects the following
+            -> TODO: name (string) to access object in question
+            -> TODO: pose (Pose) an updated pose to provide to the object
+
+        TODO: currently this method is a service (for testing purposes) but could be a topic callback for dynamic updating
+        TODO: for completeness, should have its own service request and response
+        """
+        
+        return AddCollisionObjectResponse(success=True)
+    
+    def get_collision_obj_cb(self, req: GetCollisionObjectsRequest) -> GetCollisionObjectsResponse:
+        """
+        This will return a list (string) of current dynamic collision object names
+        
+        TODO: could have more information displayed? The translation only is displayed. Can do rpy (but escape chars need handling)
+        """
+        out_list = list()
+        for key, value in self.dynamic_collision_dict.items():
+            out_list.append(str(key) + f" -> (shape: {value.obj.stype}, pose (x,y,z): {str(sm.SE3(value.obj.T).t)})")
+
+        # Dump list out
+        # return GetCollisionObjectsResponse(list(self.dynamic_collision_dict.keys()))
+        return GetCollisionObjectsResponse(out_list)
+     
     # --------------------------------------------------------------------- #
     # --------- Collision and Singularity Checking Methods ---------------- #
     # --------------------------------------------------------------------- #

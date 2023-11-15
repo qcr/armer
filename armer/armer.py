@@ -390,6 +390,37 @@ class Armer:
 
         # No collisions found with no errors identified.
         return False
+    
+    def update_dynamic_objects(self, robot: ROSRobot) -> None:
+        """
+        method to handle the addition and removal of dynamic objects per robot instance
+        """
+        # Check if the current robot has any objects that need removal
+        if robot.dynamic_collision_removal_dict:
+            for d_obj_name in list(robot.dynamic_collision_removal_dict.copy().keys()):
+                rospy.logwarn(f"Removal of Dynamic Objects in Progress")
+                # remove from backend
+                # NOTE: there is a noted bug in the swift backend that sets the object 
+                #       (in a separate dictionary called swift_objects) to None. In the self.backend.step()
+                #       method below, this attempts to run some methods that belong to the shape but cannot do so
+                #       as it is a NoneType.
+                obj_to_remove = robot.dynamic_collision_removal_dict[d_obj_name].obj
+                rospy.loginfo(f"Remove object is: {obj_to_remove}")
+                # TODO: add this feature in once swift side is fixed 
+                #       should still work for ROS backend
+                # self.backend.remove(obj_to_remove)
+                # remove from robot dict
+                robot.dynamic_collision_removal_dict.pop(d_obj_name)
+                rospy.loginfo(f"Removed successfully")
+        else:
+            # Check if the current robot has any newly added objects to add to the backend
+            # NOTE: this loop is run everytime at the moment (not an issue with limited shapes but needs better optimisation for scale)
+            for dynamic_obj in robot.dynamic_collision_dict.values():
+                if dynamic_obj.is_added == False:
+                    rospy.loginfo(f"Adding Dynamic Object: {dynamic_obj}")
+                    self.backend.add(dynamic_obj.obj)
+                    dynamic_obj.is_added = True
+                    rospy.loginfo(f"Added Successfully")
 
 
     def run(self) -> None:
@@ -417,44 +448,16 @@ class Armer:
                         # Current robot found to be in collision so preempt
                         robot.collision_approached = True
                         robot.preempt()
-
-                    # if robot.check_for_dynamic_collisions():
-                    for dynamic_obj in robot.dynamic_collision_list:
-                        if dynamic_obj.is_added == False:
-                            print(f"Adding Dynamic Object: {dynamic_obj}")
-                            self.backend.add(dynamic_obj.obj)
-                            dynamic_obj.is_added = True
-                        else:
-                            # Check for removal
-                            if dynamic_obj.removal_requested == True:
-                                print(f"Removing Dynamic Object: {dynamic_obj}")
-                                dynamic_obj.is_added = False
-                                dynamic_obj.removal_requested = False
-                                self.backend.remove(dynamic_obj.obj)
                     
-                    # # TESTING
-                    # # Add dummy object for testing
-                    # if not added:
-                    #     s0 = sg.Sphere(radius=0.05, pose=sm.SE3(0.5, 0, 0.5))
-                    #     s1 = sg.Sphere(radius=0.05, pose=sm.SE3(0.5, 0, 0.1))
-                    #     # robot.add_collision_obj(s0)
-                    #     # robot.add_collision_obj(s1)
-                    #     self.backend.add(s0)
-                    #     self.backend.add(s1)
-                    #     added = True
-
+                    # Check if the current robot has any  dynamic objects that need backend update
+                    self.update_dynamic_objects(robot=robot)
+                
+                    # Step the current robot (based on user input via ROS)
                     robot.step(dt=dt)
 
                     # Check if requested (resets overall for all robots in scene)
                     if robot.backend_reset: backend_reset = True
 
-                # # Do a backend reset
-                # if backend_reset:
-                #     self.reset_backend()
-
-                #     # Clear reset
-                #     robot.backend_reset = False
-                # else:
                 # with Timer('step'):
                 self.backend.step(dt=dt)
 

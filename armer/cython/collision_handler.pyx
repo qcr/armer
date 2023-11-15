@@ -33,7 +33,7 @@ cpdef int global_check(str robot_name,
     # print(f"NEW robot: {robot_names[idx]}" )
 
     # Loop though the global dictionary of links for robot in evaluation
-    for l_name in global_dict[r_name]:
+    for l_name in global_dict[r_name].copy():
       # DEBUGGING
       # print(f"r_name: {r_name} | l_name: {l_name}")
 

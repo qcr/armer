@@ -1656,34 +1656,6 @@ static PyObject *__Pyx_PyDict_GetItem(PyObject *d, PyObject* key);
 #define __Pyx_PyObject_Dict_GetItem(obj, name)  PyObject_GetItem(obj, name)
 #endif
 
-/* IncludeStringH.proto */
-#include <string.h>
-
-/* BytesEquals.proto */
-static CYTHON_INLINE int __Pyx_PyBytes_Equals(PyObject* s1, PyObject* s2, int equals);
-
-/* UnicodeEquals.proto */
-static CYTHON_INLINE int __Pyx_PyUnicode_Equals(PyObject* s1, PyObject* s2, int equals);
-
-/* StrEquals.proto */
-#if PY_MAJOR_VERSION >= 3
-#define __Pyx_PyString_Equals __Pyx_PyUnicode_Equals
-#else
-#define __Pyx_PyString_Equals __Pyx_PyBytes_Equals
-#endif
-
-/* PyDictContains.proto */
-static CYTHON_INLINE int __Pyx_PyDict_ContainsTF(PyObject* item, PyObject* dict, int eq) {
-    int result = PyDict_Contains(dict, item);
-    return unlikely(result < 0) ? result : (result == (eq == Py_EQ));
-}
-
-/* PySequenceContains.proto */
-static CYTHON_INLINE int __Pyx_PySequence_ContainsTF(PyObject* item, PyObject* seq, int eq) {
-    int result = PySequence_Contains(seq, item);
-    return unlikely(result < 0) ? result : (result == (eq == Py_EQ));
-}
-
 /* PyFunctionFastCall.proto */
 #if CYTHON_FAST_PYCALL
 #if !CYTHON_VECTORCALL
@@ -1734,6 +1706,34 @@ static CYTHON_INLINE PyObject* __Pyx_PyObject_CallMethO(PyObject *func, PyObject
 /* PyObjectFastCall.proto */
 #define __Pyx_PyObject_FastCall(func, args, nargs)  __Pyx_PyObject_FastCallDict(func, args, (size_t)(nargs), NULL)
 static CYTHON_INLINE PyObject* __Pyx_PyObject_FastCallDict(PyObject *func, PyObject **args, size_t nargs, PyObject *kwargs);
+
+/* IncludeStringH.proto */
+#include <string.h>
+
+/* BytesEquals.proto */
+static CYTHON_INLINE int __Pyx_PyBytes_Equals(PyObject* s1, PyObject* s2, int equals);
+
+/* UnicodeEquals.proto */
+static CYTHON_INLINE int __Pyx_PyUnicode_Equals(PyObject* s1, PyObject* s2, int equals);
+
+/* StrEquals.proto */
+#if PY_MAJOR_VERSION >= 3
+#define __Pyx_PyString_Equals __Pyx_PyUnicode_Equals
+#else
+#define __Pyx_PyString_Equals __Pyx_PyBytes_Equals
+#endif
+
+/* PyDictContains.proto */
+static CYTHON_INLINE int __Pyx_PyDict_ContainsTF(PyObject* item, PyObject* dict, int eq) {
+    int result = PyDict_Contains(dict, item);
+    return unlikely(result < 0) ? result : (result == (eq == Py_EQ));
+}
+
+/* PySequenceContains.proto */
+static CYTHON_INLINE int __Pyx_PySequence_ContainsTF(PyObject* item, PyObject* seq, int eq) {
+    int result = PySequence_Contains(seq, item);
+    return unlikely(result < 0) ? result : (result == (eq == Py_EQ));
+}
 
 /* RaiseTooManyValuesToUnpack.proto */
 static CYTHON_INLINE void __Pyx_RaiseTooManyValuesError(Py_ssize_t expected);
@@ -2094,6 +2094,7 @@ int __pyx_module_is_main_collision_handler = 0;
 static PyObject *__pyx_builtin_range;
 /* #### Code section: string_decls ### */
 static const char __pyx_k__5[] = "?";
+static const char __pyx_k_copy[] = "copy";
 static const char __pyx_k_main[] = "__main__";
 static const char __pyx_k_name[] = "name";
 static const char __pyx_k_test[] = "test";
@@ -2158,6 +2159,7 @@ typedef struct {
   PyObject *__pyx_n_s_closest_point;
   PyObject *__pyx_n_s_collision;
   PyObject *__pyx_n_s_collision_handler;
+  PyObject *__pyx_n_s_copy;
   PyObject *__pyx_n_s_global_check;
   PyObject *__pyx_n_s_global_dict;
   PyObject *__pyx_n_s_is_coroutine;
@@ -2229,6 +2231,7 @@ static int __pyx_m_clear(PyObject *m) {
   Py_CLEAR(clear_module_state->__pyx_n_s_closest_point);
   Py_CLEAR(clear_module_state->__pyx_n_s_collision);
   Py_CLEAR(clear_module_state->__pyx_n_s_collision_handler);
+  Py_CLEAR(clear_module_state->__pyx_n_s_copy);
   Py_CLEAR(clear_module_state->__pyx_n_s_global_check);
   Py_CLEAR(clear_module_state->__pyx_n_s_global_dict);
   Py_CLEAR(clear_module_state->__pyx_n_s_is_coroutine);
@@ -2278,6 +2281,7 @@ static int __pyx_m_traverse(PyObject *m, visitproc visit, void *arg) {
   Py_VISIT(traverse_module_state->__pyx_n_s_closest_point);
   Py_VISIT(traverse_module_state->__pyx_n_s_collision);
   Py_VISIT(traverse_module_state->__pyx_n_s_collision_handler);
+  Py_VISIT(traverse_module_state->__pyx_n_s_copy);
   Py_VISIT(traverse_module_state->__pyx_n_s_global_check);
   Py_VISIT(traverse_module_state->__pyx_n_s_global_dict);
   Py_VISIT(traverse_module_state->__pyx_n_s_is_coroutine);
@@ -2339,6 +2343,7 @@ static int __pyx_m_traverse(PyObject *m, visitproc visit, void *arg) {
 #define __pyx_n_s_closest_point __pyx_mstate_global->__pyx_n_s_closest_point
 #define __pyx_n_s_collision __pyx_mstate_global->__pyx_n_s_collision
 #define __pyx_n_s_collision_handler __pyx_mstate_global->__pyx_n_s_collision_handler
+#define __pyx_n_s_copy __pyx_mstate_global->__pyx_n_s_copy
 #define __pyx_n_s_global_check __pyx_mstate_global->__pyx_n_s_global_check
 #define __pyx_n_s_global_dict __pyx_mstate_global->__pyx_n_s_global_dict
 #define __pyx_n_s_is_coroutine __pyx_mstate_global->__pyx_n_s_is_coroutine
@@ -2403,10 +2408,10 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
   int __pyx_t_3;
   PyObject *__pyx_t_4 = NULL;
   PyObject *__pyx_t_5 = NULL;
-  Py_ssize_t __pyx_t_6;
-  PyObject *(*__pyx_t_7)(PyObject *);
-  PyObject *__pyx_t_8 = NULL;
-  int __pyx_t_9;
+  PyObject *__pyx_t_6 = NULL;
+  int __pyx_t_7;
+  Py_ssize_t __pyx_t_8;
+  PyObject *(*__pyx_t_9)(PyObject *);
   int __pyx_t_10;
   int __pyx_t_11;
   int __pyx_t_12;
@@ -2460,7 +2465,7 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
     /* "collision_handler.pyx":36
  * 
  *     # Loop though the global dictionary of links for robot in evaluation
- *     for l_name in global_dict[r_name]:             # <<<<<<<<<<<<<<
+ *     for l_name in global_dict[r_name].copy():             # <<<<<<<<<<<<<<
  *       # DEBUGGING
  *       # print(f"r_name: {r_name} | l_name: {l_name}")
  */
@@ -2468,51 +2473,76 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
       PyErr_SetString(PyExc_TypeError, "'NoneType' object is not subscriptable");
       __PYX_ERR(0, 36, __pyx_L1_error)
     }
-    __pyx_t_4 = __Pyx_PyDict_GetItem(__pyx_v_global_dict, __pyx_v_r_name); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 36, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_4);
+    __pyx_t_5 = __Pyx_PyDict_GetItem(__pyx_v_global_dict, __pyx_v_r_name); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 36, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_5);
+    __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_n_s_copy); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 36, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_6);
+    __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+    __pyx_t_5 = NULL;
+    __pyx_t_7 = 0;
+    #if CYTHON_UNPACK_METHODS
+    if (likely(PyMethod_Check(__pyx_t_6))) {
+      __pyx_t_5 = PyMethod_GET_SELF(__pyx_t_6);
+      if (likely(__pyx_t_5)) {
+        PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_6);
+        __Pyx_INCREF(__pyx_t_5);
+        __Pyx_INCREF(function);
+        __Pyx_DECREF_SET(__pyx_t_6, function);
+        __pyx_t_7 = 1;
+      }
+    }
+    #endif
+    {
+      PyObject *__pyx_callargs[2] = {__pyx_t_5, NULL};
+      __pyx_t_4 = __Pyx_PyObject_FastCall(__pyx_t_6, __pyx_callargs+1-__pyx_t_7, 0+__pyx_t_7);
+      __Pyx_XDECREF(__pyx_t_5); __pyx_t_5 = 0;
+      if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 36, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_4);
+      __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
+    }
     if (likely(PyList_CheckExact(__pyx_t_4)) || PyTuple_CheckExact(__pyx_t_4)) {
-      __pyx_t_5 = __pyx_t_4; __Pyx_INCREF(__pyx_t_5);
-      __pyx_t_6 = 0;
-      __pyx_t_7 = NULL;
+      __pyx_t_6 = __pyx_t_4; __Pyx_INCREF(__pyx_t_6);
+      __pyx_t_8 = 0;
+      __pyx_t_9 = NULL;
     } else {
-      __pyx_t_6 = -1; __pyx_t_5 = PyObject_GetIter(__pyx_t_4); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 36, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_5);
-      __pyx_t_7 = __Pyx_PyObject_GetIterNextFunc(__pyx_t_5); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 36, __pyx_L1_error)
+      __pyx_t_8 = -1; __pyx_t_6 = PyObject_GetIter(__pyx_t_4); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 36, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_6);
+      __pyx_t_9 = __Pyx_PyObject_GetIterNextFunc(__pyx_t_6); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 36, __pyx_L1_error)
     }
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     for (;;) {
-      if (likely(!__pyx_t_7)) {
-        if (likely(PyList_CheckExact(__pyx_t_5))) {
+      if (likely(!__pyx_t_9)) {
+        if (likely(PyList_CheckExact(__pyx_t_6))) {
           {
-            Py_ssize_t __pyx_temp = __Pyx_PyList_GET_SIZE(__pyx_t_5);
+            Py_ssize_t __pyx_temp = __Pyx_PyList_GET_SIZE(__pyx_t_6);
             #if !CYTHON_ASSUME_SAFE_MACROS
             if (unlikely((__pyx_temp < 0))) __PYX_ERR(0, 36, __pyx_L1_error)
             #endif
-            if (__pyx_t_6 >= __pyx_temp) break;
+            if (__pyx_t_8 >= __pyx_temp) break;
           }
           #if CYTHON_ASSUME_SAFE_MACROS && !CYTHON_AVOID_BORROWED_REFS
-          __pyx_t_4 = PyList_GET_ITEM(__pyx_t_5, __pyx_t_6); __Pyx_INCREF(__pyx_t_4); __pyx_t_6++; if (unlikely((0 < 0))) __PYX_ERR(0, 36, __pyx_L1_error)
+          __pyx_t_4 = PyList_GET_ITEM(__pyx_t_6, __pyx_t_8); __Pyx_INCREF(__pyx_t_4); __pyx_t_8++; if (unlikely((0 < 0))) __PYX_ERR(0, 36, __pyx_L1_error)
           #else
-          __pyx_t_4 = __Pyx_PySequence_ITEM(__pyx_t_5, __pyx_t_6); __pyx_t_6++; if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 36, __pyx_L1_error)
+          __pyx_t_4 = __Pyx_PySequence_ITEM(__pyx_t_6, __pyx_t_8); __pyx_t_8++; if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 36, __pyx_L1_error)
           __Pyx_GOTREF(__pyx_t_4);
           #endif
         } else {
           {
-            Py_ssize_t __pyx_temp = __Pyx_PyTuple_GET_SIZE(__pyx_t_5);
+            Py_ssize_t __pyx_temp = __Pyx_PyTuple_GET_SIZE(__pyx_t_6);
             #if !CYTHON_ASSUME_SAFE_MACROS
             if (unlikely((__pyx_temp < 0))) __PYX_ERR(0, 36, __pyx_L1_error)
             #endif
-            if (__pyx_t_6 >= __pyx_temp) break;
+            if (__pyx_t_8 >= __pyx_temp) break;
           }
           #if CYTHON_ASSUME_SAFE_MACROS && !CYTHON_AVOID_BORROWED_REFS
-          __pyx_t_4 = PyTuple_GET_ITEM(__pyx_t_5, __pyx_t_6); __Pyx_INCREF(__pyx_t_4); __pyx_t_6++; if (unlikely((0 < 0))) __PYX_ERR(0, 36, __pyx_L1_error)
+          __pyx_t_4 = PyTuple_GET_ITEM(__pyx_t_6, __pyx_t_8); __Pyx_INCREF(__pyx_t_4); __pyx_t_8++; if (unlikely((0 < 0))) __PYX_ERR(0, 36, __pyx_L1_error)
           #else
-          __pyx_t_4 = __Pyx_PySequence_ITEM(__pyx_t_5, __pyx_t_6); __pyx_t_6++; if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 36, __pyx_L1_error)
+          __pyx_t_4 = __Pyx_PySequence_ITEM(__pyx_t_6, __pyx_t_8); __pyx_t_8++; if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 36, __pyx_L1_error)
           __Pyx_GOTREF(__pyx_t_4);
           #endif
         }
       } else {
-        __pyx_t_4 = __pyx_t_7(__pyx_t_5);
+        __pyx_t_4 = __pyx_t_9(__pyx_t_6);
         if (unlikely(!__pyx_t_4)) {
           PyObject* exc_type = PyErr_Occurred();
           if (exc_type) {
@@ -2540,12 +2570,12 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
       }
       __pyx_t_4 = __Pyx_PyDict_GetItem(__pyx_v_global_dict, __pyx_v_r_name); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 41, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_4);
-      __pyx_t_8 = __Pyx_PyObject_Dict_GetItem(__pyx_t_4, __pyx_v_l_name); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 41, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_8);
+      __pyx_t_5 = __Pyx_PyObject_Dict_GetItem(__pyx_t_4, __pyx_v_l_name); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 41, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_5);
       __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-      if (!(likely(PyList_CheckExact(__pyx_t_8))||((__pyx_t_8) == Py_None) || __Pyx_RaiseUnexpectedTypeError("list", __pyx_t_8))) __PYX_ERR(0, 41, __pyx_L1_error)
-      __Pyx_XDECREF_SET(__pyx_v_c_check_list, ((PyObject*)__pyx_t_8));
-      __pyx_t_8 = 0;
+      if (!(likely(PyList_CheckExact(__pyx_t_5))||((__pyx_t_5) == Py_None) || __Pyx_RaiseUnexpectedTypeError("list", __pyx_t_5))) __PYX_ERR(0, 41, __pyx_L1_error)
+      __Pyx_XDECREF_SET(__pyx_v_c_check_list, ((PyObject*)__pyx_t_5));
+      __pyx_t_5 = 0;
 
       /* "collision_handler.pyx":43
  *       c_check_list = global_dict[r_name][l_name]
@@ -2554,20 +2584,20 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
  *         c_ignore_list = overlap_dict[l_name]
  *       else:
  */
-      __pyx_t_10 = (__Pyx_PyString_Equals(__pyx_v_robot_name, __pyx_v_r_name, Py_EQ)); if (unlikely((__pyx_t_10 < 0))) __PYX_ERR(0, 43, __pyx_L1_error)
-      if (__pyx_t_10) {
+      __pyx_t_11 = (__Pyx_PyString_Equals(__pyx_v_robot_name, __pyx_v_r_name, Py_EQ)); if (unlikely((__pyx_t_11 < 0))) __PYX_ERR(0, 43, __pyx_L1_error)
+      if (__pyx_t_11) {
       } else {
-        __pyx_t_9 = __pyx_t_10;
+        __pyx_t_10 = __pyx_t_11;
         goto __pyx_L8_bool_binop_done;
       }
       if (unlikely(__pyx_v_overlap_dict == Py_None)) {
         PyErr_SetString(PyExc_TypeError, "'NoneType' object is not iterable");
         __PYX_ERR(0, 43, __pyx_L1_error)
       }
-      __pyx_t_10 = (__Pyx_PyDict_ContainsTF(__pyx_v_l_name, __pyx_v_overlap_dict, Py_EQ)); if (unlikely((__pyx_t_10 < 0))) __PYX_ERR(0, 43, __pyx_L1_error)
-      __pyx_t_9 = __pyx_t_10;
+      __pyx_t_11 = (__Pyx_PyDict_ContainsTF(__pyx_v_l_name, __pyx_v_overlap_dict, Py_EQ)); if (unlikely((__pyx_t_11 < 0))) __PYX_ERR(0, 43, __pyx_L1_error)
+      __pyx_t_10 = __pyx_t_11;
       __pyx_L8_bool_binop_done:;
-      if (__pyx_t_9) {
+      if (__pyx_t_10) {
 
         /* "collision_handler.pyx":44
  *       # Handle self checking and populate overlap links for ignoring
@@ -2580,11 +2610,11 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
           PyErr_SetString(PyExc_TypeError, "'NoneType' object is not subscriptable");
           __PYX_ERR(0, 44, __pyx_L1_error)
         }
-        __pyx_t_8 = __Pyx_PyDict_GetItem(__pyx_v_overlap_dict, __pyx_v_l_name); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 44, __pyx_L1_error)
-        __Pyx_GOTREF(__pyx_t_8);
-        if (!(likely(PyList_CheckExact(__pyx_t_8))||((__pyx_t_8) == Py_None) || __Pyx_RaiseUnexpectedTypeError("list", __pyx_t_8))) __PYX_ERR(0, 44, __pyx_L1_error)
-        __Pyx_XDECREF_SET(__pyx_v_c_ignore_list, ((PyObject*)__pyx_t_8));
-        __pyx_t_8 = 0;
+        __pyx_t_5 = __Pyx_PyDict_GetItem(__pyx_v_overlap_dict, __pyx_v_l_name); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 44, __pyx_L1_error)
+        __Pyx_GOTREF(__pyx_t_5);
+        if (!(likely(PyList_CheckExact(__pyx_t_5))||((__pyx_t_5) == Py_None) || __Pyx_RaiseUnexpectedTypeError("list", __pyx_t_5))) __PYX_ERR(0, 44, __pyx_L1_error)
+        __Pyx_XDECREF_SET(__pyx_v_c_ignore_list, ((PyObject*)__pyx_t_5));
+        __pyx_t_5 = 0;
 
         /* "collision_handler.pyx":43
  *       c_check_list = global_dict[r_name][l_name]
@@ -2604,10 +2634,10 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
  *       # Local checking of evaluation robot's link with robot's target links
  */
       /*else*/ {
-        __pyx_t_8 = PyList_New(0); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 46, __pyx_L1_error)
-        __Pyx_GOTREF(__pyx_t_8);
-        __Pyx_XDECREF_SET(__pyx_v_c_ignore_list, ((PyObject*)__pyx_t_8));
-        __pyx_t_8 = 0;
+        __pyx_t_5 = PyList_New(0); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 46, __pyx_L1_error)
+        __Pyx_GOTREF(__pyx_t_5);
+        __Pyx_XDECREF_SET(__pyx_v_c_ignore_list, ((PyObject*)__pyx_t_5));
+        __pyx_t_5 = 0;
       }
       __pyx_L7:;
 
@@ -2618,8 +2648,8 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
  *         link = robot_links[l_idx]
  *         t_l_name = link.name
  */
-      __pyx_t_11 = __pyx_v_len_links;
-      __pyx_t_12 = __pyx_t_11;
+      __pyx_t_7 = __pyx_v_len_links;
+      __pyx_t_12 = __pyx_t_7;
       for (__pyx_t_13 = 0; __pyx_t_13 < __pyx_t_12; __pyx_t_13+=1) {
         __pyx_v_l_idx = __pyx_t_13;
 
@@ -2634,10 +2664,10 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
           PyErr_SetString(PyExc_TypeError, "'NoneType' object is not subscriptable");
           __PYX_ERR(0, 53, __pyx_L1_error)
         }
-        __pyx_t_8 = __Pyx_GetItemInt_List(__pyx_v_robot_links, __pyx_v_l_idx, int, 1, __Pyx_PyInt_From_int, 1, 0, 1); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 53, __pyx_L1_error)
-        __Pyx_GOTREF(__pyx_t_8);
-        __Pyx_XDECREF_SET(__pyx_v_link, __pyx_t_8);
-        __pyx_t_8 = 0;
+        __pyx_t_5 = __Pyx_GetItemInt_List(__pyx_v_robot_links, __pyx_v_l_idx, int, 1, __Pyx_PyInt_From_int, 1, 0, 1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 53, __pyx_L1_error)
+        __Pyx_GOTREF(__pyx_t_5);
+        __Pyx_XDECREF_SET(__pyx_v_link, __pyx_t_5);
+        __pyx_t_5 = 0;
 
         /* "collision_handler.pyx":54
  *       for l_idx in range(len_links):
@@ -2646,11 +2676,11 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
  *         # DEBUGGING
  *         # print(f"checking {t_l_name}")
  */
-        __pyx_t_8 = __Pyx_PyObject_GetAttrStr(__pyx_v_link, __pyx_n_s_name); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 54, __pyx_L1_error)
-        __Pyx_GOTREF(__pyx_t_8);
-        if (!(likely(PyString_CheckExact(__pyx_t_8))||((__pyx_t_8) == Py_None) || __Pyx_RaiseUnexpectedTypeError("str", __pyx_t_8))) __PYX_ERR(0, 54, __pyx_L1_error)
-        __Pyx_XDECREF_SET(__pyx_v_t_l_name, ((PyObject*)__pyx_t_8));
-        __pyx_t_8 = 0;
+        __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_v_link, __pyx_n_s_name); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 54, __pyx_L1_error)
+        __Pyx_GOTREF(__pyx_t_5);
+        if (!(likely(PyString_CheckExact(__pyx_t_5))||((__pyx_t_5) == Py_None) || __Pyx_RaiseUnexpectedTypeError("str", __pyx_t_5))) __PYX_ERR(0, 54, __pyx_L1_error)
+        __Pyx_XDECREF_SET(__pyx_v_t_l_name, ((PyObject*)__pyx_t_5));
+        __pyx_t_5 = 0;
 
         /* "collision_handler.pyx":59
  * 
@@ -2659,8 +2689,8 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
  *           continue
  * 
  */
-        __pyx_t_9 = (__Pyx_PySequence_ContainsTF(__pyx_v_t_l_name, __pyx_v_c_ignore_list, Py_EQ)); if (unlikely((__pyx_t_9 < 0))) __PYX_ERR(0, 59, __pyx_L1_error)
-        if (__pyx_t_9) {
+        __pyx_t_10 = (__Pyx_PySequence_ContainsTF(__pyx_v_t_l_name, __pyx_v_c_ignore_list, Py_EQ)); if (unlikely((__pyx_t_10 < 0))) __PYX_ERR(0, 59, __pyx_L1_error)
+        if (__pyx_t_10) {
 
           /* "collision_handler.pyx":60
  *         # Skip to next target link if it is to be ignored
@@ -2687,8 +2717,8 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
  *           continue
  * 
  */
-        __pyx_t_9 = (__Pyx_PyString_Equals(__pyx_v_t_l_name, __pyx_v_l_name, Py_EQ)); if (unlikely((__pyx_t_9 < 0))) __PYX_ERR(0, 63, __pyx_L1_error)
-        if (__pyx_t_9) {
+        __pyx_t_10 = (__Pyx_PyString_Equals(__pyx_v_t_l_name, __pyx_v_l_name, Py_EQ)); if (unlikely((__pyx_t_10 < 0))) __PYX_ERR(0, 63, __pyx_L1_error)
+        if (__pyx_t_10) {
 
           /* "collision_handler.pyx":64
  *         # Skip to next target link if it is the same link as current being checked
@@ -2745,10 +2775,10 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
             PyErr_SetString(PyExc_TypeError, "'NoneType' object is not subscriptable");
             __PYX_ERR(0, 69, __pyx_L1_error)
           }
-          __pyx_t_8 = __Pyx_GetItemInt_List(__pyx_v_c_check_list, __pyx_v_chk_idx, int, 1, __Pyx_PyInt_From_int, 1, 0, 1); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 69, __pyx_L1_error)
-          __Pyx_GOTREF(__pyx_t_8);
-          __Pyx_XDECREF_SET(__pyx_v_obj, __pyx_t_8);
-          __pyx_t_8 = 0;
+          __pyx_t_5 = __Pyx_GetItemInt_List(__pyx_v_c_check_list, __pyx_v_chk_idx, int, 1, __Pyx_PyInt_From_int, 1, 0, 1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 69, __pyx_L1_error)
+          __Pyx_GOTREF(__pyx_t_5);
+          __Pyx_XDECREF_SET(__pyx_v_obj, __pyx_t_5);
+          __pyx_t_5 = 0;
 
           /* "collision_handler.pyx":70
  *         for chk_idx in range(chk_list_len):
@@ -2757,11 +2787,11 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
  *           col_list_len = len(col_list)
  *           for col_idx in range(col_list_len):
  */
-          __pyx_t_8 = __Pyx_PyObject_GetAttrStr(__pyx_v_link, __pyx_n_s_collision); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 70, __pyx_L1_error)
-          __Pyx_GOTREF(__pyx_t_8);
-          __pyx_t_4 = __Pyx_PySequence_ListKeepNew(__pyx_t_8); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 70, __pyx_L1_error)
+          __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_v_link, __pyx_n_s_collision); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 70, __pyx_L1_error)
+          __Pyx_GOTREF(__pyx_t_5);
+          __pyx_t_4 = __Pyx_PySequence_ListKeepNew(__pyx_t_5); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 70, __pyx_L1_error)
           __Pyx_GOTREF(__pyx_t_4);
-          __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
+          __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
           __Pyx_XDECREF_SET(__pyx_v_col_list, ((PyObject*)__pyx_t_4));
           __pyx_t_4 = 0;
 
@@ -2806,29 +2836,29 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
  *             # print(f"d is: {d}")
  *             if d is not None and d <= 0:
  */
-            __pyx_t_8 = __Pyx_PyObject_GetAttrStr(__pyx_v_t_obj, __pyx_n_s_closest_point); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 77, __pyx_L1_error)
-            __Pyx_GOTREF(__pyx_t_8);
+            __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_v_t_obj, __pyx_n_s_closest_point); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 77, __pyx_L1_error)
+            __Pyx_GOTREF(__pyx_t_5);
             __pyx_t_21 = NULL;
             __pyx_t_22 = 0;
             #if CYTHON_UNPACK_METHODS
-            if (likely(PyMethod_Check(__pyx_t_8))) {
-              __pyx_t_21 = PyMethod_GET_SELF(__pyx_t_8);
+            if (likely(PyMethod_Check(__pyx_t_5))) {
+              __pyx_t_21 = PyMethod_GET_SELF(__pyx_t_5);
               if (likely(__pyx_t_21)) {
-                PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_8);
+                PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_5);
                 __Pyx_INCREF(__pyx_t_21);
                 __Pyx_INCREF(function);
-                __Pyx_DECREF_SET(__pyx_t_8, function);
+                __Pyx_DECREF_SET(__pyx_t_5, function);
                 __pyx_t_22 = 1;
               }
             }
             #endif
             {
               PyObject *__pyx_callargs[2] = {__pyx_t_21, __pyx_v_obj};
-              __pyx_t_4 = __Pyx_PyObject_FastCall(__pyx_t_8, __pyx_callargs+1-__pyx_t_22, 1+__pyx_t_22);
+              __pyx_t_4 = __Pyx_PyObject_FastCall(__pyx_t_5, __pyx_callargs+1-__pyx_t_22, 1+__pyx_t_22);
               __Pyx_XDECREF(__pyx_t_21); __pyx_t_21 = 0;
               if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 77, __pyx_L1_error)
               __Pyx_GOTREF(__pyx_t_4);
-              __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
+              __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
             }
             if ((likely(PyTuple_CheckExact(__pyx_t_4))) || (PyList_CheckExact(__pyx_t_4))) {
               PyObject* sequence = __pyx_t_4;
@@ -2840,20 +2870,20 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
               }
               #if CYTHON_ASSUME_SAFE_MACROS && !CYTHON_AVOID_BORROWED_REFS
               if (likely(PyTuple_CheckExact(sequence))) {
-                __pyx_t_8 = PyTuple_GET_ITEM(sequence, 0); 
+                __pyx_t_5 = PyTuple_GET_ITEM(sequence, 0); 
                 __pyx_t_21 = PyTuple_GET_ITEM(sequence, 1); 
                 __pyx_t_23 = PyTuple_GET_ITEM(sequence, 2); 
               } else {
-                __pyx_t_8 = PyList_GET_ITEM(sequence, 0); 
+                __pyx_t_5 = PyList_GET_ITEM(sequence, 0); 
                 __pyx_t_21 = PyList_GET_ITEM(sequence, 1); 
                 __pyx_t_23 = PyList_GET_ITEM(sequence, 2); 
               }
-              __Pyx_INCREF(__pyx_t_8);
+              __Pyx_INCREF(__pyx_t_5);
               __Pyx_INCREF(__pyx_t_21);
               __Pyx_INCREF(__pyx_t_23);
               #else
-              __pyx_t_8 = PySequence_ITEM(sequence, 0); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 77, __pyx_L1_error)
-              __Pyx_GOTREF(__pyx_t_8);
+              __pyx_t_5 = PySequence_ITEM(sequence, 0); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 77, __pyx_L1_error)
+              __Pyx_GOTREF(__pyx_t_5);
               __pyx_t_21 = PySequence_ITEM(sequence, 1); if (unlikely(!__pyx_t_21)) __PYX_ERR(0, 77, __pyx_L1_error)
               __Pyx_GOTREF(__pyx_t_21);
               __pyx_t_23 = PySequence_ITEM(sequence, 2); if (unlikely(!__pyx_t_23)) __PYX_ERR(0, 77, __pyx_L1_error)
@@ -2866,8 +2896,8 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
               __Pyx_GOTREF(__pyx_t_24);
               __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
               __pyx_t_25 = __Pyx_PyObject_GetIterNextFunc(__pyx_t_24);
-              index = 0; __pyx_t_8 = __pyx_t_25(__pyx_t_24); if (unlikely(!__pyx_t_8)) goto __pyx_L18_unpacking_failed;
-              __Pyx_GOTREF(__pyx_t_8);
+              index = 0; __pyx_t_5 = __pyx_t_25(__pyx_t_24); if (unlikely(!__pyx_t_5)) goto __pyx_L18_unpacking_failed;
+              __Pyx_GOTREF(__pyx_t_5);
               index = 1; __pyx_t_21 = __pyx_t_25(__pyx_t_24); if (unlikely(!__pyx_t_21)) goto __pyx_L18_unpacking_failed;
               __Pyx_GOTREF(__pyx_t_21);
               index = 2; __pyx_t_23 = __pyx_t_25(__pyx_t_24); if (unlikely(!__pyx_t_23)) goto __pyx_L18_unpacking_failed;
@@ -2883,8 +2913,8 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
               __PYX_ERR(0, 77, __pyx_L1_error)
               __pyx_L19_unpacking_done:;
             }
-            __Pyx_XDECREF_SET(__pyx_v_d, __pyx_t_8);
-            __pyx_t_8 = 0;
+            __Pyx_XDECREF_SET(__pyx_v_d, __pyx_t_5);
+            __pyx_t_5 = 0;
             __Pyx_XDECREF_SET(__pyx_v__, __pyx_t_21);
             __pyx_t_21 = 0;
             __Pyx_DECREF_SET(__pyx_v__, __pyx_t_23);
@@ -2897,18 +2927,18 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
  *               # Returns the link idx in collision
  *               return l_idx
  */
-            __pyx_t_10 = (__pyx_v_d != Py_None);
-            if (__pyx_t_10) {
+            __pyx_t_11 = (__pyx_v_d != Py_None);
+            if (__pyx_t_11) {
             } else {
-              __pyx_t_9 = __pyx_t_10;
+              __pyx_t_10 = __pyx_t_11;
               goto __pyx_L21_bool_binop_done;
             }
             __pyx_t_4 = PyObject_RichCompare(__pyx_v_d, __pyx_int_0, Py_LE); __Pyx_XGOTREF(__pyx_t_4); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 79, __pyx_L1_error)
-            __pyx_t_10 = __Pyx_PyObject_IsTrue(__pyx_t_4); if (unlikely((__pyx_t_10 < 0))) __PYX_ERR(0, 79, __pyx_L1_error)
+            __pyx_t_11 = __Pyx_PyObject_IsTrue(__pyx_t_4); if (unlikely((__pyx_t_11 < 0))) __PYX_ERR(0, 79, __pyx_L1_error)
             __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-            __pyx_t_9 = __pyx_t_10;
+            __pyx_t_10 = __pyx_t_11;
             __pyx_L21_bool_binop_done:;
-            if (__pyx_t_9) {
+            if (__pyx_t_10) {
 
               /* "collision_handler.pyx":81
  *             if d is not None and d <= 0:
@@ -2918,7 +2948,7 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
  *   # Got here without issue
  */
               __pyx_r = __pyx_v_l_idx;
-              __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+              __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
               goto __pyx_L0;
 
               /* "collision_handler.pyx":79
@@ -2937,12 +2967,12 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
       /* "collision_handler.pyx":36
  * 
  *     # Loop though the global dictionary of links for robot in evaluation
- *     for l_name in global_dict[r_name]:             # <<<<<<<<<<<<<<
+ *     for l_name in global_dict[r_name].copy():             # <<<<<<<<<<<<<<
  *       # DEBUGGING
  *       # print(f"r_name: {r_name} | l_name: {l_name}")
  */
     }
-    __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+    __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
   }
 
   /* "collision_handler.pyx":84
@@ -2967,7 +2997,7 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
   __pyx_L1_error:;
   __Pyx_XDECREF(__pyx_t_4);
   __Pyx_XDECREF(__pyx_t_5);
-  __Pyx_XDECREF(__pyx_t_8);
+  __Pyx_XDECREF(__pyx_t_6);
   __Pyx_XDECREF(__pyx_t_21);
   __Pyx_XDECREF(__pyx_t_23);
   __Pyx_XDECREF(__pyx_t_24);
@@ -3411,6 +3441,7 @@ static int __Pyx_CreateStringTabAndInitStrings(void) {
     {&__pyx_n_s_closest_point, __pyx_k_closest_point, sizeof(__pyx_k_closest_point), 0, 0, 1, 1},
     {&__pyx_n_s_collision, __pyx_k_collision, sizeof(__pyx_k_collision), 0, 0, 1, 1},
     {&__pyx_n_s_collision_handler, __pyx_k_collision_handler, sizeof(__pyx_k_collision_handler), 0, 0, 1, 1},
+    {&__pyx_n_s_copy, __pyx_k_copy, sizeof(__pyx_k_copy), 0, 0, 1, 1},
     {&__pyx_n_s_global_check, __pyx_k_global_check, sizeof(__pyx_k_global_check), 0, 0, 1, 1},
     {&__pyx_n_s_global_dict, __pyx_k_global_dict, sizeof(__pyx_k_global_dict), 0, 0, 1, 1},
     {&__pyx_n_s_is_coroutine, __pyx_k_is_coroutine, sizeof(__pyx_k_is_coroutine), 0, 0, 1, 1},
@@ -4221,155 +4252,6 @@ static PyObject *__Pyx_PyDict_GetItem(PyObject *d, PyObject* key) {
 }
 #endif
 
-/* BytesEquals */
-static CYTHON_INLINE int __Pyx_PyBytes_Equals(PyObject* s1, PyObject* s2, int equals) {
-#if CYTHON_COMPILING_IN_PYPY || CYTHON_COMPILING_IN_LIMITED_API
-    return PyObject_RichCompareBool(s1, s2, equals);
-#else
-    if (s1 == s2) {
-        return (equals == Py_EQ);
-    } else if (PyBytes_CheckExact(s1) & PyBytes_CheckExact(s2)) {
-        const char *ps1, *ps2;
-        Py_ssize_t length = PyBytes_GET_SIZE(s1);
-        if (length != PyBytes_GET_SIZE(s2))
-            return (equals == Py_NE);
-        ps1 = PyBytes_AS_STRING(s1);
-        ps2 = PyBytes_AS_STRING(s2);
-        if (ps1[0] != ps2[0]) {
-            return (equals == Py_NE);
-        } else if (length == 1) {
-            return (equals == Py_EQ);
-        } else {
-            int result;
-#if CYTHON_USE_UNICODE_INTERNALS && (PY_VERSION_HEX < 0x030B0000)
-            Py_hash_t hash1, hash2;
-            hash1 = ((PyBytesObject*)s1)->ob_shash;
-            hash2 = ((PyBytesObject*)s2)->ob_shash;
-            if (hash1 != hash2 && hash1 != -1 && hash2 != -1) {
-                return (equals == Py_NE);
-            }
-#endif
-            result = memcmp(ps1, ps2, (size_t)length);
-            return (equals == Py_EQ) ? (result == 0) : (result != 0);
-        }
-    } else if ((s1 == Py_None) & PyBytes_CheckExact(s2)) {
-        return (equals == Py_NE);
-    } else if ((s2 == Py_None) & PyBytes_CheckExact(s1)) {
-        return (equals == Py_NE);
-    } else {
-        int result;
-        PyObject* py_result = PyObject_RichCompare(s1, s2, equals);
-        if (!py_result)
-            return -1;
-        result = __Pyx_PyObject_IsTrue(py_result);
-        Py_DECREF(py_result);
-        return result;
-    }
-#endif
-}
-
-/* UnicodeEquals */
-static CYTHON_INLINE int __Pyx_PyUnicode_Equals(PyObject* s1, PyObject* s2, int equals) {
-#if CYTHON_COMPILING_IN_PYPY || CYTHON_COMPILING_IN_LIMITED_API
-    return PyObject_RichCompareBool(s1, s2, equals);
-#else
-#if PY_MAJOR_VERSION < 3
-    PyObject* owned_ref = NULL;
-#endif
-    int s1_is_unicode, s2_is_unicode;
-    if (s1 == s2) {
-        goto return_eq;
-    }
-    s1_is_unicode = PyUnicode_CheckExact(s1);
-    s2_is_unicode = PyUnicode_CheckExact(s2);
-#if PY_MAJOR_VERSION < 3
-    if ((s1_is_unicode & (!s2_is_unicode)) && PyString_CheckExact(s2)) {
-        owned_ref = PyUnicode_FromObject(s2);
-        if (unlikely(!owned_ref))
-            return -1;
-        s2 = owned_ref;
-        s2_is_unicode = 1;
-    } else if ((s2_is_unicode & (!s1_is_unicode)) && PyString_CheckExact(s1)) {
-        owned_ref = PyUnicode_FromObject(s1);
-        if (unlikely(!owned_ref))
-            return -1;
-        s1 = owned_ref;
-        s1_is_unicode = 1;
-    } else if (((!s2_is_unicode) & (!s1_is_unicode))) {
-        return __Pyx_PyBytes_Equals(s1, s2, equals);
-    }
-#endif
-    if (s1_is_unicode & s2_is_unicode) {
-        Py_ssize_t length;
-        int kind;
-        void *data1, *data2;
-        if (unlikely(__Pyx_PyUnicode_READY(s1) < 0) || unlikely(__Pyx_PyUnicode_READY(s2) < 0))
-            return -1;
-        length = __Pyx_PyUnicode_GET_LENGTH(s1);
-        if (length != __Pyx_PyUnicode_GET_LENGTH(s2)) {
-            goto return_ne;
-        }
-#if CYTHON_USE_UNICODE_INTERNALS
-        {
-            Py_hash_t hash1, hash2;
-        #if CYTHON_PEP393_ENABLED
-            hash1 = ((PyASCIIObject*)s1)->hash;
-            hash2 = ((PyASCIIObject*)s2)->hash;
-        #else
-            hash1 = ((PyUnicodeObject*)s1)->hash;
-            hash2 = ((PyUnicodeObject*)s2)->hash;
-        #endif
-            if (hash1 != hash2 && hash1 != -1 && hash2 != -1) {
-                goto return_ne;
-            }
-        }
-#endif
-        kind = __Pyx_PyUnicode_KIND(s1);
-        if (kind != __Pyx_PyUnicode_KIND(s2)) {
-            goto return_ne;
-        }
-        data1 = __Pyx_PyUnicode_DATA(s1);
-        data2 = __Pyx_PyUnicode_DATA(s2);
-        if (__Pyx_PyUnicode_READ(kind, data1, 0) != __Pyx_PyUnicode_READ(kind, data2, 0)) {
-            goto return_ne;
-        } else if (length == 1) {
-            goto return_eq;
-        } else {
-            int result = memcmp(data1, data2, (size_t)(length * kind));
-            #if PY_MAJOR_VERSION < 3
-            Py_XDECREF(owned_ref);
-            #endif
-            return (equals == Py_EQ) ? (result == 0) : (result != 0);
-        }
-    } else if ((s1 == Py_None) & s2_is_unicode) {
-        goto return_ne;
-    } else if ((s2 == Py_None) & s1_is_unicode) {
-        goto return_ne;
-    } else {
-        int result;
-        PyObject* py_result = PyObject_RichCompare(s1, s2, equals);
-        #if PY_MAJOR_VERSION < 3
-        Py_XDECREF(owned_ref);
-        #endif
-        if (!py_result)
-            return -1;
-        result = __Pyx_PyObject_IsTrue(py_result);
-        Py_DECREF(py_result);
-        return result;
-    }
-return_eq:
-    #if PY_MAJOR_VERSION < 3
-    Py_XDECREF(owned_ref);
-    #endif
-    return (equals == Py_EQ);
-return_ne:
-    #if PY_MAJOR_VERSION < 3
-    Py_XDECREF(owned_ref);
-    #endif
-    return (equals == Py_NE);
-#endif
-}
-
 /* PyFunctionFastCall */
 #if CYTHON_FAST_PYCALL && !CYTHON_VECTORCALL
 static PyObject* __Pyx_PyFunction_FastCallNoKw(PyCodeObject *co, PyObject **args, Py_ssize_t na,
@@ -4619,6 +4501,155 @@ static CYTHON_INLINE PyObject* __Pyx_PyObject_FastCallDict(PyObject *func, PyObj
     #else
     return __Pyx_PyObject_FastCall_fallback(func, args, (size_t)nargs, kwargs);
     #endif
+}
+
+/* BytesEquals */
+static CYTHON_INLINE int __Pyx_PyBytes_Equals(PyObject* s1, PyObject* s2, int equals) {
+#if CYTHON_COMPILING_IN_PYPY || CYTHON_COMPILING_IN_LIMITED_API
+    return PyObject_RichCompareBool(s1, s2, equals);
+#else
+    if (s1 == s2) {
+        return (equals == Py_EQ);
+    } else if (PyBytes_CheckExact(s1) & PyBytes_CheckExact(s2)) {
+        const char *ps1, *ps2;
+        Py_ssize_t length = PyBytes_GET_SIZE(s1);
+        if (length != PyBytes_GET_SIZE(s2))
+            return (equals == Py_NE);
+        ps1 = PyBytes_AS_STRING(s1);
+        ps2 = PyBytes_AS_STRING(s2);
+        if (ps1[0] != ps2[0]) {
+            return (equals == Py_NE);
+        } else if (length == 1) {
+            return (equals == Py_EQ);
+        } else {
+            int result;
+#if CYTHON_USE_UNICODE_INTERNALS && (PY_VERSION_HEX < 0x030B0000)
+            Py_hash_t hash1, hash2;
+            hash1 = ((PyBytesObject*)s1)->ob_shash;
+            hash2 = ((PyBytesObject*)s2)->ob_shash;
+            if (hash1 != hash2 && hash1 != -1 && hash2 != -1) {
+                return (equals == Py_NE);
+            }
+#endif
+            result = memcmp(ps1, ps2, (size_t)length);
+            return (equals == Py_EQ) ? (result == 0) : (result != 0);
+        }
+    } else if ((s1 == Py_None) & PyBytes_CheckExact(s2)) {
+        return (equals == Py_NE);
+    } else if ((s2 == Py_None) & PyBytes_CheckExact(s1)) {
+        return (equals == Py_NE);
+    } else {
+        int result;
+        PyObject* py_result = PyObject_RichCompare(s1, s2, equals);
+        if (!py_result)
+            return -1;
+        result = __Pyx_PyObject_IsTrue(py_result);
+        Py_DECREF(py_result);
+        return result;
+    }
+#endif
+}
+
+/* UnicodeEquals */
+static CYTHON_INLINE int __Pyx_PyUnicode_Equals(PyObject* s1, PyObject* s2, int equals) {
+#if CYTHON_COMPILING_IN_PYPY || CYTHON_COMPILING_IN_LIMITED_API
+    return PyObject_RichCompareBool(s1, s2, equals);
+#else
+#if PY_MAJOR_VERSION < 3
+    PyObject* owned_ref = NULL;
+#endif
+    int s1_is_unicode, s2_is_unicode;
+    if (s1 == s2) {
+        goto return_eq;
+    }
+    s1_is_unicode = PyUnicode_CheckExact(s1);
+    s2_is_unicode = PyUnicode_CheckExact(s2);
+#if PY_MAJOR_VERSION < 3
+    if ((s1_is_unicode & (!s2_is_unicode)) && PyString_CheckExact(s2)) {
+        owned_ref = PyUnicode_FromObject(s2);
+        if (unlikely(!owned_ref))
+            return -1;
+        s2 = owned_ref;
+        s2_is_unicode = 1;
+    } else if ((s2_is_unicode & (!s1_is_unicode)) && PyString_CheckExact(s1)) {
+        owned_ref = PyUnicode_FromObject(s1);
+        if (unlikely(!owned_ref))
+            return -1;
+        s1 = owned_ref;
+        s1_is_unicode = 1;
+    } else if (((!s2_is_unicode) & (!s1_is_unicode))) {
+        return __Pyx_PyBytes_Equals(s1, s2, equals);
+    }
+#endif
+    if (s1_is_unicode & s2_is_unicode) {
+        Py_ssize_t length;
+        int kind;
+        void *data1, *data2;
+        if (unlikely(__Pyx_PyUnicode_READY(s1) < 0) || unlikely(__Pyx_PyUnicode_READY(s2) < 0))
+            return -1;
+        length = __Pyx_PyUnicode_GET_LENGTH(s1);
+        if (length != __Pyx_PyUnicode_GET_LENGTH(s2)) {
+            goto return_ne;
+        }
+#if CYTHON_USE_UNICODE_INTERNALS
+        {
+            Py_hash_t hash1, hash2;
+        #if CYTHON_PEP393_ENABLED
+            hash1 = ((PyASCIIObject*)s1)->hash;
+            hash2 = ((PyASCIIObject*)s2)->hash;
+        #else
+            hash1 = ((PyUnicodeObject*)s1)->hash;
+            hash2 = ((PyUnicodeObject*)s2)->hash;
+        #endif
+            if (hash1 != hash2 && hash1 != -1 && hash2 != -1) {
+                goto return_ne;
+            }
+        }
+#endif
+        kind = __Pyx_PyUnicode_KIND(s1);
+        if (kind != __Pyx_PyUnicode_KIND(s2)) {
+            goto return_ne;
+        }
+        data1 = __Pyx_PyUnicode_DATA(s1);
+        data2 = __Pyx_PyUnicode_DATA(s2);
+        if (__Pyx_PyUnicode_READ(kind, data1, 0) != __Pyx_PyUnicode_READ(kind, data2, 0)) {
+            goto return_ne;
+        } else if (length == 1) {
+            goto return_eq;
+        } else {
+            int result = memcmp(data1, data2, (size_t)(length * kind));
+            #if PY_MAJOR_VERSION < 3
+            Py_XDECREF(owned_ref);
+            #endif
+            return (equals == Py_EQ) ? (result == 0) : (result != 0);
+        }
+    } else if ((s1 == Py_None) & s2_is_unicode) {
+        goto return_ne;
+    } else if ((s2 == Py_None) & s1_is_unicode) {
+        goto return_ne;
+    } else {
+        int result;
+        PyObject* py_result = PyObject_RichCompare(s1, s2, equals);
+        #if PY_MAJOR_VERSION < 3
+        Py_XDECREF(owned_ref);
+        #endif
+        if (!py_result)
+            return -1;
+        result = __Pyx_PyObject_IsTrue(py_result);
+        Py_DECREF(py_result);
+        return result;
+    }
+return_eq:
+    #if PY_MAJOR_VERSION < 3
+    Py_XDECREF(owned_ref);
+    #endif
+    return (equals == Py_EQ);
+return_ne:
+    #if PY_MAJOR_VERSION < 3
+    Py_XDECREF(owned_ref);
+    #endif
+    return (equals == Py_NE);
+#endif
 }
 
 /* RaiseTooManyValuesToUnpack */
