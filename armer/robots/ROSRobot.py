@@ -43,6 +43,9 @@ from armer_msgs.srv import *
 from trajectory_msgs.msg import JointTrajectoryPoint, JointTrajectory
 from moveit_msgs.msg import RobotState, AttachedCollisionObject, CollisionObject, RobotTrajectory, DisplayTrajectory
 
+# TESTING NEW IMPORTS FOR DYNAMIC OBJECT MARKER DISPLAY (RVIZ)
+from visualization_msgs.msg import Marker, MarkerArray
+
 # pylint: disable=too-many-instance-attributes
 
 import tf2_ros
@@ -55,7 +58,10 @@ class ControlMode:
 # Test class of dynamic objects
 @dataclass
 class DynamicCollisionObj:
-    obj: sg.Shape
+    shape: sg.Shape
+    key: str = ''
+    id: int = 0
+    pose: Pose = Pose()
     is_added: bool = False
 
 class ROSRobot(rtb.Robot):
@@ -258,6 +264,13 @@ class ROSRobot(rtb.Robot):
             self.display_traj_publisher: rospy.Publisher = rospy.Publisher(
                 '{}/armer_traj_display'.format(self.name.lower()),
                 DisplayTrajectory,
+                queue_size=1
+            )
+
+            # --- TEST RVIZ MARKER PUBLISHER --- #
+            self.display_rviz_marker_publisher: rospy.Publisher = rospy.Publisher(
+                '{}/armer_marker_display'.format(self.name.lower()),
+                MarkerArray,
                 queue_size=1
             )
 
@@ -1908,11 +1921,11 @@ class ROSRobot(rtb.Robot):
                                                                 req.pose.orientation.y,
                                                                 req.pose.orientation.z]).SE3()
         # Handle type selection or error
-        obj: sg.Shape = None
+        shape: sg.Shape = None
         if req.type == "sphere":
-            obj = sg.Sphere(radius=radius, pose=pose_se3)
+            shape = sg.Sphere(radius=radius, pose=pose_se3)
         elif req.type == "cylinder":
-            obj = sg.Cylinder(radius=radius, length=length, pose=pose_se3)
+            shape = sg.Cylinder(radius=radius, length=length, pose=pose_se3)
         elif req.type == "mesh":
             rospy.logwarn(f"In progress -> not yet implemented. Exiting...")
             return AddCollisionObjectResponse(success=False)
@@ -1933,10 +1946,10 @@ class ROSRobot(rtb.Robot):
             self.dynamic_collision_removal_dict[req.name] = removed_obj
     
         # Create a Dynamic Collision Object and add the configured shape to the scene
-        dynamic_obj = DynamicCollisionObj(obj=obj, is_added=False)
+        dynamic_obj = DynamicCollisionObj(shape=shape, key=req.name, pose=req.pose, is_added=False)
         # NOTE: these dictionaries are accessed and checked by Armer's main loop for addition to a backend.
         self.dynamic_collision_dict[req.name] = dynamic_obj
-        self.collision_dict[req.name] = [dynamic_obj.obj]
+        self.collision_dict[req.name] = [dynamic_obj.shape]
 
         return AddCollisionObjectResponse(success=True)
     
@@ -2592,6 +2605,50 @@ class ROSRobot(rtb.Robot):
     def publish(self):
         self.joint_publisher.publish(Float64MultiArray(data=self.qd))
 
+    def marker_publisher(self):
+        """
+        Gets any existing dynamic objects (if added) and publishes them for debugging/display in RVIZ
+        """
+    
+        # Iterate through and add to marker publish if ready
+        marker_array = []
+        for obj in list(self.dynamic_collision_dict.values()):
+            # Ensure the object has been successfully added to the backend first
+            if obj.is_added:
+                # Default setup of marker header
+                marker = Marker()
+                marker.header.frame_id = self.base_link.name
+                marker.header.stamp = rospy.Time.now()
+
+                if obj.shape.stype == 'sphere':
+                    marker.type = 2
+
+                    # Expects diameter (m)
+                    marker.scale.x = obj.shape.radius * 2
+                    marker.scale.y = obj.shape.radius * 2
+                    marker.scale.z = obj.shape.radius * 2
+                elif obj.shape.stype == 'cylinder':
+                    marker.type = 3
+
+                    # Expects diameter (m)
+                    marker.scale.x = obj.shape.radius * 2
+                    marker.scale.y = obj.shape.radius * 2
+                    marker.scale.z = obj.shape.length
+                else:
+                    break
+            
+                marker.id = obj.id
+                marker.pose = obj.pose
+                marker.color.r = obj.shape.color[0]
+                marker.color.g = obj.shape.color[1]
+                marker.color.b = obj.shape.color[2]
+                marker.color.a = obj.shape.color[3]
+
+                marker_array.append(marker)
+
+        # Publish array of markers
+        self.display_rviz_marker_publisher.publish(marker_array)
+
     def step(self, dt: float = 0.01) -> None:  # pylint: disable=unused-argument
         """
         Updates the robot joints (robot.q) used in computing kinematics
@@ -2695,6 +2752,8 @@ class ROSRobot(rtb.Robot):
         self.last_tick = current_time
 
         self.state_publisher.publish(self.state)
+        # TESTING Marker Publisher (RVIZ)
+        self.marker_publisher()
 
         self.event.set()
 

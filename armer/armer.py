@@ -404,8 +404,8 @@ class Armer:
                 #       (in a separate dictionary called swift_objects) to None. In the self.backend.step()
                 #       method below, this attempts to run some methods that belong to the shape but cannot do so
                 #       as it is a NoneType.
-                obj_to_remove = robot.dynamic_collision_removal_dict[d_obj_name].obj
-                rospy.loginfo(f"Remove object is: {obj_to_remove}")
+                shape_to_remove = robot.dynamic_collision_removal_dict[d_obj_name].shape
+                rospy.loginfo(f"Remove object is: {shape_to_remove}")
                 # TODO: add this feature in once swift side is fixed 
                 #       should still work for ROS backend
                 # self.backend.remove(obj_to_remove)
@@ -418,7 +418,7 @@ class Armer:
             for dynamic_obj in robot.dynamic_collision_dict.values():
                 if dynamic_obj.is_added == False:
                     rospy.loginfo(f"Adding Dynamic Object: {dynamic_obj}")
-                    self.backend.add(dynamic_obj.obj)
+                    dynamic_obj.id = self.backend.add(dynamic_obj.shape)
                     dynamic_obj.is_added = True
                     rospy.loginfo(f"Added Successfully")
 
