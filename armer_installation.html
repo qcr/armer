@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Armer Installation &mdash; Armer Manipulator Control Interface  documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="_static/graphviz.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js?v=b3ba4146"></script>
+        <script src="_static/doctools.js?v=888ff710"></script>
+        <script src="_static/sphinx_highlight.js?v=4825356b"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Supported Arms" href="supported_arms.html" />
+    <link rel="prev" title="Introduction" href="welcome.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #2c3e50" >
+
+          
+          
+          <a href="index.html">
+            
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="welcome.html">Introduction</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Armer Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#requirements">Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#robot-specific-requirements">Robot Specific Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#quickstart-installation-native-linux">Quickstart Installation (Native Linux)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#robostack-installation-linux-mac-windows">RoboStack Installation (Linux, Mac, Windows)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="supported_arms.html">Supported Arms</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="set_joint_velocity.html">Setting Joint Velocites</a></li>
+<li class="toctree-l1"><a class="reference internal" href="set_joint_position.html">Setting Joint Positions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="set_cartesian_velocity.html">Setting Cartesian Velocites</a></li>
+<li class="toctree-l1"><a class="reference internal" href="set_cartesian_position.html">Setting Cartesian Positions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="guarded_motion.html">Guarded Motion</a></li>
+<li class="toctree-l1"><a class="reference internal" href="use_named_poses.html">Using Named Poses</a></li>
+<li class="toctree-l1"><a class="reference internal" href="creating_a_hardware_package.html">Creating a Hardware Package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="create_an_RTB_model.html">Creating a Robotics Toolbox Model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="custom_robot.html">Creating A Custom Robot</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Code:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="API.html">Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules.html">Modules</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #2c3e50" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Armer Manipulator Control Interface</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Armer Installation</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/armer_installation.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="armer-installation">
+<h1>Armer Installation<a class="headerlink" href="#armer-installation" title="Permalink to this heading">¶</a></h1>
+<section id="requirements">
+<h2>Requirements<a class="headerlink" href="#requirements" title="Permalink to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference external" href="https://www.python.org/">Python</a> &gt;= 3.6</p></li>
+<li><p><a class="reference external" href="http://wiki.ros.org/noetic">ROS Noetic</a></p></li>
+<li><p><a class="reference external" href="https://pypi.org/project/roboticstoolbox-python/">Robotics Toolbox for Python</a></p></li>
+<li><p><a class="reference external" href="https://qcr.github.io/armer/add_qcr_repos.html">QCR repos</a></p></li>
+</ul>
+</section>
+<section id="robot-specific-requirements">
+<h2>Robot Specific Requirements<a class="headerlink" href="#robot-specific-requirements" title="Permalink to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>ROS drivers with joint group velocity controllers (ros_control)</p></li>
+<li><p>Robotics Toolbox model or URDF (loaded as a robot_description parameter)</p></li>
+</ul>
+</section>
+<section id="quickstart-installation-native-linux">
+<h2>Quickstart Installation (Native Linux)<a class="headerlink" href="#quickstart-installation-native-linux" title="Permalink to this heading">¶</a></h2>
+<p>Copy and paste the following code snippet into a terminal to create a new catkin workspace and install the Armer drivers to it. Note this script will also add the workspace to be sourced every time a bash terminal is opened.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Install pip</span>
+sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>python3-pip
+
+<span class="c1"># Make the workspace and clone armer and armer_msgs packages</span>
+mkdir<span class="w"> </span>-p<span class="w"> </span>~/armer_ws/src<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>~/armer_ws/src
+git<span class="w"> </span>clone<span class="w"> </span>https://github.com/qcr/armer.git<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/qcr/armer_msgs
+
+<span class="c1"># Install all required packages</span>
+pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>~/armer_ws/src/armer/requirements.txt
+<span class="nb">cd</span><span class="w"> </span>..<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>rosdep<span class="w"> </span>init<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>rosdep<span class="w"> </span>update<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>rosdep<span class="w"> </span>install<span class="w"> </span>--from-paths<span class="w"> </span>src<span class="w"> </span>--ignore-src<span class="w"> </span>-r<span class="w"> </span>-y
+
+<span class="c1"># Make and source the workspace</span>
+catkin_make
+<span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;source ~/armer_ws/devel/setup.bash&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>~/.bashrc
+<span class="nb">source</span><span class="w"> </span>~/armer_ws/devel/setup.bash
+<span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Installation complete!&quot;</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If the <code class="docutils literal notranslate"><span class="pre">rosdep</span></code> command is failing to find dependencies, make sure the QCR Robotic Vision repos have been added. See <a class="reference external" href="add_qcr_repos.html">Adding QCR Robotic Vision Repos</a></p>
+</div>
+</section>
+<section id="robostack-installation-linux-mac-windows">
+<h2>RoboStack Installation (Linux, Mac, Windows)<a class="headerlink" href="#robostack-installation-linux-mac-windows" title="Permalink to this heading">¶</a></h2>
+<p>To enable easy use of ROS on these operating systems, it is recommended to use <a class="reference external" href="https://robostack.github.io/">RoboStack</a>; note that ROS 1 (noetic) is recommended at this stage. Please ensure you have <a class="reference external" href="https://mamba.readthedocs.io/en/latest/installation.html">mamba</a> installed before proceeding. Please follow all required steps for the RoboStack install (as per their instructions) to enable the smoothest setup on your particular OS.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This is still in progress. See here for updates.</p>
+</div>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># --- Mamba Environment Setup --- #</span>
+<span class="c1"># Create and activate a new robostack (ros-env) environment</span>
+mamba<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>ros-env<span class="w"> </span>ros-noetic-desktop<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.9<span class="w"> </span>-c<span class="w"> </span>robostack-staging<span class="w"> </span>-c<span class="w"> </span>conda-forge<span class="w"> </span>--no-channel-priority<span class="w"> </span>--override-channels
+mamba<span class="w"> </span>activate<span class="w"> </span>ros-env
+
+<span class="c1"># Install some compiler packages</span>
+mamba<span class="w"> </span>install<span class="w"> </span>compilers<span class="w"> </span>cmake<span class="w"> </span>pkg-config<span class="w"> </span>make<span class="w"> </span>ninja
+
+<span class="c1"># FOR WINDOWS: Install the Visual Studio command prompt - if you use Visual Studio 2022</span>
+mamba<span class="w"> </span>install<span class="w"> </span>vs2022_win-64
+
+<span class="c1"># --- ARMer Setup --- #</span>
+<span class="c1"># Make the armer workspace and clone in armer and armer_msgs packages</span>
+<span class="c1"># FOR LINUX/MACOS</span>
+mkdir<span class="w"> </span>-p<span class="w"> </span>~/armer_ws/src<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>~/armer_ws/src
+<span class="c1"># FOR WINDOWS: Assumes you are in the home folder</span>
+mkdir<span class="w"> </span>armer_ws<span class="se">\s</span>rc<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>armer_ws<span class="se">\s</span>rc
+<span class="c1"># Clone in armer and armer_msgs</span>
+git<span class="w"> </span>clone<span class="w"> </span>https://github.com/qcr/armer.git<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/qcr/armer_msgs
+<span class="c1"># Install all required packages (into ros-env) - from current directory</span>
+<span class="c1"># FOR LINUX/MACOS</span>
+pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>armer/requirements.txt
+<span class="c1"># FOR WINDOWS</span>
+pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>armer<span class="se">\r</span>equirements.txt
+<span class="c1"># Enter armer_ws folder and run rosdep commands</span>
+<span class="nb">cd</span><span class="w"> </span>..<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>rosdep<span class="w"> </span>init<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>rosdep<span class="w"> </span>update<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>rosdep<span class="w"> </span>install<span class="w"> </span>--from-paths<span class="w"> </span>src<span class="w"> </span>--ignore-src<span class="w"> </span>-r<span class="w"> </span>-y
+
+<span class="c1"># Make and source the workspace (including environment)</span>
+catkin_make
+
+<span class="c1"># --- Default Activation of Environment --- #</span>
+<span class="c1"># FOR LINUX</span>
+<span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;mamba activate ros-env&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>~/.bashrc
+
+<span class="c1"># FOR MACOS</span>
+<span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;mamba activate ros-env&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>~/.bash_profile
+
+<span class="c1"># --- Workspace Source --- #</span>
+<span class="nb">source</span><span class="w"> </span>~/armer_ws/devel/setup.bash
+</pre></div>
+</div>
+<p>If the script has completed with no errors, continue on to <a class="reference external" href="supported_arms.html">Supported Arms</a>.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="welcome.html" class="btn btn-neutral float-left" title="Introduction" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="supported_arms.html" class="btn btn-neutral float-right" title="Supported Arms" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Gavin Suddrey.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Using Named Poses &mdash; Armer Manipulator Control Interface  documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="_static/graphviz.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js?v=b3ba4146"></script>
+        <script src="_static/doctools.js?v=888ff710"></script>
+        <script src="_static/sphinx_highlight.js?v=4825356b"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Creating a Hardware Package" href="creating_a_hardware_package.html" />
+    <link rel="prev" title="Guarded Motion" href="guarded_motion.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #2c3e50" >
+
+          
+          
+          <a href="index.html">
+            
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="welcome.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="armer_installation.html">Armer Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="supported_arms.html">Supported Arms</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="set_joint_velocity.html">Setting Joint Velocites</a></li>
+<li class="toctree-l1"><a class="reference internal" href="set_joint_position.html">Setting Joint Positions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="set_cartesian_velocity.html">Setting Cartesian Velocites</a></li>
+<li class="toctree-l1"><a class="reference internal" href="set_cartesian_position.html">Setting Cartesian Positions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="guarded_motion.html">Guarded Motion</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Using Named Poses</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#adding-a-named-pose">Adding a Named Pose</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#moving-to-a-named-pose">Moving to a Named Pose</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#removing-a-named-pose">Removing a Named Pose</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#getting-saved-named-poses">Getting Saved Named Poses</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#loading-named-poses-from-config-files">Loading Named Poses from Config files</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#removing-named-poses-from-config-files">Removing Named Poses from Config files</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="creating_a_hardware_package.html">Creating a Hardware Package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="create_an_RTB_model.html">Creating a Robotics Toolbox Model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="custom_robot.html">Creating A Custom Robot</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Code:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="API.html">Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules.html">Modules</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #2c3e50" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Armer Manipulator Control Interface</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Using Named Poses</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/use_named_poses.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="using-named-poses">
+<h1>Using Named Poses<a class="headerlink" href="#using-named-poses" title="Permalink to this heading">¶</a></h1>
+<p>Armer provides the ability to save and load poses for any arm.</p>
+<section id="adding-a-named-pose">
+<h2>Adding a Named Pose<a class="headerlink" href="#adding-a-named-pose" title="Permalink to this heading">¶</a></h2>
+<p>Simply navigate a manipulator into any pose by any means and call the service <code class="docutils literal notranslate"><span class="pre">/arm/set_named_pose</span></code>. The pose is saved locally to a config file in YAML format and automatically loaded each time Armer is launched.</p>
+<p>The service can be summoned via Python:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">armer_msgs.srv</span> <span class="kn">import</span> <span class="n">AddNamedPose</span>
+<span class="kn">import</span> <span class="nn">rospy</span>
+
+<span class="n">rospy</span><span class="o">.</span><span class="n">init_node</span><span class="p">(</span><span class="s1">&#39;armer_example&#39;</span><span class="p">,</span> <span class="n">disable_signals</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">add_pose_service</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">ServiceProxy</span><span class="p">(</span><span class="s1">&#39;/arm/set_named_pose&#39;</span><span class="p">,</span> <span class="n">AddNamedPose</span><span class="p">)</span>
+
+<span class="n">named_pose</span><span class="o">=</span><span class="s2">&quot;my_pose&quot;</span>
+<span class="n">add_pose_service</span><span class="p">(</span><span class="n">named_pose</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Or via bash command line:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>rosservice<span class="w"> </span>call<span class="w"> </span>/arm/set_named_pose<span class="w"> </span><span class="s2">&quot;pose_name: {DESIRED_POSE_NAME}&quot;</span>
+</pre></div>
+</div>
+<p>The pose is now saved and the robot can navigate to the saved pose by making a request to the action server.</p>
+</section>
+<section id="moving-to-a-named-pose">
+<h2>Moving to a Named Pose<a class="headerlink" href="#moving-to-a-named-pose" title="Permalink to this heading">¶</a></h2>
+<p>The Armer interface uses a ROS action server to listen for requests to move to a named pose.</p>
+<p>Requests to the ROS action server can be made by creating a ROS action client in Python. This client is used to send requests to the action server.</p>
+<p>This example shows a request to move to named pose <cite>my_pose</cite>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">armer_msgs.msg</span> <span class="kn">import</span> <span class="n">MoveToNamedPoseAction</span><span class="p">,</span> <span class="n">MoveToNamedPoseGoal</span>
+<span class="kn">import</span> <span class="nn">actionlib</span>
+<span class="kn">import</span> <span class="nn">rospy</span>
+
+<span class="n">rospy</span><span class="o">.</span><span class="n">init_node</span><span class="p">(</span><span class="s1">&#39;armer_example&#39;</span><span class="p">,</span> <span class="n">disable_signals</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="n">named_pose</span><span class="o">=</span><span class="s2">&quot;my_pose&quot;</span>
+
+<span class="n">servo_cli</span> <span class="o">=</span> <span class="n">actionlib</span><span class="o">.</span><span class="n">SimpleActionClient</span><span class="p">(</span><span class="s1">&#39;/arm/joint/named&#39;</span><span class="p">,</span> <span class="n">MoveToNamedPoseAction</span><span class="p">)</span>
+<span class="n">servo_cli</span><span class="o">.</span><span class="n">wait_for_server</span><span class="p">()</span>
+
+<span class="n">goal</span> <span class="o">=</span> <span class="n">MoveToNamedPoseGoal</span><span class="p">()</span>
+<span class="n">goal</span><span class="o">.</span><span class="n">pose_name</span><span class="o">=</span><span class="n">named_pose</span>
+
+<span class="c1"># Send goal and wait for it to finish</span>
+<span class="n">servo_cli</span><span class="o">.</span><span class="n">send_goal</span><span class="p">(</span><span class="n">goal</span><span class="p">)</span>
+<span class="n">servo_cli</span><span class="o">.</span><span class="n">wait_for_result</span><span class="p">()</span>
+<span class="n">servo_cli</span><span class="o">.</span><span class="n">get_result</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="removing-a-named-pose">
+<h2>Removing a Named Pose<a class="headerlink" href="#removing-a-named-pose" title="Permalink to this heading">¶</a></h2>
+<p>Named poses can be removed via the <code class="docutils literal notranslate"><span class="pre">/arm/remove_named_pose</span></code> service. This can be called via Python:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">armer_msgs.srv</span> <span class="kn">import</span> <span class="n">RemoveNamedPose</span>
+<span class="kn">import</span> <span class="nn">rospy</span>
+
+<span class="n">rospy</span><span class="o">.</span><span class="n">init_node</span><span class="p">(</span><span class="s1">&#39;armer_example&#39;</span><span class="p">,</span> <span class="n">disable_signals</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">remove_pose_service</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">ServiceProxy</span><span class="p">(</span><span class="s1">&#39;/arm/remove_named_pose&#39;</span><span class="p">,</span> <span class="n">RemoveNamedPose</span><span class="p">)</span>
+
+<span class="n">named_pose</span><span class="o">=</span><span class="s2">&quot;my_pose&quot;</span>
+<span class="n">remove_pose_service</span><span class="p">(</span><span class="n">named_pose</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Or bash:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>rosservice<span class="w"> </span>call<span class="w"> </span>/arm/remove_named_pose<span class="w"> </span><span class="s2">&quot;pose_name: {POSE_TO_REMOVE}&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="getting-saved-named-poses">
+<h2>Getting Saved Named Poses<a class="headerlink" href="#getting-saved-named-poses" title="Permalink to this heading">¶</a></h2>
+<p>To see a list of poses are saved, use the <code class="docutils literal notranslate"><span class="pre">/arm/get_named_poses</span></code> service.</p>
+<p>Via Python:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">armer_msgs.srv</span> <span class="kn">import</span> <span class="n">GetNamedPoses</span>
+<span class="kn">import</span> <span class="nn">rospy</span>
+
+<span class="n">rospy</span><span class="o">.</span><span class="n">init_node</span><span class="p">(</span><span class="s1">&#39;armer_example&#39;</span><span class="p">,</span> <span class="n">disable_signals</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">get_poses_service</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">ServiceProxy</span><span class="p">(</span><span class="s1">&#39;/arm/get_named_poses&#39;</span><span class="p">,</span> <span class="n">GetNamedPoses</span><span class="p">)</span>
+
+<span class="n">get_poses_service</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Bash:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>rosservice<span class="w"> </span>call<span class="w"> </span>/arm/get_named_poses
+</pre></div>
+</div>
+</section>
+<section id="loading-named-poses-from-config-files">
+<h2>Loading Named Poses from Config files<a class="headerlink" href="#loading-named-poses-from-config-files" title="Permalink to this heading">¶</a></h2>
+<p>To load configs from a YAML other than the default Armer config, the <code class="docutils literal notranslate"><span class="pre">/arm/add_named_pose_config</span></code> service can be used.</p>
+<p>It can be summoned via Python or Bash.</p>
+<p>Python:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">armer_msgs.srv</span> <span class="kn">import</span> <span class="n">AddNamedPoseConfig</span>
+<span class="kn">import</span> <span class="nn">rospy</span>
+
+<span class="n">rospy</span><span class="o">.</span><span class="n">init_node</span><span class="p">(</span><span class="s1">&#39;armer_example&#39;</span><span class="p">,</span> <span class="n">disable_signals</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">save_config_service</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">ServiceProxy</span><span class="p">(</span><span class="s1">&#39;/arm/add_named_pose_config&#39;</span><span class="p">,</span> <span class="n">AddNamedPoseConfig</span><span class="p">)</span>
+
+<span class="n">config_path</span><span class="o">=</span><span class="s2">&quot;/home/user/saved_poses.yaml&quot;</span>
+<span class="n">save_config_service</span><span class="p">(</span><span class="n">config_path</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Bash:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>rosservice<span class="w"> </span>call<span class="w"> </span>/arm/add_named_pose_config<span class="w"> </span><span class="s2">&quot;config_path: {PATH_TO_CONFIG.yaml}&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="removing-named-poses-from-config-files">
+<h2>Removing Named Poses from Config files<a class="headerlink" href="#removing-named-poses-from-config-files" title="Permalink to this heading">¶</a></h2>
+<p>To remove the config poses, the <code class="docutils literal notranslate"><span class="pre">/arm/remove_named_pose_config</span></code> service can be called.</p>
+<p>Via Python:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">armer_msgs.srv</span> <span class="kn">import</span> <span class="n">RemoveNamedPoseConfig</span>
+<span class="kn">import</span> <span class="nn">rospy</span>
+
+<span class="n">rospy</span><span class="o">.</span><span class="n">init_node</span><span class="p">(</span><span class="s1">&#39;armer_example&#39;</span><span class="p">,</span> <span class="n">disable_signals</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">remove_config_service</span> <span class="o">=</span> <span class="n">rospy</span><span class="o">.</span><span class="n">ServiceProxy</span><span class="p">(</span><span class="s1">&#39;/arm/remove_named_pose_config&#39;</span><span class="p">,</span> <span class="n">RemoveNamedPoseConfig</span><span class="p">)</span>
+
+<span class="n">config_path</span><span class="o">=</span><span class="s2">&quot;/home/user/saved_poses.yaml&quot;</span>
+<span class="n">remove_config_service</span><span class="p">(</span><span class="n">config_path</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Bash:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>rosservice<span class="w"> </span>call<span class="w"> </span>/arm/remove_named_pose_config<span class="w"> </span><span class="s2">&quot;config_path: {PATH_TO_CONFIG.yaml}&quot;</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="guarded_motion.html" class="btn btn-neutral float-left" title="Guarded Motion" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="creating_a_hardware_package.html" class="btn btn-neutral float-right" title="Creating a Hardware Package" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Gavin Suddrey.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

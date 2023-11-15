@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Introduction &mdash; Armer Manipulator Control Interface  documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="_static/graphviz.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js?v=b3ba4146"></script>
+        <script src="_static/doctools.js?v=888ff710"></script>
+        <script src="_static/sphinx_highlight.js?v=4825356b"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Armer Installation" href="armer_installation.html" />
+    <link rel="prev" title="Welcome to Armer’s documentation!" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #2c3e50" >
+
+          
+          
+          <a href="index.html">
+            
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Introduction</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#requirements">Requirements</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#software-requirements">Software requirements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#robot-specific-requirements">Robot specific requirements</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="armer_installation.html">Armer Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="supported_arms.html">Supported Arms</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="set_joint_velocity.html">Setting Joint Velocites</a></li>
+<li class="toctree-l1"><a class="reference internal" href="set_joint_position.html">Setting Joint Positions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="set_cartesian_velocity.html">Setting Cartesian Velocites</a></li>
+<li class="toctree-l1"><a class="reference internal" href="set_cartesian_position.html">Setting Cartesian Positions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="guarded_motion.html">Guarded Motion</a></li>
+<li class="toctree-l1"><a class="reference internal" href="use_named_poses.html">Using Named Poses</a></li>
+<li class="toctree-l1"><a class="reference internal" href="creating_a_hardware_package.html">Creating a Hardware Package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="create_an_RTB_model.html">Creating a Robotics Toolbox Model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="custom_robot.html">Creating A Custom Robot</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Code:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="API.html">Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules.html">Modules</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #2c3e50" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Armer Manipulator Control Interface</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Introduction</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/welcome.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="introduction">
+<h1>Introduction<a class="headerlink" href="#introduction" title="Permalink to this heading">¶</a></h1>
+<img alt="Armer example gif" src="https://github.com/qcr/armer/wiki/armer_example.gif" />
+<a class="reference external image-reference" href="https://github.com/qcr/armer"><img alt="Armer's code on github" src="https://github.com/qcr/armer/wiki/codelink.png" /></a>
+<img alt="Armer simplified block diagram" src="https://github.com/qcr/armer/wiki/PetersDiagram.png" />
+<p>Armer is a Python3 layer that extends the capability of a ROS-enabled robot arm.</p>
+<p>Armer handles requests for advanced types of motion such as:</p>
+<ul class="simple">
+<li><p>Straight-line movement to a task-space pose</p></li>
+<li><p>Straight-line movement to a named joint configuration</p></li>
+<li><p>Task-space velocity with guarding compliant motion etc.</p></li>
+</ul>
+<p>Armer itself is a collection of ROS topics, services and action servers. It communicates with a ROS-enabled arm to execute the motion requests, communicating with the robot using ROS on the user’s behalf.</p>
+<p>Armer is implemented in Python 3 and uses the Robotics Toolbox for Python to perform all kinematic and differential kinematics functions.</p>
+<p>Armer provides rich control modes such as:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="set_joint_velocity.html">Joint velocity control</a></p></li>
+<li><p><a class="reference external" href="set_joint_position.html">Joint position control</a></p></li>
+<li><p><a class="reference external" href="set_Cartesian_velocity.html">End effector Cartesian velocity control</a></p></li>
+<li><p><a class="reference external" href="set_Cartesian_pose.html">End effector Cartesian position control</a></p></li>
+<li><p><a class="reference external" href="guarded_motion.html">End effector Cartesian velocity control with guarded motion</a></p></li>
+</ul>
+<p>Using Armer, the user is able to seamlessly switch between these modes of control.</p>
+<p>These control modes can be used to control real or simulated robots using Swift. This gives users the ability to develop even without access to a physical manipulator.</p>
+<p>The control instructions can be used across different robotic platforms allowing users to control robots with the same instructions.</p>
+<p>Below is a gif of 3 different simulated arms moving with the same Cartesian velocity control commands.</p>
+<img alt="Armer same code example gif" src="https://github.com/qcr/armer/wiki/same_code_example.gif" />
+<p>Armer is available for several popular robots including:</p>
+<ul class="simple">
+<li><p>Franka Panda: <a class="reference external" href="https://github.com/qcr/armer_panda">https://github.com/qcr/armer_panda</a></p></li>
+<li><p>Universal Robot UR3: <a class="reference external" href="https://github.com/qcr/armer_ur">https://github.com/qcr/armer_ur</a></p></li>
+<li><p>Universal Robot UR5: <a class="reference external" href="https://github.com/qcr/armer_ur">https://github.com/qcr/armer_ur</a></p></li>
+<li><p>Universal Robot UR10: <a class="reference external" href="https://github.com/qcr/armer_ur">https://github.com/qcr/armer_ur</a></p></li>
+<li><p>ABB IRB6700: <a class="reference external" href="https://github.com/qcr/armer_abb">https://github.com/qcr/armer_abb</a></p></li>
+</ul>
+<p>Armer can be accessed primarily through Python3 scripts utilizing rospy to bridge Python code to the ROS framework.</p>
+<section id="requirements">
+<h2>Requirements<a class="headerlink" href="#requirements" title="Permalink to this heading">¶</a></h2>
+<p>Several ROS action servers, topics and services are set up by Armer to enable this functionality. A summary of these can be found <a class="reference external" href="API.html">here</a>.</p>
+<p>The driver is built on the <a class="reference external" href="https://qcr.github.io/code/robotics-toolbox-python">Robotics Toolbox (RTB) for Python</a> and requires a URDF loaded RTB model to calculate the required movement kinematics, RTB comes with browser based simulator <a class="reference external" href="https://qcr.github.io/code/swift/">Swift</a> which Armer uses as an out of the box simulator.</p>
+<p>Due to these supporting packages using Armer with a manipulator will require several requirements:</p>
+<section id="software-requirements">
+<h3>Software requirements<a class="headerlink" href="#software-requirements" title="Permalink to this heading">¶</a></h3>
+<ul class="simple">
+<li><p><a class="reference external" href="https://www.python.org/">Python</a> &gt;= 3.6</p></li>
+<li><p><a class="reference external" href="http://wiki.ros.org/noetic">ROS Noetic</a></p></li>
+<li><p><a class="reference external" href="https://pypi.org/project/roboticstoolbox-python/">Robotics Toolbox for Python</a></p></li>
+<li><p><a class="reference external" href="https://qcr.github.io/armer/add_qcr_repos.html">Add QCR repos to apt</a></p></li>
+<li><p>Chrome browser (for using Swift sim)</p></li>
+</ul>
+</section>
+<section id="robot-specific-requirements">
+<h3>Robot specific requirements<a class="headerlink" href="#robot-specific-requirements" title="Permalink to this heading">¶</a></h3>
+<ul class="simple">
+<li><p>ROS drivers with joint velocity controllers</p></li>
+<li><p>Robotics Toolbox model</p></li>
+</ul>
+<p>To get started, check out the <a class="reference external" href="armer_installation.html">Armer Installation</a> page!</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="Welcome to Armer’s documentation!" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="armer_installation.html" class="btn btn-neutral float-right" title="Armer Installation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Gavin Suddrey.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

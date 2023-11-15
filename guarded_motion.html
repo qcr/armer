@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Guarded Motion &mdash; Armer Manipulator Control Interface  documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="_static/graphviz.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js?v=b3ba4146"></script>
+        <script src="_static/doctools.js?v=888ff710"></script>
+        <script src="_static/sphinx_highlight.js?v=4825356b"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Using Named Poses" href="use_named_poses.html" />
+    <link rel="prev" title="Setting Cartesian Positions" href="set_cartesian_position.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #2c3e50" >
+
+          
+          
+          <a href="index.html">
+            
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="welcome.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="armer_installation.html">Armer Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="supported_arms.html">Supported Arms</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="set_joint_velocity.html">Setting Joint Velocites</a></li>
+<li class="toctree-l1"><a class="reference internal" href="set_joint_position.html">Setting Joint Positions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="set_cartesian_velocity.html">Setting Cartesian Velocites</a></li>
+<li class="toctree-l1"><a class="reference internal" href="set_cartesian_position.html">Setting Cartesian Positions</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Guarded Motion</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#via-python">Via Python</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="use_named_poses.html">Using Named Poses</a></li>
+<li class="toctree-l1"><a class="reference internal" href="creating_a_hardware_package.html">Creating a Hardware Package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="create_an_RTB_model.html">Creating a Robotics Toolbox Model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="custom_robot.html">Creating A Custom Robot</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Code:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="API.html">Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules.html">Modules</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #2c3e50" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Armer Manipulator Control Interface</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Guarded Motion</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/guarded_motion.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="guarded-motion">
+<h1>Guarded Motion<a class="headerlink" href="#guarded-motion" title="Permalink to this heading">¶</a></h1>
+<p>The Armer interface contains a ROS action server which listens for requests to set Cartesian velocities in a specified frame and respond reactively to force on the end effector.</p>
+<p>The user can use a ROS action client to set the Cartesian velocities of the end effector.</p>
+<section id="via-python">
+<h2>Via Python<a class="headerlink" href="#via-python" title="Permalink to this heading">¶</a></h2>
+<p>Requests to the ROS action server can be made by creating a ROS action client in Python. This client is used to send requests to the action server.</p>
+<p>The following code block shows a Python3 script of setting the linear velocty in the z direction to -0.05 m/s. The manipulator will continue in this direction for 5 seconds or until a force greater than 5nm applied to the end effector is detected.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">rospy</span>
+<span class="kn">import</span> <span class="nn">actionlib</span>
+<span class="kn">from</span> <span class="nn">armer_msgs.msg</span> <span class="kn">import</span> <span class="n">GuardedVelocityAction</span><span class="p">,</span> <span class="n">GuardedVelocityGoal</span>
+
+<span class="n">rospy</span><span class="o">.</span><span class="n">init_node</span><span class="p">(</span><span class="s1">&#39;armer_example&#39;</span><span class="p">)</span>
+
+<span class="n">vel_cli</span> <span class="o">=</span> <span class="n">actionlib</span><span class="o">.</span><span class="n">SimpleActionClient</span><span class="p">(</span><span class="s1">&#39;/arm/cartesian/guarded_velocity&#39;</span><span class="p">,</span> <span class="n">GuardedVelocityAction</span><span class="p">)</span>
+<span class="n">vel_cli</span><span class="o">.</span><span class="n">wait_for_server</span><span class="p">()</span>
+
+<span class="n">goal</span> <span class="o">=</span> <span class="n">GuardedVelocityGoal</span><span class="p">()</span>
+<span class="n">goal</span><span class="o">.</span><span class="n">twist_stamped</span><span class="o">.</span><span class="n">twist</span><span class="o">.</span><span class="n">linear</span><span class="o">.</span><span class="n">z</span> <span class="o">=</span> <span class="o">-</span><span class="mf">0.05</span>
+
+<span class="c1"># Trigger on duration expiring or force limit violation</span>
+<span class="n">goal</span><span class="o">.</span><span class="n">guards</span><span class="o">.</span><span class="n">enabled</span> <span class="o">=</span> <span class="n">goal</span><span class="o">.</span><span class="n">guards</span><span class="o">.</span><span class="n">GUARD_DURATION</span> <span class="o">|</span> <span class="n">goal</span><span class="o">.</span><span class="n">guards</span><span class="o">.</span><span class="n">GUARD_EFFORT</span>
+<span class="c1"># motion should not last longer than 5 seconds</span>
+<span class="n">goal</span><span class="o">.</span><span class="n">guards</span><span class="o">.</span><span class="n">duration</span> <span class="o">=</span> <span class="mi">5</span>
+<span class="c1"># force measured at end-effector should not exceed 5nm</span>
+<span class="n">goal</span><span class="o">.</span><span class="n">guards</span><span class="o">.</span><span class="n">effort</span><span class="o">.</span><span class="n">force</span><span class="o">.</span><span class="n">z</span> <span class="o">=</span> <span class="mi">5</span>
+
+<span class="n">vel_cli</span><span class="o">.</span><span class="n">send_goal</span><span class="p">(</span><span class="n">goal</span><span class="p">)</span>
+<span class="n">vel_cli</span><span class="o">.</span><span class="n">wait_for_result</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="set_cartesian_position.html" class="btn btn-neutral float-left" title="Setting Cartesian Positions" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="use_named_poses.html" class="btn btn-neutral float-right" title="Using Named Poses" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Gavin Suddrey.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Creating a Hardware Package &mdash; Armer Manipulator Control Interface  documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="_static/graphviz.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js?v=b3ba4146"></script>
+        <script src="_static/doctools.js?v=888ff710"></script>
+        <script src="_static/sphinx_highlight.js?v=4825356b"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Creating a Robotics Toolbox Model" href="create_an_RTB_model.html" />
+    <link rel="prev" title="Using Named Poses" href="use_named_poses.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #2c3e50" >
+
+          
+          
+          <a href="index.html">
+            
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="welcome.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="armer_installation.html">Armer Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="supported_arms.html">Supported Arms</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="set_joint_velocity.html">Setting Joint Velocites</a></li>
+<li class="toctree-l1"><a class="reference internal" href="set_joint_position.html">Setting Joint Positions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="set_cartesian_velocity.html">Setting Cartesian Velocites</a></li>
+<li class="toctree-l1"><a class="reference internal" href="set_cartesian_position.html">Setting Cartesian Positions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="guarded_motion.html">Guarded Motion</a></li>
+<li class="toctree-l1"><a class="reference internal" href="use_named_poses.html">Using Named Poses</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Creating a Hardware Package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#creating-a-launch-file">Creating a Launch File</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#creating-a-configuration-file">Creating a Configuration File</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id1">Putting it All Together</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="create_an_RTB_model.html">Creating a Robotics Toolbox Model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="custom_robot.html">Creating A Custom Robot</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Code:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="API.html">Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules.html">Modules</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #2c3e50" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Armer Manipulator Control Interface</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Creating a Hardware Package</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/creating_a_hardware_package.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="creating-a-hardware-package">
+<h1>Creating a Hardware Package<a class="headerlink" href="#creating-a-hardware-package" title="Permalink to this heading">¶</a></h1>
+<p>For convenience, a hardware package should be created to launch the drivers for an arm or arm group. This consists of:</p>
+<ul class="simple">
+<li><p>A <a class="reference external" href="http://wiki.ros.org/roslaunch/XML">ROS launch file</a> which launches the manipulator drivers and then the Armer drivers</p></li>
+<li><p>A <a class="reference external" href="http://wiki.ros.org/YAML%20Overview">yaml configuration file</a> which sets runtime parameters such as the model being launched and the type of backend</p></li>
+</ul>
+<p>These files are packaged togther as a hardware package. To skip to folder structure and naming convention, see the <a class="reference external" href="creating_a_hardware_package.html#putting-it-all-together">Putting it All Together</a> section of this guide.</p>
+<p>Examples of hardware packages can be seen with the <a class="reference external" href="https://github.com/qcr/armer_panda/">armer_panda</a> or the <a class="reference external" href="https://github.com/qcr/armer_ur/">armer_ur</a> packages.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>At this point in time, only manipulators with joint velocity controllers are supported by Armer. If an arm does not support this, it cannot be used with Armer.</p>
+</div>
+<section id="creating-a-launch-file">
+<h2>Creating a Launch File<a class="headerlink" href="#creating-a-launch-file" title="Permalink to this heading">¶</a></h2>
+<p>This is a ROS launch file which starts the manipulator’s drivers as well as the Armer driver. This is achieved by combining the contents of the ROS driver launch file with the <a class="reference external" href="https://github.com/qcr/armer/blob/master/launch/armer.launch/">armer.launch</a> file found in the Armer driver package.</p>
+<ol class="arabic">
+<li><p>If they have not already been installed, install the ROS drivers for the manipulator. This can generally be done by googling <code class="docutils literal notranslate"><span class="pre">{ROBOT_MODEL}</span> <span class="pre">ROS</span> <span class="pre">drivers</span></code> and following their readme instructions.</p></li>
+<li><p>After the drivers have been installed to the relevant workspace, read the ROS driver’s documentation to find the launch file that starts the driver.</p>
+<blockquote>
+<div><p>This launch file usually will start the driver node and joint controllers. The launch file sections relevant to starting these should be copied over (or included) into the template below and the file should be named <code class="docutils literal notranslate"><span class="pre">robot_bringup.launch</span></code>:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="cp">&lt;?xml version=&quot;1.0&quot; ?&gt;</span>
+<span class="nt">&lt;launch&gt;</span>
+<span class="w">    </span><span class="nt">&lt;arg</span><span class="w"> </span><span class="na">name=</span><span class="s">&quot;config&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;arg</span><span class="w"> </span><span class="na">name=</span><span class="s">&quot;sim&quot;</span><span class="w"> </span><span class="na">default=</span><span class="s">&quot;false&quot;</span><span class="w"> </span><span class="nt">/&gt;</span>
+
+<span class="w">    </span><span class="cm">&lt;!-- Physical Robot --&gt;</span>
+<span class="w">    </span><span class="nt">&lt;group</span><span class="w"> </span><span class="na">unless=</span><span class="s">&quot;$(arg sim)&quot;</span><span class="nt">&gt;</span>
+
+<span class="w">        </span><span class="cm">&lt;!-- Manipulator driver --&gt;</span>
+<span class="w">        </span><span class="cm">&lt;!--INCLUDE OR COPY THE CONTENTS OF THE MANIPULATOR&#39;S ROS DRIVER LAUNCH FILE HERE --&gt;</span>
+
+<span class="w">        </span><span class="cm">&lt;!-- Launch armer driver --&gt;</span>
+<span class="w">        </span><span class="nt">&lt;include</span><span class="w"> </span><span class="na">file=</span><span class="s">&quot;$(find armer)/launch/armer.launch&quot;</span><span class="nt">&gt;</span>
+<span class="w">            </span><span class="nt">&lt;arg</span><span class="w"> </span><span class="na">name=</span><span class="s">&quot;config&quot;</span><span class="w"> </span><span class="na">value=</span><span class="s">&quot;$(arg config)&quot;</span><span class="w"> </span><span class="nt">/&gt;</span>
+<span class="w">        </span><span class="nt">&lt;/include&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/group&gt;</span>
+
+<span class="w">    </span><span class="cm">&lt;!-- Simulated Robot --&gt;</span>
+<span class="w">    </span><span class="nt">&lt;group</span><span class="w"> </span><span class="na">if=</span><span class="s">&quot;$(arg sim)&quot;</span><span class="nt">&gt;</span>
+<span class="w">        </span><span class="nt">&lt;include</span><span class="w"> </span><span class="na">file=</span><span class="s">&quot;$(find armer)/launch/armer.launch&quot;</span><span class="nt">&gt;</span>
+<span class="w">            </span><span class="nt">&lt;arg</span><span class="w"> </span><span class="na">name=</span><span class="s">&quot;config&quot;</span><span class="w"> </span><span class="na">value=</span><span class="s">&quot;$(arg config)&quot;</span><span class="w"> </span><span class="nt">/&gt;</span>
+<span class="w">        </span><span class="nt">&lt;/include&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/group&gt;</span>
+<span class="nt">&lt;/launch&gt;</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+</ol>
+</section>
+<section id="creating-a-configuration-file">
+<h2>Creating a Configuration File<a class="headerlink" href="#creating-a-configuration-file" title="Permalink to this heading">¶</a></h2>
+<p>To configure parameters such as if Armer is interfacing with a simulation or a physical arm, a yaml config file should be created.</p>
+<p>Armer uses the Robotics Toolbox to perform calculations and this config file will point to the Robotics toolbox ERobot object so movement can be processed. If the manipulator does not have an existing RTB model or if unsure, see <a class="reference external" href="create_an_RTB_model.html#creating-a-robotics-toolbox-model/">Creating a Robotics Toolbox model</a>.</p>
+<p>Create a config for launching the physical robot backend using the following as an example template and saved as <code class="docutils literal notranslate"><span class="pre">{ROBOT_MODEL}_{BACKEND_MODE}.yaml</span></code> where backend mode is <cite>“real”</cite> for a physical robot config and <cite>“sim”</cite> for a Swift sim robot:</p>
+<blockquote>
+<div><div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">robots</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nv">DESIRED_ROBOT_NAMESPACE</span><span class="p p-Indicator">}</span>
+<span class="w">    </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">roboticstoolbox.models.{ROBOTIC_TOOLBOX_MODEL_NAME}</span>
+<span class="nt">backend</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nv">DESIRED_BACKEND_TYPE</span><span class="p p-Indicator">}</span>
+</pre></div>
+</div>
+<p>Most parameters can be left as defaults, but these are the essential parameters that should be changed for basic functionality.</p>
+<table class="docutils align-default" id="id2">
+<caption><span class="caption-text">Key configuration parameters</span><a class="headerlink" href="#id2" title="Permalink to this table">¶</a></caption>
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Field Name</p></th>
+<th class="head"><p>Description</p></th>
+<th class="head"><p>Example</p></th>
+<th class="head"><p>Default</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>name</p></td>
+<td><p>namespace to be used</p></td>
+<td><p><cite>“my_cool_robot”</cite></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>model</p></td>
+<td><p>robotics toolbox model to use</p></td>
+<td><p>roboticstoolbox.models.Panda</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>backend</p></td>
+<td><p>backend to be used</p></td>
+<td><p>roboticstoolbox.backends.swift.Swift</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+</tr>
+</tbody>
+</table>
+<dl class="simple">
+<dt>The two current options for backend are:</dt><dd><ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">roboticstoolbox.backends.swift.Swift</span></code> (Swift simulation robot)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">armer.backends.ROS.ROS</span></code> (Physical robot)</p></li>
+</ul>
+</dd>
+</dl>
+<p>Multiple robots can be launched at a time and parameters for each individual instance can be set under the corresponding namespace. For example:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">robots</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">panda</span>
+<span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">model</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">roboticstoolbox.models.Panda</span>
+<span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">origin</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">-1</span><span class="p p-Indicator">]</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ur5</span>
+<span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">model</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">roboticstoolbox.models.UR5</span>
+<span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">origin</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">-1</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0</span><span class="p p-Indicator">]</span>
+<span class="nt">backend</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">roboticstoolbox.backends.swift.Swift</span>
+</pre></div>
+</div>
+<p>In this example, a Panda and a UR5 arm are being launched with different origin settings. The options for each different robot section is signaled with the <code class="docutils literal notranslate"><span class="pre">-</span></code> symbol before the name parameter.</p>
+<p>The following parameters are available for setting in multi or single robot operations.</p>
+<table class="docutils align-default" id="id3">
+<caption><span class="caption-text">Robot parameters</span><a class="headerlink" href="#id3" title="Permalink to this table">¶</a></caption>
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 20.0%" />
+<col style="width: 10.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Field Name</p></th>
+<th class="head"><p>Description</p></th>
+<th class="head"><p>Example</p></th>
+<th class="head"><p>Default</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>joint_state_topic</p></td>
+<td><p>topic to listen to joint states on</p></td>
+<td><p><cite>“/my_joint_states”</cite></p></td>
+<td><p><cite>“/joint_states”</cite></p></td>
+</tr>
+<tr class="row-odd"><td><p>joint_velocity_topic</p></td>
+<td><p>topic to listen to velocity on</p></td>
+<td><p><cite>“/my_controller/joint_velocity”</cite></p></td>
+<td><p><cite>“/joint_group_velocity_controller/command”</cite></p></td>
+</tr>
+<tr class="row-even"><td><p>origin</p></td>
+<td><p>set a different origin for the robot</p></td>
+<td><p><cite>[-1, 0, 0, 0, 0, 0]</cite></p></td>
+<td><p><cite>[0, 0, 0, 0, 0, 0]</cite></p></td>
+</tr>
+<tr class="row-odd"><td><p>gripper</p></td>
+<td><p>specify the end effector link</p></td>
+<td><p><cite>“tool0”</cite></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>logging: frequency</p></td>
+<td><p>sets the frequency of logging</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">false</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></td>
+</tr>
+</tbody>
+</table>
+<p>Certain arms (such as the UR3) have multiple end effectors so specifying the link must be done by adding a “gripper” field to the robots section with the link name as a string.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">joint_state_topic</span></code> and <code class="docutils literal notranslate"><span class="pre">joint_velocity_topic</span></code> are how Armer gets feedback and controls the manipulator via the ROS drivers. If the ROS drivers do not map to the Armer defaults of <code class="docutils literal notranslate"><span class="pre">/joint_states</span></code> and <code class="docutils literal notranslate"><span class="pre">/joint_group_velocity_controller/command</span></code>, the topics will need to be specified.</p>
+</div></blockquote>
+</section>
+<section id="id1">
+<h2>Putting it All Together<a class="headerlink" href="#id1" title="Permalink to this heading">¶</a></h2>
+<p>For ease of deployment and use, the launch and config file should be packaged into a ROS package. The overall file structure is as follows:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>armer_<span class="o">{</span>ROBOT_MODEL<span class="o">}</span>/
+<span class="w">    </span>├─<span class="w"> </span>launch/
+<span class="w">    </span>│<span class="w">   </span>├─<span class="w"> </span>robot_bringup.launch
+<span class="w">    </span>├─<span class="w"> </span>cfg/
+<span class="w">    </span>│<span class="w">   </span>├─<span class="w"> </span><span class="o">{</span>ROBOT_MODEL<span class="o">}</span>_<span class="o">{</span>BACKEND_MODE<span class="o">}</span>.yaml
+</pre></div>
+</div>
+<ol class="arabic">
+<li><p>The name of the package should be <code class="docutils literal notranslate"><span class="pre">armer_{ROBOT_MODEL}</span></code>.</p></li>
+<li><p>The launch file should be placed in the <code class="docutils literal notranslate"><span class="pre">armer_{ROBOT_MODEL}/launch</span></code> directory.</p></li>
+<li><p>Relevant config files should be placed in <code class="docutils literal notranslate"><span class="pre">armer_{ROBOT_MODEL}/cfg</span></code>.</p></li>
+<li><p>The package can be created by running <code class="docutils literal notranslate"><span class="pre">catkin_create_pkg</span> <span class="pre">armer_{ROBOT_MODEL}/</span></code> in the directory above <code class="docutils literal notranslate"><span class="pre">armer_{ROBOT_MODEL}</span></code>.</p></li>
+<li><p>The package can be built by running <code class="docutils literal notranslate"><span class="pre">catkin_make</span></code> in the main workspace directory</p></li>
+<li><p>If all has gone well, the ROS drivers and the Armer drivers should be started after running:</p>
+<blockquote>
+<div><div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>roslaunch<span class="w"> </span>armer_<span class="o">{</span>ROBOT_MODEL<span class="o">}</span><span class="w"> </span>robot_bringup.launch<span class="w"> </span>config:<span class="o">={</span>PATH_TO_CONFIG_YAML_FILE<span class="o">}</span><span class="w"> </span>sim:<span class="o">={</span>true/false<span class="o">}</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+</ol>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For further details on creating a ROS package see <a class="reference external" href="http://wiki.ros.org/ROS/Tutorials/CreatingPackage">http://wiki.ros.org/ROS/Tutorials/CreatingPackage</a>.</p>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="use_named_poses.html" class="btn btn-neutral float-left" title="Using Named Poses" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="create_an_RTB_model.html" class="btn btn-neutral float-right" title="Creating a Robotics Toolbox Model" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Gavin Suddrey.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

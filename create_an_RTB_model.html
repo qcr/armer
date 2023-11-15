@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Creating a Robotics Toolbox Model &mdash; Armer Manipulator Control Interface  documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="_static/graphviz.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js?v=b3ba4146"></script>
+        <script src="_static/doctools.js?v=888ff710"></script>
+        <script src="_static/sphinx_highlight.js?v=4825356b"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Creating A Custom Robot" href="custom_robot.html" />
+    <link rel="prev" title="Creating a Hardware Package" href="creating_a_hardware_package.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #2c3e50" >
+
+          
+          
+          <a href="index.html">
+            
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="welcome.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="armer_installation.html">Armer Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="supported_arms.html">Supported Arms</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="set_joint_velocity.html">Setting Joint Velocites</a></li>
+<li class="toctree-l1"><a class="reference internal" href="set_joint_position.html">Setting Joint Positions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="set_cartesian_velocity.html">Setting Cartesian Velocites</a></li>
+<li class="toctree-l1"><a class="reference internal" href="set_cartesian_position.html">Setting Cartesian Positions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="guarded_motion.html">Guarded Motion</a></li>
+<li class="toctree-l1"><a class="reference internal" href="use_named_poses.html">Using Named Poses</a></li>
+<li class="toctree-l1"><a class="reference internal" href="creating_a_hardware_package.html">Creating a Hardware Package</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Creating a Robotics Toolbox Model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="custom_robot.html">Creating A Custom Robot</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Code:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="API.html">Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules.html">Modules</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #2c3e50" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Armer Manipulator Control Interface</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Creating a Robotics Toolbox Model</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/create_an_RTB_model.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="creating-a-robotics-toolbox-model">
+<h1>Creating a Robotics Toolbox Model<a class="headerlink" href="#creating-a-robotics-toolbox-model" title="Permalink to this heading">¶</a></h1>
+<p>Armer loads a URDF model into the Python Robotic Toolbox framework to process the kinematics and other movement related calculations.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For more information on the Robotics Toolbox see their <a class="reference external" href="https://petercorke.github.io/robotics-toolbox-python/index.html">documentation page</a></p>
+</div>
+<p>The Robotics Toolbox contains a wide <a class="reference external" href="https://petercorke.github.io/robotics-toolbox-python/_modules/index.html">selection of arms</a> so always check first before setting out to creating your own.</p>
+<p>Create the following file structure:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>├──<span class="w"> </span>HARDWARE_PACKAGE_NAME
+│<span class="w">   </span>├──<span class="w"> </span>__init__.py
+│<span class="w">   </span>└──<span class="w"> </span>robots
+│<span class="w">       </span>├──<span class="w"> </span>__init__.py
+│<span class="w">       </span>└──<span class="w"> </span>ROBOT_NAME.py
+├──<span class="w"> </span>cfg
+│<span class="w">   </span>├──<span class="w"> </span>ROBOT_NAME_real.yaml
+│<span class="w">   </span>└──<span class="w"> </span>ROBOT_NAME_sim.yaml
+├──<span class="w"> </span>CMakeLists.txt
+├──<span class="w"> </span>data
+│<span class="w">   </span>└──<span class="w"> </span>xacro
+│<span class="w">       </span>├──<span class="w"> </span>meshes
+│<span class="w">       </span>└──<span class="w"> </span>robots
+│<span class="w">           </span>├──<span class="w"> </span>RELEVANT_XACRO_FILES.xacro
+├──<span class="w"> </span>launch
+│<span class="w">   </span>└──<span class="w"> </span>robot_bringup.launch
+├──<span class="w"> </span>LICENSE
+├──<span class="w"> </span>package.xml
+├──<span class="w"> </span>README.md
+└──<span class="w"> </span>setup.py
+</pre></div>
+</div>
+<p>The relevant meshes should be placed in <code class="docutils literal notranslate"><span class="pre">data/xacro/meshes</span></code></p>
+<p>Relevant URDF files should be placed in <code class="docutils literal notranslate"><span class="pre">data/xacro/robots</span></code></p>
+<p>Fill in the following template and paste into the Python file in <code class="docutils literal notranslate"><span class="pre">armer_ROBOT_NAME/robots/ROBOT_NAME.py</span></code></p>
+<blockquote>
+<div><div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">roboticstoolbox.robot.ERobot</span> <span class="kn">import</span> <span class="n">ERobot</span>
+<span class="kn">from</span> <span class="nn">rospkg</span> <span class="kn">import</span> <span class="n">RosPack</span>
+
+<span class="k">class</span> <span class="nc">ROBOT_MODEL_NAME</span><span class="p">(</span><span class="n">ERobot</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+
+        <span class="n">links</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">urdf_string</span><span class="p">,</span> <span class="n">urdf_filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">URDF_read</span><span class="p">(</span><span class="s2">&quot;robots/ROBOT_URDF.xacro&quot;</span><span class="p">,</span> <span class="n">tld</span><span class="o">=</span><span class="n">RosPack</span><span class="p">()</span><span class="o">.</span><span class="n">get_path</span><span class="p">(</span><span class="s1">&#39;HARDWARE_PACKAGE_NAME&#39;</span><span class="p">)</span> <span class="o">+</span> <span class="s1">&#39;/data/xacro&#39;</span><span class="p">)</span>
+
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
+            <span class="n">links</span><span class="p">,</span>
+            <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
+            <span class="n">urdf_string</span><span class="o">=</span><span class="n">urdf_string</span><span class="p">,</span>
+            <span class="n">urdf_filepath</span><span class="o">=</span><span class="n">urdf_filepath</span><span class="p">,</span>
+            <span class="n">manufacturer</span><span class="o">=</span><span class="s2">&quot;ROBOT_MANUFACTURER_NAME&quot;</span><span class="p">,</span>
+            <span class="n">gripper_links</span><span class="o">=</span><span class="n">links</span><span class="p">[</span><span class="mi">7</span><span class="p">]</span>
+        <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">addconfiguration</span><span class="p">(</span>
+            <span class="s2">&quot;qr&quot;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>  <span class="c1"># pragma nocover</span>
+
+        <span class="n">robot</span> <span class="o">=</span> <span class="n">ROBOT_MODEL_NAME</span><span class="p">()</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">robot</span><span class="p">)</span>
+</pre></div>
+</div>
+</div></blockquote>
+<p>To verify the model has been created correctly, <code class="docutils literal notranslate"><span class="pre">ROBOT_NAME.py</span></code> can be run and will print out details of the model</p>
+<p>In order for Armer and RTB to be able to find the custom robot model file, the <code class="docutils literal notranslate"><span class="pre">__init__.py</span></code> and <code class="docutils literal notranslate"><span class="pre">setup.py</span></code> files must also be configured correctly.</p>
+<p>The contents <code class="docutils literal notranslate"><span class="pre">__init__.py</span></code> of should be as follows:</p>
+<blockquote>
+<div><div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">armer_ROBOT_NAME.models.ROBOT_NAME</span> <span class="kn">import</span> <span class="n">ROBOT_NAME</span>
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s1">&#39;ROBOT_NAME&#39;</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+</div></blockquote>
+<p>An example of <code class="docutils literal notranslate"><span class="pre">setup.py</span></code> can be found in <a class="reference external" href="https://github.com/qcr/armer_mico">armer_mico</a>. Modify armer_mico instances to match the name of the custom package.</p>
+<p>Your model can now be called by RTB and can be loaded from a config file for Armer to use.</p>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="creating_a_hardware_package.html" class="btn btn-neutral float-left" title="Creating a Hardware Package" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="custom_robot.html" class="btn btn-neutral float-right" title="Creating A Custom Robot" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Gavin Suddrey.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
