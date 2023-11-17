@@ -25,6 +25,8 @@ class ROS(Connector):  # pragma nocover
         self.robots = {}
         # Dynamically added objects go here
         self.dynamic_objects = []
+        # All Objects Tracked here
+        self.backend_objects = []
 
     #
     #  Basic methods to do with the state of the external program
@@ -74,10 +76,18 @@ class ROS(Connector):  # pragma nocover
             # TODO: test with real robot
             # NOTE: this is to keep track of added objects to this backend (dynamically added)
             ob._propogate_scene_tree()
+
             # ob._added_to_swift = True
             self.dynamic_objects.append(ob)
+            print(f"Added obj: {ob}")
 
         super().add()
+
+        # Output an ID for added obj
+        self.backend_objects.append(ob)
+        id = len(self.backend_objects)
+
+        return id
 
     def step(self, dt=0.01):
         '''

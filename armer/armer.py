@@ -408,7 +408,7 @@ class Armer:
                 rospy.loginfo(f"Remove object is: {shape_to_remove}")
                 # TODO: add this feature in once swift side is fixed 
                 #       should still work for ROS backend
-                # self.backend.remove(obj_to_remove)
+                self.backend.remove(shape_to_remove)
                 # remove from robot dict
                 robot.dynamic_collision_removal_dict.pop(d_obj_name)
                 rospy.loginfo(f"Removed successfully")

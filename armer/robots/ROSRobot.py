@@ -1974,7 +1974,7 @@ class ROSRobot(rtb.Robot):
         """
         out_list = list()
         for key, value in self.dynamic_collision_dict.items():
-            out_list.append(str(key) + f" -> (shape: {value.obj.stype}, pose (x,y,z): {str(sm.SE3(value.obj.T).t)})")
+            out_list.append(str(key) + f" -> (shape: {value.shape.stype}, pose (x,y,z): {str(sm.SE3(value.shape.T).t)})")
 
         # Dump list out
         # return GetCollisionObjectsResponse(list(self.dynamic_collision_dict.keys()))
