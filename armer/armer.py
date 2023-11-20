@@ -103,7 +103,7 @@ class Armer:
 
             # # TESTING
             # # Add dummy object for testing
-            # s0 = sg.Sphere(radius=0.05, pose=sm.SE3(0.5, 0, 0.5))
+            # s0 = sg.Sphere(radius=0.05, pose=sm.SE3(0.0, -0.5, 0.15))
             # s1 = sg.Sphere(radius=0.05, pose=sm.SE3(0.5, 0, 0.1))
             # robot.add_collision_obj(s0)
             # robot.add_collision_obj(s1)
@@ -408,7 +408,7 @@ class Armer:
                 rospy.loginfo(f"Remove object is: {shape_to_remove}")
                 # TODO: add this feature in once swift side is fixed 
                 #       should still work for ROS backend
-                self.backend.remove(shape_to_remove)
+                # self.backend.remove(shape_to_remove)
                 # remove from robot dict
                 robot.dynamic_collision_removal_dict.pop(d_obj_name)
                 rospy.loginfo(f"Removed successfully")

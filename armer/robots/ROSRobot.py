@@ -85,6 +85,7 @@ class ROSRobot(rtb.Robot):
                  trajectory_end_cutoff=0.000001,
                  qlim_min=None,
                  qlim_max=None,
+                 qdlim=None,
                  * args,
                  **kwargs):  # pylint: disable=unused-argument
         
@@ -106,6 +107,12 @@ class ROSRobot(rtb.Robot):
         if qlim_min and qlim_max:
             self.qlim = np.array([qlim_min, qlim_max])
             rospy.loginfo(f"Updating Custom qlim: {self.qlim}")
+
+        if qdlim:
+            self.qdlim = np.array(qdlim)
+            rospy.loginfo(f"Updating Custom qdlim: {self.qdlim}")
+        else:
+            self.qdlim = None
 
         # Singularity index threshold (0 is a sigularity)
         # NOTE: this is a tested value and may require configuration (i.e., speed of robot)
@@ -148,7 +155,7 @@ class ROSRobot(rtb.Robot):
             # print(f"link name in sort: {link.name}")
             # Add current link to overall dictionary
             self.collision_dict[link.name] = link.collision.data if link.collision.data else []
-            [self.collision_obj_list.append(data) for data in link.collision.data]
+            # [self.collision_obj_list.append(data) for data in link.collision.data]
 
             self.sorted_links.append(link)
             link=link.parent
@@ -160,9 +167,12 @@ class ROSRobot(rtb.Robot):
         # TESTING 
         # Initialise a 'ghost' robot instance for trajectory collision checking
         # NOTE: could also use this for visualising the trajectory (TBD)
-        self.robot_ghost = URDFRobot(wait_for_description=False,\
+        # NOTE: there was an issue identified around using the latest franka-emika panda description
+        self.robot_ghost = URDFRobot(
+            wait_for_description=False, 
             collision_check_start_link=self.collision_sliced_links[0].name, 
-            collision_check_stop_link=self.collision_sliced_links[-1].name)
+            collision_check_stop_link=self.collision_sliced_links[-1].name
+        )
         
         # Define a list of dynamic objects (to be added in at runtime)
         self.dynamic_collision_dict = dict()
@@ -1867,6 +1877,9 @@ class ROSRobot(rtb.Robot):
     # --------------------------------------------------------------------- #
     # --------- Collision and Singularity Checking Services --------------- #
     # --------------------------------------------------------------------- #
+    def add_collision_obj(self, obj):
+        self.collision_obj_list.append(obj)
+
     def get_collision_check_window(self, req: EmptyRequest) -> EmptyResponse:
         """
         TODO: add this
@@ -1950,6 +1963,13 @@ class ROSRobot(rtb.Robot):
         # NOTE: these dictionaries are accessed and checked by Armer's main loop for addition to a backend.
         self.dynamic_collision_dict[req.name] = dynamic_obj
         self.collision_dict[req.name] = [dynamic_obj.shape]
+
+        # Add to list of objects for NEO
+        # NOTE: NEO needs more work to avoid local minima
+        # NOTE: Also, existing description shapes (not part of the robot tree) need to be peeled out and added here as well
+        self.collision_obj_list.append(shape)
+
+        print(f"Current collision objects: {self.collision_obj_list}")
 
         return AddCollisionObjectResponse(success=True)
     
@@ -2284,15 +2304,15 @@ class ROSRobot(rtb.Robot):
                 0.3,
                 0.05,
                 1.0,
-                start=self.link_dict["panda_hand"],
-                end=self.link_dict["panda_link0"],
+                start=self.link_dict["panda_link1"],
+                end=self.link_dict["panda_hand"],
             )
 
             # print(f"c_Ain: {np.shape(c_Ain)} | Ain: {np.shape(Ain)}")
             # If there are any parts of the robot within the influence distance
             # to the collision in the scene
             if c_Ain is not None and c_bin is not None:
-                c_Ain = np.c_[c_Ain, np.zeros((c_Ain.shape[0], 6))]
+                c_Ain = np.c_[c_Ain, np.zeros((c_Ain.shape[0], 4))]
 
                 # print(f"c_Ain (in prob area): {np.shape(c_Ain)} | Ain: {np.shape(Ain)}")
                 # Stack the inequality constraints
@@ -2300,12 +2320,12 @@ class ROSRobot(rtb.Robot):
                 bin = np.r_[bin, c_bin]
 
         # Linear component of objective function: the manipulability Jacobian
-        c = np.r_[-self.jacobm(self.q).reshape((len(self.q),)), np.zeros(7)]
+        c = np.r_[-self.jacobm(self.q).reshape((len(self.q),)), np.zeros(6)]
 
         # The lower and upper bounds on the joint velocity and slack variable
         if np.any(self.qdlim):
-            lb = -np.r_[self.qdlim[:len(self.q)], 10 * np.ones(7)]
-            ub = np.r_[self.qdlim[:len(self.q)], 10 * np.ones(7)]
+            lb = -np.r_[self.qdlim[:len(self.q)], 10 * np.ones(6)]
+            ub = np.r_[self.qdlim[:len(self.q)], 10 * np.ones(6)]
 
             # Solve for the joint velocities dq
             qd = qp.solve_qp(Q, c, Ain, bin, Aeq, beq, lb=lb, ub=ub, solver='daqp')
