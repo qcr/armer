@@ -29,6 +29,7 @@ import spatialgeometry as sg
 from dataclasses import dataclass
 from armer.utils import ikine, mjtg, trapezoidal
 
+# Import Standard Messages
 from std_msgs.msg import Header, Bool
 from sensor_msgs.msg import JointState
 from geometry_msgs.msg import Pose, PoseStamped, Point
@@ -36,6 +37,7 @@ from geometry_msgs.msg import TwistStamped, Twist, Transform
 from std_srvs.srv import Empty, EmptyRequest, EmptyResponse
 from std_msgs.msg import Float64MultiArray
 
+# Import ARMER Messages
 from armer_msgs.msg import *
 from armer_msgs.srv import *
 
@@ -46,6 +48,9 @@ from moveit_msgs.msg import RobotState, AttachedCollisionObject, CollisionObject
 # TESTING NEW IMPORTS FOR DYNAMIC OBJECT MARKER DISPLAY (RVIZ)
 from visualization_msgs.msg import Marker, MarkerArray
 
+# TESTING CONTROLLER SWITCHING FOR NEW TRAJECTORY CONTROL
+from controller_manager_msgs.srv import SwitchController
+from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryGoal
 # pylint: disable=too-many-instance-attributes
 
 import tf2_ros
@@ -526,6 +531,16 @@ class ROSRobot(rtb.Robot):
     # --------------------------------------------------------------------- #
     # --------- ROS Topic Callback Methods -------------------------------- #
     # --------------------------------------------------------------------- #
+    # Implementation from: https://github.com/ros-controls/ros_control/issues/511 
+    def controller_switch_service(self, ns, cls, **kwargs):
+        rospy.wait_for_service(ns)
+        service = rospy.ServiceProxy(ns, cls)
+        response = service(**kwargs)
+        if not response.ok:
+            rospy.logwarn(f"Attempting controller switch failed...")
+        else:
+            rospy.loginfo(f"Controller switched successfully")
+
     def _state_cb(self, msg):
         if not self.joint_indexes:
             for joint_name in self.joint_names:
@@ -1019,6 +1034,21 @@ class ROSRobot(rtb.Robot):
             
             pose = goal_pose.pose
 
+            ## Attempt to swtich to trajectory controller
+            #try:
+            #    self.controller_switch_service("/controller_manager/switch_controller",
+            #            SwitchController,
+            #            start_controllers=["position_joint_trajectory_controller"],
+            #            stop_controllers=["joint_group_velocity_controller"],
+            #            strictness=1, start_asap=False, timeout=0.0)
+            #except rospy.ServiceException as e:
+            #    rospy.logerr(f"Could not switch controllers: {e}")
+            #    self.executor = None
+            #    self.moving = False
+            #    self.pose_server.set_succeeded(
+            #      MoveToPoseResult(success=False), 'Could not switch controllers to run'
+            #    )
+                
             # IS THE GOAL POSE WITHIN THE BOUNDRY?...
             if self.pose_within_workspace(pose) == False:
                 rospy.logwarn("-- Pose goal outside defined workspace; refusing to move...")
@@ -1052,42 +1082,77 @@ class ROSRobot(rtb.Robot):
 
             # Construct a joint trajectory representation
             # TODO: test and implement this with joint trajectory controller
-            jt_traj_point = JointTrajectoryPoint()
-            jt_traj_point.time_from_start = np.max(traj.t)
-            jt_traj_point.positions = traj.s
-            jt_traj_point.velocities = traj.sd
+            print(f"traj time: {traj.t}")
+            max_time = np.max(traj.t)
+            time_array = np.linspace(0, max_time, len(traj.s))
+            print(f"time array: {time_array}")
+
             jt_traj = JointTrajectory()
             jt_traj.joint_names = self.joint_names
-            jt_traj.points = jt_traj_point
+            print(f"traj joint names: {jt_traj.joint_names}")
+            for idx in range(0,len(traj.s)):
+            #    print(f"current time array: {time_array[idx]} | rospy duration: {rospy.Duration(time_array[idx])}")
+                jt_traj_point = JointTrajectoryPoint()
+                jt_traj_point.time_from_start = rospy.Duration(time_array[idx])
+                jt_traj_point.positions = list(traj.s[idx])
+                #jt_traj_point.velocities = traj.sd[idx]
+                jt_traj.points.append(jt_traj_point)
 
+            #jt_traj_point = JointTrajectoryPoint()
+            #jt_traj_point.time_from_start = rospy.Duration(np.max(traj.t))
+            #jt_traj_point.positions = list(traj.s[-1])
+            ##jt_traj_point.velocities = traj.sd[idx]
+            #jt_traj.points.append(jt_traj_point)
+            
             # Conduct 'Ghost' Robot Check for Collision throughout trajectory
             # NOTE: also publishes marker representation of trajectory for visual confirmation (Rviz)
             go_signal = self.trajectory_collision_checker(traj=traj)
             
-            # # TESTING MOVEIT VISUALISATION
-            # robot_traj = RobotTrajectory()
-            # robot_traj.multi_dof_joint_trajectory = jt_traj
-            # print(f"jt_traj: {jt_traj}")
+            ## TESTING MOVEIT VISUALISATION
+            robot_traj = RobotTrajectory()
+            robot_traj.joint_trajectory = jt_traj
+            print(f"jt_traj: {jt_traj}")
 
-            # robot_state = RobotState()
-            # state = JointState()
-            # state.position = list(self.q)
-            # state.velocity = list(self.qd)
-            # state.effort = np.zeros(self.n)
-            # robot_state.joint_state = state
-            # robot_state.is_diff = False
+            robot_state = RobotState()
+            state = JointState()
+            state.position = list(self.q)
+            state.velocity = list(self.qd)
+            state.effort = np.zeros(self.n)
+            robot_state.joint_state = state
+            robot_state.is_diff = False
 
-            # display_traj = DisplayTrajectory()
-            # display_traj.model_id = self.name
-            # display_traj.trajectory = robot_traj
-            # display_traj.trajectory_start = robot_state
+            display_traj = DisplayTrajectory()
+            display_traj.model_id = self.name
+            display_traj.trajectory = robot_traj
+            display_traj.trajectory_start = robot_state
 
-            # self.display_moveit_traj_publisher.publish(display_traj)
+            #self.display_moveit_traj_publisher.publish(display_traj)
 
             # Check for collision only at end for speed
             # go_signal = self.check_collision_per_state(q=solution.q)
-            
+            #go_signal = False 
             if go_signal:
+                # ---- TESTING NEW IMPLEMENTATION
+                # Create a client to loaded controller
+                #client = actionlib.SimpleActionClient('/position_joint_trajectory_controller/follow_joint_trajectory', 
+                #        FollowJointTrajectoryAction)
+
+                ## Wait for client server connection
+                #client.wait_for_server()
+
+                ## Create goal
+                #goal = FollowJointTrajectoryGoal()
+                #goal.trajectory = jt_traj
+
+                ## Send Joint Trajectory to position controller for execution
+                #client.send_goal(goal)
+
+                ## Wait for controller to finish
+                #client.wait_for_result()
+
+                ## Debugging out of result
+                #print(f"result: {client.get_result()}")
+                
                 self.executor = TrajectoryExecutor(
                     self,
                     traj=traj,
@@ -1098,10 +1163,10 @@ class ROSRobot(rtb.Robot):
                     rospy.sleep(0.01)
 
 
-                # # Send empty data at end to clear visual trajectory
-                # marker_traj = Marker()
-                # marker_traj.points = []
-                # self.display_traj_publisher.publish(marker_traj)
+                # Send empty data at end to clear visual trajectory
+                marker_traj = Marker()
+                marker_traj.points = []
+                self.display_traj_publisher.publish(marker_traj)
 
                 if self.executor.is_succeeded():
                     self.pose_server.set_succeeded(MoveToPoseResult(success=True))
@@ -1111,6 +1176,21 @@ class ROSRobot(rtb.Robot):
                 self.pose_server.set_aborted(MoveToPoseResult(success=False))
                 self.executor = None
                 self.moving = False
+            
+            ## Attempt to swtich back to joint group velocity controller
+            #try:
+            #    self.controller_switch_service("/controller_manager/switch_controller",
+            #            SwitchController,
+            #            start_controllers=["joint_group_velocity_controller"],
+            #            stop_controllers=["position_joint_trajectory_controller"],
+            #            strictness=1, start_asap=False, timeout=0.0)
+            #except rospy.ServiceException as e:
+            #    rospy.logerr(f"Could not switch controllers: {e}")
+            #    self.executor = None
+            #    self.moving = False
+            #    self.pose_server.set_succeeded(
+            #      MoveToPoseResult(success=False), 'Could not switch controllers to run'
+            #    )
 
     def trajectory_collision_checker(self, traj) -> bool:
         # Attempt to slice the trajectory into bit-size chuncks to speed up collision check
