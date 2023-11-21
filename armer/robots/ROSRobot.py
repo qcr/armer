@@ -1034,20 +1034,20 @@ class ROSRobot(rtb.Robot):
             
             pose = goal_pose.pose
 
-            ## Attempt to swtich to trajectory controller
-            #try:
-            #    self.controller_switch_service("/controller_manager/switch_controller",
-            #            SwitchController,
-            #            start_controllers=["position_joint_trajectory_controller"],
-            #            stop_controllers=["joint_group_velocity_controller"],
-            #            strictness=1, start_asap=False, timeout=0.0)
-            #except rospy.ServiceException as e:
-            #    rospy.logerr(f"Could not switch controllers: {e}")
-            #    self.executor = None
-            #    self.moving = False
-            #    self.pose_server.set_succeeded(
-            #      MoveToPoseResult(success=False), 'Could not switch controllers to run'
-            #    )
+            # Attempt to swtich to trajectory controller
+            try:
+               self.controller_switch_service("/controller_manager/switch_controller",
+                       SwitchController,
+                       start_controllers=["position_joint_trajectory_controller"],
+                       stop_controllers=["joint_group_velocity_controller"],
+                       strictness=1, start_asap=False, timeout=0.0)
+            except rospy.ServiceException as e:
+               rospy.logerr(f"Could not switch controllers: {e}")
+               self.executor = None
+               self.moving = False
+               self.pose_server.set_succeeded(
+                 MoveToPoseResult(success=False), 'Could not switch controllers to run'
+               )
                 
             # IS THE GOAL POSE WITHIN THE BOUNDRY?...
             if self.pose_within_workspace(pose) == False:
@@ -1088,14 +1088,15 @@ class ROSRobot(rtb.Robot):
             print(f"time array: {time_array}")
 
             jt_traj = JointTrajectory()
-            jt_traj.joint_names = self.joint_names
+            jt_traj.header.stamp = rospy.Time.now()
+            jt_traj.joint_names = list(self.joint_names)
             print(f"traj joint names: {jt_traj.joint_names}")
             for idx in range(0,len(traj.s)):
             #    print(f"current time array: {time_array[idx]} | rospy duration: {rospy.Duration(time_array[idx])}")
                 jt_traj_point = JointTrajectoryPoint()
                 jt_traj_point.time_from_start = rospy.Duration(time_array[idx])
                 jt_traj_point.positions = list(traj.s[idx])
-                #jt_traj_point.velocities = traj.sd[idx]
+                #jt_traj_point.velocities = list(traj.sd[idx])
                 jt_traj.points.append(jt_traj_point)
 
             #jt_traj_point = JointTrajectoryPoint()
@@ -1111,7 +1112,7 @@ class ROSRobot(rtb.Robot):
             ## TESTING MOVEIT VISUALISATION
             robot_traj = RobotTrajectory()
             robot_traj.joint_trajectory = jt_traj
-            print(f"jt_traj: {jt_traj}")
+            # print(f"jt_traj: {len(jt_traj)}")
 
             robot_state = RobotState()
             state = JointState()
@@ -1134,63 +1135,62 @@ class ROSRobot(rtb.Robot):
             if go_signal:
                 # ---- TESTING NEW IMPLEMENTATION
                 # Create a client to loaded controller
-                #client = actionlib.SimpleActionClient('/position_joint_trajectory_controller/follow_joint_trajectory', 
-                #        FollowJointTrajectoryAction)
+                client = actionlib.SimpleActionClient('/position_joint_trajectory_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
 
-                ## Wait for client server connection
-                #client.wait_for_server()
+                # Wait for client server connection
+                client.wait_for_server()
 
-                ## Create goal
-                #goal = FollowJointTrajectoryGoal()
-                #goal.trajectory = jt_traj
+                # Create goal
+                goal = FollowJointTrajectoryGoal()
+                goal.trajectory = jt_traj
 
-                ## Send Joint Trajectory to position controller for execution
-                #client.send_goal(goal)
+                # Send Joint Trajectory to position controller for execution
+                client.send_goal(goal)
 
-                ## Wait for controller to finish
-                #client.wait_for_result()
+                # Wait for controller to finish
+                client.wait_for_result()
 
-                ## Debugging out of result
-                #print(f"result: {client.get_result()}")
+                # Debugging out of result
+                print(f"result: {client.get_result()}")
                 
-                self.executor = TrajectoryExecutor(
-                    self,
-                    traj=traj,
-                    cutoff=self.trajectory_end_cutoff
-                )
+                # self.executor = TrajectoryExecutor(
+                #     self,
+                #     traj=traj,
+                #     cutoff=self.trajectory_end_cutoff
+                # )
 
-                while not self.executor.is_finished():
-                    rospy.sleep(0.01)
+                # while not self.executor.is_finished():
+                #     rospy.sleep(0.01)
 
 
-                # Send empty data at end to clear visual trajectory
-                marker_traj = Marker()
-                marker_traj.points = []
-                self.display_traj_publisher.publish(marker_traj)
+                # # Send empty data at end to clear visual trajectory
+                # marker_traj = Marker()
+                # marker_traj.points = []
+                # self.display_traj_publisher.publish(marker_traj)
 
-                if self.executor.is_succeeded():
-                    self.pose_server.set_succeeded(MoveToPoseResult(success=True))
-                else:
-                    self.pose_server.set_aborted(MoveToPoseResult(success=False))
+                # if self.executor.is_succeeded():
+                self.pose_server.set_succeeded(MoveToPoseResult(success=True))
+                # else:
+                    # self.pose_server.set_aborted(MoveToPoseResult(success=False))
             else:
                 self.pose_server.set_aborted(MoveToPoseResult(success=False))
                 self.executor = None
                 self.moving = False
             
-            ## Attempt to swtich back to joint group velocity controller
-            #try:
-            #    self.controller_switch_service("/controller_manager/switch_controller",
-            #            SwitchController,
-            #            start_controllers=["joint_group_velocity_controller"],
-            #            stop_controllers=["position_joint_trajectory_controller"],
-            #            strictness=1, start_asap=False, timeout=0.0)
-            #except rospy.ServiceException as e:
-            #    rospy.logerr(f"Could not switch controllers: {e}")
-            #    self.executor = None
-            #    self.moving = False
-            #    self.pose_server.set_succeeded(
-            #      MoveToPoseResult(success=False), 'Could not switch controllers to run'
-            #    )
+            # Attempt to swtich back to joint group velocity controller
+            try:
+               self.controller_switch_service("/controller_manager/switch_controller",
+                       SwitchController,
+                       start_controllers=["joint_group_velocity_controller"],
+                       stop_controllers=["position_joint_trajectory_controller"],
+                       strictness=1, start_asap=False, timeout=0.0)
+            except rospy.ServiceException as e:
+               rospy.logerr(f"Could not switch controllers: {e}")
+               self.executor = None
+               self.moving = False
+               self.pose_server.set_succeeded(
+                 MoveToPoseResult(success=False), 'Could not switch controllers to run'
+               )
 
     def trajectory_collision_checker(self, traj) -> bool:
         # Attempt to slice the trajectory into bit-size chuncks to speed up collision check
