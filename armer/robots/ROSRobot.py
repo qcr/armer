@@ -31,7 +31,7 @@ from armer.utils import ikine, mjtg, trapezoidal
 
 from std_msgs.msg import Header, Bool
 from sensor_msgs.msg import JointState
-from geometry_msgs.msg import Pose, PoseStamped
+from geometry_msgs.msg import Pose, PoseStamped, Point
 from geometry_msgs.msg import TwistStamped, Twist, Transform
 from std_srvs.srv import Empty, EmptyRequest, EmptyResponse
 from std_msgs.msg import Float64MultiArray
@@ -244,7 +244,7 @@ class ROSRobot(rtb.Robot):
 
         # Trajectory Generation (designed to expect a Trajectory class obj)
         self.executor = None
-        self.traj_generator = mjtg
+        self.traj_generator = trapezoidal #mjtg
 
         self.joint_subscriber = rospy.Subscriber(
             joint_state_topic if joint_state_topic else '/joint_states',
@@ -273,13 +273,19 @@ class ROSRobot(rtb.Robot):
             # --- TEST GHOST PUBLISHER --- #
             self.display_traj_publisher: rospy.Publisher = rospy.Publisher(
                 '{}/armer_traj_display'.format(self.name.lower()),
+                Marker,
+                queue_size=1
+            )
+
+            self.display_moveit_traj_publisher: rospy.Publisher = rospy.Publisher(
+                '{}/armer_moveit_display'.format(self.name.lower()),
                 DisplayTrajectory,
                 queue_size=1
             )
 
             # --- TEST RVIZ MARKER PUBLISHER --- #
             self.display_rviz_marker_publisher: rospy.Publisher = rospy.Publisher(
-                '{}/armer_marker_display'.format(self.name.lower()),
+                '{}/armer_dyn_obj_display'.format(self.name.lower()),
                 MarkerArray,
                 queue_size=1
             )
@@ -1023,57 +1029,60 @@ class ROSRobot(rtb.Robot):
                 self.moving = False
                 return
             
+            # Attempt to get valid solution
+            # NOTE: on failure, returns existing state as solution for 0 movement
             solution = ikine(self, pose, q0=self.q, end=self.gripper)
+            ik_invalid = all(x == y for x,y in zip(self.q, solution.q))
+            if ik_invalid:
+                rospy.logwarn(f"-- Could not find valid solution, refusing to move...")
+                self.pose_server.set_succeeded(
+                  MoveToPoseResult(success=False), 'IK Solution Invalid'
+                )
+                self.executor = None
+                self.moving = False
+                return
 
             # Check for singularity on end solution:
             # TODO: prevent motion on this bool? Needs to be thought about
             if self.check_singularity(solution.q):
                 rospy.logwarn(f"IK solution within singularity threshold [{self.singularity_thresh}] -> ill-advised motion")
 
-            # TESTING
-            # Check for collision throughout trajectory
-            go_signal = True
+            # Generate trajectory from successful solution
             traj = self.traj_generator(self, qf=solution.q, max_speed=goal.speed if goal.speed else 0.2)
-            # Attempt to slice the trajectory into bit-size chuncks to speed up collision check
-            # NOTE: doesn't need to check every state in trajectory, as spatially stepping will find links in collision
-            # TODO: check this assumption holds true
-            step_thresh = 50
-            step_value = int(len(traj.s) / step_thresh) if int(len(traj.s) / step_thresh) > 0 else 1
 
+            # Construct a joint trajectory representation
+            # TODO: test and implement this with joint trajectory controller
             jt_traj_point = JointTrajectoryPoint()
             jt_traj_point.time_from_start = np.max(traj.t)
-            print(f"Traj len: {len(traj.s)} | with step value: {step_value}")
-            with Timer("Full Trajectory Collision Check"):
-                for idx in range(0,len(traj.s),step_value):
-                    # print(f"q: {q}")
-                    jt_traj_point.positions = traj.s[idx]
-                    jt_traj_point.velocities = traj.sd[idx]
-                    if self.check_collision_per_state(q=traj.s[idx]) == False:
-                        go_signal = False
-                        break
-
+            jt_traj_point.positions = traj.s
+            jt_traj_point.velocities = traj.sd
             jt_traj = JointTrajectory()
             jt_traj.joint_names = self.joint_names
             jt_traj.points = jt_traj_point
 
-            robot_traj = RobotTrajectory()
-            robot_traj.joint_trajectory = jt_traj
-            print(f"jt_traj: {jt_traj}")
+            # Conduct 'Ghost' Robot Check for Collision throughout trajectory
+            # NOTE: also publishes marker representation of trajectory for visual confirmation (Rviz)
+            go_signal = self.trajectory_collision_checker(traj=traj)
+            
+            # # TESTING MOVEIT VISUALISATION
+            # robot_traj = RobotTrajectory()
+            # robot_traj.multi_dof_joint_trajectory = jt_traj
+            # print(f"jt_traj: {jt_traj}")
 
-            robot_state = RobotState()
-            state = JointState()
-            state.position = list(self.q)
-            state.velocity = list(self.qd)
-            state.effort = np.zeros(self.n)
-            robot_state.joint_state = state
-            robot_state.is_diff = False
+            # robot_state = RobotState()
+            # state = JointState()
+            # state.position = list(self.q)
+            # state.velocity = list(self.qd)
+            # state.effort = np.zeros(self.n)
+            # robot_state.joint_state = state
+            # robot_state.is_diff = False
 
-            display_traj = DisplayTrajectory()
-            display_traj.model_id = self.name
-            display_traj.trajectory = robot_traj
-            display_traj.trajectory_start = robot_state
+            # display_traj = DisplayTrajectory()
+            # display_traj.model_id = self.name
+            # display_traj.trajectory = robot_traj
+            # display_traj.trajectory_start = robot_state
 
-            # self.display_traj_publisher.publish(display_traj)
+            # self.display_moveit_traj_publisher.publish(display_traj)
 
             # Check for collision only at end for speed
             # go_signal = self.check_collision_per_state(q=solution.q)
@@ -1088,6 +1097,12 @@ class ROSRobot(rtb.Robot):
                 while not self.executor.is_finished():
                     rospy.sleep(0.01)
 
+
+                # # Send empty data at end to clear visual trajectory
+                # marker_traj = Marker()
+                # marker_traj.points = []
+                # self.display_traj_publisher.publish(marker_traj)
+
                 if self.executor.is_succeeded():
                     self.pose_server.set_succeeded(MoveToPoseResult(success=True))
                 else:
@@ -1096,6 +1111,58 @@ class ROSRobot(rtb.Robot):
                 self.pose_server.set_aborted(MoveToPoseResult(success=False))
                 self.executor = None
                 self.moving = False
+
+    def trajectory_collision_checker(self, traj) -> bool:
+        # Attempt to slice the trajectory into bit-size chuncks to speed up collision check
+        # NOTE: doesn't need to check every state in trajectory, as spatially stepping will find links in collision
+        # NOTE: the smaller the step thresh is, the less points used for checking (resulting in faster execution)
+        # TODO: check this assumption holds true
+        step_thresh = 10
+        step_value = int(len(traj.s) / step_thresh) if int(len(traj.s) / step_thresh) > 0 else 1
+        
+        # Create marker array for representing trajectory
+        marker_traj = Marker()
+        marker_traj.header.frame_id = self.base_link.name
+        marker_traj.header.stamp = rospy.Time.now()
+        marker_traj.action = Marker.ADD
+        marker_traj.pose.orientation.w = 1
+        marker_traj.id = 0
+        marker_traj.type = Marker.LINE_STRIP
+        marker_traj.scale.x = 0.01
+        # Default to Green Markers
+        marker_traj.color.g = 1.0
+        marker_traj.color.a = 1.0
+
+        # Initial empty publish
+        marker_traj.points = []
+        self.display_traj_publisher.publish(marker_traj)
+
+        rospy.loginfo(f"Traj len: {len(traj.s)} | with step value: {step_value}")
+        go = True
+        with Timer("Full Trajectory Collision Check", enabled=True):
+            for idx in range(0,len(traj.s),step_value):
+                
+                # Calculate end-effector pose and extract translation component
+                pose = self.ets(start=self.base_link, end=self.gripper).eval(traj.s[idx])
+                extracted_t = pose[:3, 3]
+
+                # Update marker trajectory for visual representation
+                p = Point()
+                p.x = extracted_t[0]
+                p.y = extracted_t[1]
+                p.z = extracted_t[2]
+                marker_traj.points.append(p)
+
+                print(f"extracted translation: {extracted_t}")
+                if self.check_collision_per_state(q=traj.s[idx]) == False:
+                    # Terminate on collision check failure
+                    go=False
+                    break
+
+        # Publish marker (regardless of failure case for visual identification)
+        self.display_traj_publisher.publish(marker_traj)
+        # Output go based on passing collision check
+        return go
 
     def step_cb(self, goal: MoveToPoseGoal) -> None:
         """

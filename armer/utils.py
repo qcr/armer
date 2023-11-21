@@ -40,14 +40,14 @@ def trapezoidal(robot: rtb.Robot, qf: np.ndarray, max_speed=None, frequency=500,
     traj = rtb.mtraj(rtb.trapezoidal, q0=robot.q, qf=qf, t=frequency)
 
     # Check if trajectory is valid
-    if np.max(traj.qd) != 0:
+    if np.max(traj.qd) != 0 and move_time_sec != 0:
         # Scale the joint trajectories (in steps) to the overall expected move time (sec)
         scaled_qd = traj.qd*(frequency/move_time_sec)
         # print(f"max scaled qd: {np.max(scaled_qd)}")
         # return the generated trajectory scaled with expected speed/time
         return Trajectory(name='trapezoidal-v1', t=move_time_sec, s=traj.q, sd=scaled_qd, sdd=None, istime=True)
     else:
-        rospy.logerr(f"Trajectory is invalid --> Cannot Solve.")
+        rospy.logerr(f"Trajectory is invalid --> Cannot Solve. Given Move Time: [{move_time_sec}]")
         return Trajectory(name='invalid', t=1, s=robot.q, sd=None, sdd=None, istime=False)
 
 def mjtg(robot: rtb.robot, qf: np.ndarray, max_speed: float=0.2, max_rot: float=0.5, frequency=500):
