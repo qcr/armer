@@ -1091,19 +1091,19 @@ class ROSRobot(rtb.Robot):
             jt_traj.header.stamp = rospy.Time.now()
             jt_traj.joint_names = list(self.joint_names)
             print(f"traj joint names: {jt_traj.joint_names}")
-            for idx in range(0,len(traj.s)):
+            #for idx in range(0,len(traj.s)):
             #    print(f"current time array: {time_array[idx]} | rospy duration: {rospy.Duration(time_array[idx])}")
-                jt_traj_point = JointTrajectoryPoint()
-                jt_traj_point.time_from_start = rospy.Duration(time_array[idx])
-                jt_traj_point.positions = list(traj.s[idx])
+                #jt_traj_point = JointTrajectoryPoint()
+                #jt_traj_point.time_from_start = rospy.Duration(time_array[idx])
+                #jt_traj_point.positions = list(traj.s[idx])
                 #jt_traj_point.velocities = list(traj.sd[idx])
-                jt_traj.points.append(jt_traj_point)
+                #jt_traj.points.append(jt_traj_point)
 
-            #jt_traj_point = JointTrajectoryPoint()
-            #jt_traj_point.time_from_start = rospy.Duration(np.max(traj.t))
-            #jt_traj_point.positions = list(traj.s[-1])
-            ##jt_traj_point.velocities = traj.sd[idx]
-            #jt_traj.points.append(jt_traj_point)
+            jt_traj_point = JointTrajectoryPoint()
+            jt_traj_point.time_from_start = rospy.Duration(np.max(traj.t))
+            jt_traj_point.positions = list(traj.s[-1])
+            #jt_traj_point.velocities = traj.sd[idx]
+            jt_traj.points.append(jt_traj_point)
             
             # Conduct 'Ghost' Robot Check for Collision throughout trajectory
             # NOTE: also publishes marker representation of trajectory for visual confirmation (Rviz)
