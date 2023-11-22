@@ -291,19 +291,38 @@ class Armer:
         # print(f"sliced links: {[link.name for link in robot.collision_sliced_links]}")
         # print(f"col dict -> robots to check: {[robot for robot in self.global_collision_dict.keys()]}")
         # print(f"col dict -> links to check as a dict: {[link for link in self.global_collision_dict.values()]}")
+        # print(f"panda_link5 check: {self.global_collision_dict['arm']['panda_link5']}")
+
+        # start = timeit.default_timer()
+        # Creates a KD tree based on link locations (cartesian translation) to target link (sliced) and extracts 
+        # closest links to evaluate (based on dim; e.g., if dim=3, then the 3 closest links will be checked for that link)
+        # NOTE: this has yielded a notable improvement in execution without this method (approx. 120%). However, 
+        #       it is important to note that the link distances used in the tree are based on that link's origin point.
+        #       therefore, there may be cases where the size of the link (physically) is larger than its origin, meaning we miss it in eval
+        #       This is something to investigate to robustify this method.
+        check_links = robot.query_kd_nn_collision_tree(
+            sliced_links=robot.collision_sliced_links, 
+            dim=4,
+            debug=True
+        )
+        # end = timeit.default_timer()
+        # print(f"[NEW] full collision check: {1/(end-start)} hz | check links: {check_links}")
 
         # Alternative Method
         # NOTE: this has between 1-6% increase in speed of execution
-        with Timer("NEW GLOBAL CHECK", enabled=False):
-            col_link_id = collision_handler.global_check(
-                robot_name = robot.name,
-                robot_names = list(self.global_collision_dict.keys()),
-                len_robots = len(self.global_collision_dict.keys()),
-                robot_links = robot.collision_sliced_links,
-                len_links = len(robot.collision_sliced_links),
-                global_dict = self.global_collision_dict,
-                overlap_dict = robot.overlapped_link_dict
-            )
+        start = timeit.default_timer()
+        col_link_id = collision_handler.global_check(
+            robot_name = robot.name,
+            robot_names = list(self.global_collision_dict.keys()),
+            len_robots = len(self.global_collision_dict.keys()),
+            robot_links = robot.collision_sliced_links,
+            len_links = len(robot.collision_sliced_links),
+            global_dict = self.global_collision_dict,
+            overlap_dict = robot.overlapped_link_dict,
+            check_links = check_links
+        )
+        end = timeit.default_timer()
+        print(f"[OLD] full collision check: {1/(end-start)} hz")
     
         if col_link_id >= 0:
             rospy.logwarn(f"Global Collision Check -> Robot [{robot.name}] in collision with link {robot.collision_sliced_links[col_link_id].name}")
@@ -422,7 +441,6 @@ class Armer:
                     dynamic_obj.is_added = True
                     rospy.loginfo(f"Added Successfully")
 
-
     def run(self) -> None:
         """
         Runs the driver. This is a blocking call.
@@ -444,11 +462,15 @@ class Armer:
                     # TODO: Each robot performs its own self check (possibly saves some time?)
                     # Each robot is then checked with a global collision check (environment and other robots)
                     # If collisions are found (self or with global) preemption signal sent to each robot object.
+                    # start = timeit.default_timer()
                     if self.global_collision_check(robot=robot) and robot.preempted == False:
                         # Current robot found to be in collision so preempt
                         robot.collision_approached = True
                         robot.preempt()
-                    
+                        
+                    # end = timeit.default_timer()
+                    # print(f"[Current] full collision check: {1/(end-start)} hz")  
+
                     # Check if the current robot has any  dynamic objects that need backend update
                     self.update_dynamic_objects(robot=robot)
                 

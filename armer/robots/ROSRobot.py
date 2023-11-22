@@ -19,7 +19,7 @@ import actionlib
 import tf
 import roboticstoolbox as rtb
 import spatialmath as sm
-from spatialmath import SE3, SO3, UnitQuaternion, base
+from spatialmath import SE3, SO3, UnitQuaternion, base, Quaternion
 import pointcloud_utils as pclu
 import numpy as np
 import yaml
@@ -52,6 +52,10 @@ from visualization_msgs.msg import Marker, MarkerArray
 from controller_manager_msgs.srv import SwitchController
 from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryGoal
 # pylint: disable=too-many-instance-attributes
+
+# TESTING NEW IMPORTS FOR KD TREE COLLISION SEARCH METHOD
+from sklearn.neighbors import KDTree
+from armer.cython import collision_handler
 
 import tf2_ros
 
@@ -277,7 +281,7 @@ class ROSRobot(rtb.Robot):
 
             # --- TEST GHOST PUBLISHER --- #
             self.display_traj_publisher: rospy.Publisher = rospy.Publisher(
-                '{}/armer_traj_display'.format(self.name.lower()),
+                '{}/trajectory_marker_display'.format(self.name.lower()),
                 Marker,
                 queue_size=1
             )
@@ -290,7 +294,13 @@ class ROSRobot(rtb.Robot):
 
             # --- TEST RVIZ MARKER PUBLISHER --- #
             self.display_rviz_marker_publisher: rospy.Publisher = rospy.Publisher(
-                '{}/armer_dyn_obj_display'.format(self.name.lower()),
+                '{}/dynamic_marker_display'.format(self.name.lower()),
+                MarkerArray,
+                queue_size=1
+            )
+
+            self.collision_debug_publisher: rospy.Publisher = rospy.Publisher(
+                '{}/collision_debug_display'.format(self.name.lower()),
                 MarkerArray,
                 queue_size=1
             )
@@ -1035,6 +1045,7 @@ class ROSRobot(rtb.Robot):
             pose = goal_pose.pose
 
             # Attempt to swtich to trajectory controller
+            # NOTE: works but needs to be peeled out so simulation can still work
             try:
                self.controller_switch_service("/controller_manager/switch_controller",
                        SwitchController,
@@ -1042,7 +1053,7 @@ class ROSRobot(rtb.Robot):
                        stop_controllers=["joint_group_velocity_controller"],
                        strictness=1, start_asap=False, timeout=0.0)
             except rospy.ServiceException as e:
-               rospy.logerr(f"Could not switch controllers: {e}")
+               rospy.logerr(f"-- Could not switch controllers: {e}")
                self.executor = None
                self.moving = False
                self.pose_server.set_succeeded(
@@ -1064,7 +1075,7 @@ class ROSRobot(rtb.Robot):
             solution = ikine(self, pose, q0=self.q, end=self.gripper)
             ik_invalid = all(x == y for x,y in zip(self.q, solution.q))
             if ik_invalid:
-                rospy.logwarn(f"-- Could not find valid solution, refusing to move...")
+                rospy.logwarn(f"-- Could not find valid IK solution, refusing to move...")
                 self.pose_server.set_succeeded(
                   MoveToPoseResult(success=False), 'IK Solution Invalid'
                 )
@@ -1087,6 +1098,7 @@ class ROSRobot(rtb.Robot):
             time_array = np.linspace(0, max_time, len(traj.s))
             print(f"time array: {time_array}")
 
+            # NOTE: adding one waypoint works, but adding all waypoints is an issue as time value is not correct per step
             jt_traj = JointTrajectory()
             jt_traj.header.stamp = rospy.Time.now()
             jt_traj.joint_names = list(self.joint_names)
@@ -1191,58 +1203,6 @@ class ROSRobot(rtb.Robot):
                self.pose_server.set_succeeded(
                  MoveToPoseResult(success=False), 'Could not switch controllers to run'
                )
-
-    def trajectory_collision_checker(self, traj) -> bool:
-        # Attempt to slice the trajectory into bit-size chuncks to speed up collision check
-        # NOTE: doesn't need to check every state in trajectory, as spatially stepping will find links in collision
-        # NOTE: the smaller the step thresh is, the less points used for checking (resulting in faster execution)
-        # TODO: check this assumption holds true
-        step_thresh = 10
-        step_value = int(len(traj.s) / step_thresh) if int(len(traj.s) / step_thresh) > 0 else 1
-        
-        # Create marker array for representing trajectory
-        marker_traj = Marker()
-        marker_traj.header.frame_id = self.base_link.name
-        marker_traj.header.stamp = rospy.Time.now()
-        marker_traj.action = Marker.ADD
-        marker_traj.pose.orientation.w = 1
-        marker_traj.id = 0
-        marker_traj.type = Marker.LINE_STRIP
-        marker_traj.scale.x = 0.01
-        # Default to Green Markers
-        marker_traj.color.g = 1.0
-        marker_traj.color.a = 1.0
-
-        # Initial empty publish
-        marker_traj.points = []
-        self.display_traj_publisher.publish(marker_traj)
-
-        rospy.loginfo(f"Traj len: {len(traj.s)} | with step value: {step_value}")
-        go = True
-        with Timer("Full Trajectory Collision Check", enabled=True):
-            for idx in range(0,len(traj.s),step_value):
-                
-                # Calculate end-effector pose and extract translation component
-                pose = self.ets(start=self.base_link, end=self.gripper).eval(traj.s[idx])
-                extracted_t = pose[:3, 3]
-
-                # Update marker trajectory for visual representation
-                p = Point()
-                p.x = extracted_t[0]
-                p.y = extracted_t[1]
-                p.z = extracted_t[2]
-                marker_traj.points.append(p)
-
-                print(f"extracted translation: {extracted_t}")
-                if self.check_collision_per_state(q=traj.s[idx]) == False:
-                    # Terminate on collision check failure
-                    go=False
-                    break
-
-        # Publish marker (regardless of failure case for visual identification)
-        self.display_traj_publisher.publish(marker_traj)
-        # Output go based on passing collision check
-        return go
 
     def step_cb(self, goal: MoveToPoseGoal) -> None:
         """
@@ -2024,9 +1984,6 @@ class ROSRobot(rtb.Robot):
     # --------------------------------------------------------------------- #
     # --------- Collision and Singularity Checking Services --------------- #
     # --------------------------------------------------------------------- #
-    def add_collision_obj(self, obj):
-        self.collision_obj_list.append(obj)
-
     def get_collision_check_window(self, req: EmptyRequest) -> EmptyResponse:
         """
         TODO: add this
@@ -2150,6 +2107,197 @@ class ROSRobot(rtb.Robot):
     # --------------------------------------------------------------------- #
     # --------- Collision and Singularity Checking Methods ---------------- #
     # --------------------------------------------------------------------- #
+    def add_collision_obj(self, obj):
+        """
+        Simple mechanism for adding a shape object to the collision list
+        NOTE: only for debugging purposes
+        """
+        self.collision_obj_list.append(obj)
+
+    def query_kd_nn_collision_tree(self, sliced_links: list = [], dim: int = 5, debug: bool = False) -> list:
+        """
+        Given a list of links (sliced), this method returns nearest neighbor links for collision checking
+        Aims to improve efficiency by identifying dim closest objects for collision checking per link
+        """
+        # Early termination
+        if sliced_links == None or sliced_links == []:
+            rospy.logerr(f"target links: {sliced_links} is not valid. Exiting...")
+            return []
+
+        # print(f"cylinder link check: {self.link_dict['cylinder_link']}")
+
+        check_links = []
+        for sliced_link in sliced_links:
+            # Early termination on error
+            if sliced_link.name not in self.link_dict.keys():
+                rospy.logerr(f"Given sliced link: {sliced_link.name} is not valid. Skipping...")
+                continue
+
+            # Debugging print of the shapes within collision
+            # start = timeit.default_timer()
+            updated_ignore_list = self.overlapped_link_dict[sliced_link.name]
+            updated_ignore_list.append(sliced_link.name)
+            # print(updated_ignore_list)
+
+            # Create a new dictionary of target links ignoring known collision links (and self)
+            new_dict = {key: val for key, val in self.collision_dict.items() if key not in updated_ignore_list}
+            # print(f"new dict: {new_dict}")
+
+            # Get distance of each link (within new dictionary) to provided target
+            # link_pose_dict = {
+            #     link_name: self.ets(start=self.link_dict[sliced_link.name], end=self.link_dict[link_name]).eval(self.q)[:3, 3] 
+            #     for link_name in new_dict.keys() if link_name in self.link_dict.keys()
+            # }
+
+            # print(f"link pose dict from target: {link_pose_dict}")
+            target_shape_translations = []
+            link_pose_dict = {}
+            for link, shapes in new_dict.items():
+                if link not in new_dict.keys():
+                    continue
+                
+                # Link is in our dictionary (new_dict) but not in the robot's link dict (not part of the robot by default)
+                # This would represent a object added dynamically during runtime (as other objects would belong to the robot)
+                # TODO: find a solution that doesn't need this added 'fix'
+                if link not in self.link_dict.keys():
+                    for shape in new_dict[link]:
+                        translation = shape.T[:3,3]
+                        target_shape_translations.append(shape.T[:3,3])
+
+                    # Takes the last shape for main translation check (for now)
+                    # TODO: handle this better for multi-shape representations of dynamic objects
+                    link_pose_dict[link] = translation
+                else:
+                    # Link is part of current robot tree. Get ETS from target 
+                    translation = self.ets(start=self.base_link, end=self.link_dict[link]).eval(self.q)[:3, 3]
+                    link_pose_dict[link] = translation
+                    target_shape_translations.append(translation)
+
+            # Create a tree for look up
+            tree = KDTree(data=target_shape_translations)
+            target_position = self.ets(start=self.base_link, end=sliced_link).eval(self.q)[:3, 3]
+            # Test query of nearest neighbors for a specific shape (3D) as origin (given tree is from source)
+            dist, ind = tree.query(X=[target_position], k=dim)
+            # print(f"dist: {dist} | links: {[list(link_pose_dict.keys())[i] for i in ind[0]]}")
+
+            check_links.append([list(link_pose_dict.keys())[i] for i in ind[0]])
+       
+        # print(f"single shape collision check: {1/(end-start)} hz")
+        if debug:
+            #### -- DEBUGGING DISPLAY IN RVIZ OF TARGET MARKERS --- ####
+            marker_array=[]
+            counter = 0
+            for idx in ind[0]:
+                link_to_map = list(link_pose_dict.keys())[idx]
+
+                for shape in new_dict[link_to_map]:
+                    # Default setup of marker header
+                    marker = Marker()
+
+                    # NOTE: this is currently an assumption as dynamic objects as easily added with respect to base link
+                    # TODO: add with respect to any frame would be good
+                    if link_to_map not in self.link_dict.keys():
+                        marker.header.frame_id = self.base_link.name
+                    else:
+                        marker.header.frame_id = link_to_map
+
+                    marker.header.stamp = rospy.Time.now()
+                    if shape.stype == 'sphere':
+                        marker.type = 2
+                        # Expects diameter (m)
+                        marker.scale.x = shape.radius * 2
+                        marker.scale.y = shape.radius * 2
+                        marker.scale.z = shape.radius * 2
+                    elif shape.stype == 'cylinder':
+                        marker.type = 3
+
+                        # Expects diameter (m)
+                        marker.scale.x = shape.radius * 2
+                        marker.scale.y = shape.radius * 2
+                        marker.scale.z = shape.length
+                    else:
+                        break
+                
+                    marker.id = counter
+                    pose_se3 = sm.SE3(shape.T[:3, 3])
+                    marker.pose.position = Point(*pose_se3.t)
+                    marker.color.r = 0
+                    marker.color.g = 1
+                    marker.color.b = 0
+                    marker.color.a = 0.25
+                    counter+=1
+
+                    marker_array.append(marker)
+
+            # Publish array of markers
+            self.collision_debug_publisher.publish(marker_array)
+
+        return check_links
+
+    def trajectory_collision_checker(self, traj) -> bool:
+        """
+        - Checks against a given trajectory (per state) if a collision is found
+        - Outputs a debugging marker trail of path for visualisation
+        
+        Returns True valid (no collisions), otherwise False if found
+        """
+        # Attempt to slice the trajectory into bit-size chuncks to speed up collision check
+        # NOTE: doesn't need to check every state in trajectory, as spatially stepping will find links in collision
+        # NOTE: the smaller the step thresh is, the less points used for checking (resulting in faster execution)
+        # TODO: check this assumption holds true
+        step_thresh = 10
+        step_value = int(len(traj.s) / step_thresh) if int(len(traj.s) / step_thresh) > 0 else 1
+        
+        # Create marker array for representing trajectory
+        marker_traj = Marker()
+        marker_traj.header.frame_id = self.base_link.name
+        marker_traj.header.stamp = rospy.Time.now()
+        marker_traj.action = Marker.ADD
+        marker_traj.pose.orientation.w = 1
+        marker_traj.id = 0
+        marker_traj.type = Marker.LINE_STRIP
+        marker_traj.scale.x = 0.01
+        # Default to Green Markers
+        marker_traj.color.g = 1.0
+        marker_traj.color.a = 1.0
+
+        # Initial empty publish
+        marker_traj.points = []
+        self.display_traj_publisher.publish(marker_traj)
+
+        rospy.loginfo(f"Traj len: {len(traj.s)} | with step value: {step_value}")
+        go = True
+        with Timer("Full Trajectory Collision Check", enabled=True):
+            for idx in range(0,len(traj.s),step_value):
+                
+                # Calculate end-effector pose and extract translation component
+                pose = self.ets(start=self.base_link, end=self.gripper).eval(traj.s[idx])
+                extracted_t = pose[:3, 3]
+
+                # Update marker trajectory for visual representation
+                p = Point()
+                p.x = extracted_t[0]
+                p.y = extracted_t[1]
+                p.z = extracted_t[2]
+                marker_traj.points.append(p)
+
+                print(f"extracted translation: {extracted_t}")
+                if self.check_collision_per_state(q=traj.s[idx]) == False:
+                    # Terminate on collision check failure
+                    # TODO: add red component to trail to signify collision
+                    # NOTE: currently terminates on collision for speed and efficiency
+                    #       could continue (regardless) to show 'full' trajectory with collision
+                    #       component highlighted? Note, that speed is a function of 
+                    #       step_thresh (currently yields approx. 30Hz on calculation 
+                    #       for a 500 sample size traj at a step_tresh of 10)
+                    go=False
+                    break
+
+        # Publish marker (regardless of failure case for visual identification)
+        self.display_traj_publisher.publish(marker_traj)
+        # Output go based on passing collision check
+        return go
+    
     def get_link_collision_dict(self) -> dict():
         """
         Returns a dictionary of all associated links (names) which lists their respective collision data
@@ -2919,7 +3067,7 @@ class ROSRobot(rtb.Robot):
         self.last_tick = current_time
 
         self.state_publisher.publish(self.state)
-        # TESTING Marker Publisher (RVIZ)
+        # Publishes any dynamically added shapes/collision objects to RVIZ for debugging
         self.marker_publisher()
 
         self.event.set()

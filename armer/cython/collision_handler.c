@@ -1707,34 +1707,6 @@ static CYTHON_INLINE PyObject* __Pyx_PyObject_CallMethO(PyObject *func, PyObject
 #define __Pyx_PyObject_FastCall(func, args, nargs)  __Pyx_PyObject_FastCallDict(func, args, (size_t)(nargs), NULL)
 static CYTHON_INLINE PyObject* __Pyx_PyObject_FastCallDict(PyObject *func, PyObject **args, size_t nargs, PyObject *kwargs);
 
-/* IncludeStringH.proto */
-#include <string.h>
-
-/* BytesEquals.proto */
-static CYTHON_INLINE int __Pyx_PyBytes_Equals(PyObject* s1, PyObject* s2, int equals);
-
-/* UnicodeEquals.proto */
-static CYTHON_INLINE int __Pyx_PyUnicode_Equals(PyObject* s1, PyObject* s2, int equals);
-
-/* StrEquals.proto */
-#if PY_MAJOR_VERSION >= 3
-#define __Pyx_PyString_Equals __Pyx_PyUnicode_Equals
-#else
-#define __Pyx_PyString_Equals __Pyx_PyBytes_Equals
-#endif
-
-/* PyDictContains.proto */
-static CYTHON_INLINE int __Pyx_PyDict_ContainsTF(PyObject* item, PyObject* dict, int eq) {
-    int result = PyDict_Contains(dict, item);
-    return unlikely(result < 0) ? result : (result == (eq == Py_EQ));
-}
-
-/* PySequenceContains.proto */
-static CYTHON_INLINE int __Pyx_PySequence_ContainsTF(PyObject* item, PyObject* seq, int eq) {
-    int result = PySequence_Contains(seq, item);
-    return unlikely(result < 0) ? result : (result == (eq == Py_EQ));
-}
-
 /* RaiseTooManyValuesToUnpack.proto */
 static CYTHON_INLINE void __Pyx_RaiseTooManyValuesError(Py_ssize_t expected);
 
@@ -1752,6 +1724,15 @@ static int __Pyx_IternextUnpackEndCheck(PyObject *retval, Py_ssize_t expected);
 static CYTHON_INLINE PyObject* __Pyx_PyList_FromArray(PyObject *const *src, Py_ssize_t n);
 static CYTHON_INLINE PyObject* __Pyx_PyTuple_FromArray(PyObject *const *src, Py_ssize_t n);
 #endif
+
+/* IncludeStringH.proto */
+#include <string.h>
+
+/* BytesEquals.proto */
+static CYTHON_INLINE int __Pyx_PyBytes_Equals(PyObject* s1, PyObject* s2, int equals);
+
+/* UnicodeEquals.proto */
+static CYTHON_INLINE int __Pyx_PyUnicode_Equals(PyObject* s1, PyObject* s2, int equals);
 
 /* fastcall.proto */
 #if CYTHON_AVOID_BORROWED_REFS
@@ -1819,6 +1800,25 @@ static int __Pyx_ParseOptionalKeywords(PyObject *kwds, PyObject *const *kwvalues
     ((likely(__Pyx_IS_TYPE(obj, type) | (none_allowed && (obj == Py_None)))) ? 1 :\
         __Pyx__ArgTypeTest(obj, type, name, exact))
 static int __Pyx__ArgTypeTest(PyObject *obj, PyTypeObject *type, const char *name, int exact);
+
+/* StrEquals.proto */
+#if PY_MAJOR_VERSION >= 3
+#define __Pyx_PyString_Equals __Pyx_PyUnicode_Equals
+#else
+#define __Pyx_PyString_Equals __Pyx_PyBytes_Equals
+#endif
+
+/* PyDictContains.proto */
+static CYTHON_INLINE int __Pyx_PyDict_ContainsTF(PyObject* item, PyObject* dict, int eq) {
+    int result = PyDict_Contains(dict, item);
+    return unlikely(result < 0) ? result : (result == (eq == Py_EQ));
+}
+
+/* PySequenceContains.proto */
+static CYTHON_INLINE int __Pyx_PySequence_ContainsTF(PyObject* item, PyObject* seq, int eq) {
+    int result = PySequence_Contains(seq, item);
+    return unlikely(result < 0) ? result : (result == (eq == Py_EQ));
+}
 
 /* IncludeStructmemberH.proto */
 #include <structmember.h>
@@ -2081,7 +2081,8 @@ static int __Pyx_InitStrings(__Pyx_StringTabEntry *t);
 /* Module declarations from "cython" */
 
 /* Module declarations from "collision_handler" */
-static int __pyx_f_17collision_handler_global_check(PyObject *, PyObject *, int, PyObject *, int, PyObject *, PyObject *, int __pyx_skip_dispatch); /*proto*/
+static int __pyx_f_17collision_handler_col_check(PyObject *, PyObject *, int, PyObject *, int __pyx_skip_dispatch); /*proto*/
+static int __pyx_f_17collision_handler_global_check(PyObject *, PyObject *, int, PyObject *, int, PyObject *, PyObject *, PyObject *, int __pyx_skip_dispatch); /*proto*/
 static int __pyx_f_17collision_handler_test(int, int, int __pyx_skip_dispatch); /*proto*/
 /* #### Code section: typeinfo ### */
 /* #### Code section: before_global_var ### */
@@ -2093,7 +2094,7 @@ int __pyx_module_is_main_collision_handler = 0;
 /* #### Code section: global_var ### */
 static PyObject *__pyx_builtin_range;
 /* #### Code section: string_decls ### */
-static const char __pyx_k__5[] = "?";
+static const char __pyx_k__7[] = "?";
 static const char __pyx_k_copy[] = "copy";
 static const char __pyx_k_main[] = "__main__";
 static const char __pyx_k_name[] = "name";
@@ -2103,24 +2104,28 @@ static const char __pyx_k_val2[] = "val2";
 static const char __pyx_k_range[] = "range";
 static const char __pyx_k_name_2[] = "__name__";
 static const char __pyx_k_test_2[] = "__test__";
+static const char __pyx_k_col_check[] = "col_check";
 static const char __pyx_k_collision[] = "collision";
 static const char __pyx_k_len_links[] = "len_links";
 static const char __pyx_k_len_robots[] = "len_robots";
 static const char __pyx_k_robot_name[] = "robot_name";
+static const char __pyx_k_check_links[] = "check_links";
 static const char __pyx_k_global_dict[] = "global_dict";
 static const char __pyx_k_robot_links[] = "robot_links";
 static const char __pyx_k_robot_names[] = "robot_names";
 static const char __pyx_k_global_check[] = "global_check";
 static const char __pyx_k_is_coroutine[] = "_is_coroutine";
 static const char __pyx_k_overlap_dict[] = "overlap_dict";
+static const char __pyx_k_sliced_links[] = "sliced_links";
 static const char __pyx_k_closest_point[] = "closest_point";
 static const char __pyx_k_collision_handler[] = "collision_handler";
 static const char __pyx_k_asyncio_coroutines[] = "asyncio.coroutines";
 static const char __pyx_k_cline_in_traceback[] = "cline_in_traceback";
 static const char __pyx_k_armer_cython_collision_handler_p[] = "armer/cython/collision_handler.pyx";
 /* #### Code section: decls ### */
-static PyObject *__pyx_pf_17collision_handler_global_check(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_robot_name, PyObject *__pyx_v_robot_names, int __pyx_v_len_robots, PyObject *__pyx_v_robot_links, int __pyx_v_len_links, PyObject *__pyx_v_global_dict, PyObject *__pyx_v_overlap_dict); /* proto */
-static PyObject *__pyx_pf_17collision_handler_2test(CYTHON_UNUSED PyObject *__pyx_self, int __pyx_v_val1, int __pyx_v_val2); /* proto */
+static PyObject *__pyx_pf_17collision_handler_col_check(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_sliced_links, PyObject *__pyx_v_check_links, int __pyx_v_len_links, PyObject *__pyx_v_global_dict); /* proto */
+static PyObject *__pyx_pf_17collision_handler_2global_check(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_robot_name, PyObject *__pyx_v_robot_names, int __pyx_v_len_robots, PyObject *__pyx_v_robot_links, int __pyx_v_len_links, PyObject *__pyx_v_global_dict, PyObject *__pyx_v_overlap_dict, PyObject *__pyx_v_check_links); /* proto */
+static PyObject *__pyx_pf_17collision_handler_4test(CYTHON_UNUSED PyObject *__pyx_self, int __pyx_v_val1, int __pyx_v_val2); /* proto */
 /* #### Code section: late_includes ### */
 /* #### Code section: module_state ### */
 typedef struct {
@@ -2152,11 +2157,13 @@ typedef struct {
   #endif
   #if CYTHON_USE_MODULE_STATE
   #endif
-  PyObject *__pyx_n_s__5;
+  PyObject *__pyx_n_s__7;
   PyObject *__pyx_kp_s_armer_cython_collision_handler_p;
   PyObject *__pyx_n_s_asyncio_coroutines;
+  PyObject *__pyx_n_s_check_links;
   PyObject *__pyx_n_s_cline_in_traceback;
   PyObject *__pyx_n_s_closest_point;
+  PyObject *__pyx_n_s_col_check;
   PyObject *__pyx_n_s_collision;
   PyObject *__pyx_n_s_collision_handler;
   PyObject *__pyx_n_s_copy;
@@ -2173,6 +2180,7 @@ typedef struct {
   PyObject *__pyx_n_s_robot_links;
   PyObject *__pyx_n_s_robot_name;
   PyObject *__pyx_n_s_robot_names;
+  PyObject *__pyx_n_s_sliced_links;
   PyObject *__pyx_n_s_test;
   PyObject *__pyx_n_s_test_2;
   PyObject *__pyx_n_s_val1;
@@ -2180,8 +2188,10 @@ typedef struct {
   PyObject *__pyx_int_0;
   PyObject *__pyx_tuple_;
   PyObject *__pyx_tuple__3;
+  PyObject *__pyx_tuple__5;
   PyObject *__pyx_codeobj__2;
   PyObject *__pyx_codeobj__4;
+  PyObject *__pyx_codeobj__6;
 } __pyx_mstate;
 
 #if CYTHON_USE_MODULE_STATE
@@ -2224,11 +2234,13 @@ static int __pyx_m_clear(PyObject *m) {
   #ifdef __Pyx_FusedFunction_USED
   Py_CLEAR(clear_module_state->__pyx_FusedFunctionType);
   #endif
-  Py_CLEAR(clear_module_state->__pyx_n_s__5);
+  Py_CLEAR(clear_module_state->__pyx_n_s__7);
   Py_CLEAR(clear_module_state->__pyx_kp_s_armer_cython_collision_handler_p);
   Py_CLEAR(clear_module_state->__pyx_n_s_asyncio_coroutines);
+  Py_CLEAR(clear_module_state->__pyx_n_s_check_links);
   Py_CLEAR(clear_module_state->__pyx_n_s_cline_in_traceback);
   Py_CLEAR(clear_module_state->__pyx_n_s_closest_point);
+  Py_CLEAR(clear_module_state->__pyx_n_s_col_check);
   Py_CLEAR(clear_module_state->__pyx_n_s_collision);
   Py_CLEAR(clear_module_state->__pyx_n_s_collision_handler);
   Py_CLEAR(clear_module_state->__pyx_n_s_copy);
@@ -2245,6 +2257,7 @@ static int __pyx_m_clear(PyObject *m) {
   Py_CLEAR(clear_module_state->__pyx_n_s_robot_links);
   Py_CLEAR(clear_module_state->__pyx_n_s_robot_name);
   Py_CLEAR(clear_module_state->__pyx_n_s_robot_names);
+  Py_CLEAR(clear_module_state->__pyx_n_s_sliced_links);
   Py_CLEAR(clear_module_state->__pyx_n_s_test);
   Py_CLEAR(clear_module_state->__pyx_n_s_test_2);
   Py_CLEAR(clear_module_state->__pyx_n_s_val1);
@@ -2252,8 +2265,10 @@ static int __pyx_m_clear(PyObject *m) {
   Py_CLEAR(clear_module_state->__pyx_int_0);
   Py_CLEAR(clear_module_state->__pyx_tuple_);
   Py_CLEAR(clear_module_state->__pyx_tuple__3);
+  Py_CLEAR(clear_module_state->__pyx_tuple__5);
   Py_CLEAR(clear_module_state->__pyx_codeobj__2);
   Py_CLEAR(clear_module_state->__pyx_codeobj__4);
+  Py_CLEAR(clear_module_state->__pyx_codeobj__6);
   return 0;
 }
 #endif
@@ -2274,11 +2289,13 @@ static int __pyx_m_traverse(PyObject *m, visitproc visit, void *arg) {
   #ifdef __Pyx_FusedFunction_USED
   Py_VISIT(traverse_module_state->__pyx_FusedFunctionType);
   #endif
-  Py_VISIT(traverse_module_state->__pyx_n_s__5);
+  Py_VISIT(traverse_module_state->__pyx_n_s__7);
   Py_VISIT(traverse_module_state->__pyx_kp_s_armer_cython_collision_handler_p);
   Py_VISIT(traverse_module_state->__pyx_n_s_asyncio_coroutines);
+  Py_VISIT(traverse_module_state->__pyx_n_s_check_links);
   Py_VISIT(traverse_module_state->__pyx_n_s_cline_in_traceback);
   Py_VISIT(traverse_module_state->__pyx_n_s_closest_point);
+  Py_VISIT(traverse_module_state->__pyx_n_s_col_check);
   Py_VISIT(traverse_module_state->__pyx_n_s_collision);
   Py_VISIT(traverse_module_state->__pyx_n_s_collision_handler);
   Py_VISIT(traverse_module_state->__pyx_n_s_copy);
@@ -2295,6 +2312,7 @@ static int __pyx_m_traverse(PyObject *m, visitproc visit, void *arg) {
   Py_VISIT(traverse_module_state->__pyx_n_s_robot_links);
   Py_VISIT(traverse_module_state->__pyx_n_s_robot_name);
   Py_VISIT(traverse_module_state->__pyx_n_s_robot_names);
+  Py_VISIT(traverse_module_state->__pyx_n_s_sliced_links);
   Py_VISIT(traverse_module_state->__pyx_n_s_test);
   Py_VISIT(traverse_module_state->__pyx_n_s_test_2);
   Py_VISIT(traverse_module_state->__pyx_n_s_val1);
@@ -2302,8 +2320,10 @@ static int __pyx_m_traverse(PyObject *m, visitproc visit, void *arg) {
   Py_VISIT(traverse_module_state->__pyx_int_0);
   Py_VISIT(traverse_module_state->__pyx_tuple_);
   Py_VISIT(traverse_module_state->__pyx_tuple__3);
+  Py_VISIT(traverse_module_state->__pyx_tuple__5);
   Py_VISIT(traverse_module_state->__pyx_codeobj__2);
   Py_VISIT(traverse_module_state->__pyx_codeobj__4);
+  Py_VISIT(traverse_module_state->__pyx_codeobj__6);
   return 0;
 }
 #endif
@@ -2336,11 +2356,13 @@ static int __pyx_m_traverse(PyObject *m, visitproc visit, void *arg) {
 #endif
 #if CYTHON_USE_MODULE_STATE
 #endif
-#define __pyx_n_s__5 __pyx_mstate_global->__pyx_n_s__5
+#define __pyx_n_s__7 __pyx_mstate_global->__pyx_n_s__7
 #define __pyx_kp_s_armer_cython_collision_handler_p __pyx_mstate_global->__pyx_kp_s_armer_cython_collision_handler_p
 #define __pyx_n_s_asyncio_coroutines __pyx_mstate_global->__pyx_n_s_asyncio_coroutines
+#define __pyx_n_s_check_links __pyx_mstate_global->__pyx_n_s_check_links
 #define __pyx_n_s_cline_in_traceback __pyx_mstate_global->__pyx_n_s_cline_in_traceback
 #define __pyx_n_s_closest_point __pyx_mstate_global->__pyx_n_s_closest_point
+#define __pyx_n_s_col_check __pyx_mstate_global->__pyx_n_s_col_check
 #define __pyx_n_s_collision __pyx_mstate_global->__pyx_n_s_collision
 #define __pyx_n_s_collision_handler __pyx_mstate_global->__pyx_n_s_collision_handler
 #define __pyx_n_s_copy __pyx_mstate_global->__pyx_n_s_copy
@@ -2357,6 +2379,7 @@ static int __pyx_m_traverse(PyObject *m, visitproc visit, void *arg) {
 #define __pyx_n_s_robot_links __pyx_mstate_global->__pyx_n_s_robot_links
 #define __pyx_n_s_robot_name __pyx_mstate_global->__pyx_n_s_robot_name
 #define __pyx_n_s_robot_names __pyx_mstate_global->__pyx_n_s_robot_names
+#define __pyx_n_s_sliced_links __pyx_mstate_global->__pyx_n_s_sliced_links
 #define __pyx_n_s_test __pyx_mstate_global->__pyx_n_s_test
 #define __pyx_n_s_test_2 __pyx_mstate_global->__pyx_n_s_test_2
 #define __pyx_n_s_val1 __pyx_mstate_global->__pyx_n_s_val1
@@ -2364,11 +2387,598 @@ static int __pyx_m_traverse(PyObject *m, visitproc visit, void *arg) {
 #define __pyx_int_0 __pyx_mstate_global->__pyx_int_0
 #define __pyx_tuple_ __pyx_mstate_global->__pyx_tuple_
 #define __pyx_tuple__3 __pyx_mstate_global->__pyx_tuple__3
+#define __pyx_tuple__5 __pyx_mstate_global->__pyx_tuple__5
 #define __pyx_codeobj__2 __pyx_mstate_global->__pyx_codeobj__2
 #define __pyx_codeobj__4 __pyx_mstate_global->__pyx_codeobj__4
+#define __pyx_codeobj__6 __pyx_mstate_global->__pyx_codeobj__6
 /* #### Code section: module_code ### */
 
 /* "collision_handler.pyx":5
+ * # Ignore negative indice checking (i.e., a[-1])
+ * @cython.wraparound(False)
+ * cpdef int col_check(list sliced_links, list check_links, int len_links, dict global_dict):             # <<<<<<<<<<<<<<
+ * 
+ *   cdef int s_idx
+ */
+
+static PyObject *__pyx_pw_17collision_handler_1col_check(PyObject *__pyx_self, 
+#if CYTHON_METH_FASTCALL
+PyObject *const *__pyx_args, Py_ssize_t __pyx_nargs, PyObject *__pyx_kwds
+#else
+PyObject *__pyx_args, PyObject *__pyx_kwds
+#endif
+); /*proto*/
+static int __pyx_f_17collision_handler_col_check(PyObject *__pyx_v_sliced_links, PyObject *__pyx_v_check_links, int __pyx_v_len_links, PyObject *__pyx_v_global_dict, CYTHON_UNUSED int __pyx_skip_dispatch) {
+  int __pyx_v_s_idx;
+  int __pyx_v_e_idx;
+  int __pyx_v_eval_link_list_len;
+  int __pyx_v_col_list_len;
+  int __pyx_v_chk_list_len;
+  PyObject *__pyx_v_t_link_names = 0;
+  PyObject *__pyx_v_col_list = 0;
+  PyObject *__pyx_v_c_check_list = 0;
+  int __pyx_v_chk_idx;
+  PyObject *__pyx_v_obj = NULL;
+  int __pyx_v_col_idx;
+  PyObject *__pyx_v_t_obj = NULL;
+  PyObject *__pyx_v_d = NULL;
+  CYTHON_UNUSED PyObject *__pyx_v__ = NULL;
+  int __pyx_r;
+  __Pyx_RefNannyDeclarations
+  int __pyx_t_1;
+  int __pyx_t_2;
+  int __pyx_t_3;
+  PyObject *__pyx_t_4 = NULL;
+  PyObject *__pyx_t_5 = NULL;
+  Py_ssize_t __pyx_t_6;
+  int __pyx_t_7;
+  int __pyx_t_8;
+  int __pyx_t_9;
+  int __pyx_t_10;
+  int __pyx_t_11;
+  int __pyx_t_12;
+  int __pyx_t_13;
+  int __pyx_t_14;
+  int __pyx_t_15;
+  PyObject *__pyx_t_16 = NULL;
+  int __pyx_t_17;
+  PyObject *__pyx_t_18 = NULL;
+  PyObject *__pyx_t_19 = NULL;
+  PyObject *(*__pyx_t_20)(PyObject *);
+  int __pyx_t_21;
+  int __pyx_t_22;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("col_check", 1);
+
+  /* "collision_handler.pyx":16
+ *   cdef list c_check_list
+ * 
+ *   for s_idx in range(len_links):             # <<<<<<<<<<<<<<
+ *     # Get the current current slice link's collision objects to check against
+ *     col_list = list(sliced_links[s_idx].collision)
+ */
+  __pyx_t_1 = __pyx_v_len_links;
+  __pyx_t_2 = __pyx_t_1;
+  for (__pyx_t_3 = 0; __pyx_t_3 < __pyx_t_2; __pyx_t_3+=1) {
+    __pyx_v_s_idx = __pyx_t_3;
+
+    /* "collision_handler.pyx":18
+ *   for s_idx in range(len_links):
+ *     # Get the current current slice link's collision objects to check against
+ *     col_list = list(sliced_links[s_idx].collision)             # <<<<<<<<<<<<<<
+ *     col_list_len = len(col_list)
+ * 
+ */
+    if (unlikely(__pyx_v_sliced_links == Py_None)) {
+      PyErr_SetString(PyExc_TypeError, "'NoneType' object is not subscriptable");
+      __PYX_ERR(0, 18, __pyx_L1_error)
+    }
+    __pyx_t_4 = __Pyx_GetItemInt_List(__pyx_v_sliced_links, __pyx_v_s_idx, int, 1, __Pyx_PyInt_From_int, 1, 0, 1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 18, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_4);
+    __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_4, __pyx_n_s_collision); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 18, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_5);
+    __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+    __pyx_t_4 = __Pyx_PySequence_ListKeepNew(__pyx_t_5); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 18, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_4);
+    __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+    __Pyx_XDECREF_SET(__pyx_v_col_list, ((PyObject*)__pyx_t_4));
+    __pyx_t_4 = 0;
+
+    /* "collision_handler.pyx":19
+ *     # Get the current current slice link's collision objects to check against
+ *     col_list = list(sliced_links[s_idx].collision)
+ *     col_list_len = len(col_list)             # <<<<<<<<<<<<<<
+ * 
+ *     # Get target links as list
+ */
+    __pyx_t_6 = __Pyx_PyList_GET_SIZE(__pyx_v_col_list); if (unlikely(__pyx_t_6 == ((Py_ssize_t)-1))) __PYX_ERR(0, 19, __pyx_L1_error)
+    __pyx_v_col_list_len = __pyx_t_6;
+
+    /* "collision_handler.pyx":22
+ * 
+ *     # Get target links as list
+ *     t_link_names = check_links[s_idx]             # <<<<<<<<<<<<<<
+ *     eval_link_list_len = len(t_link_names)
+ *     for e_idx in range(eval_link_list_len):
+ */
+    if (unlikely(__pyx_v_check_links == Py_None)) {
+      PyErr_SetString(PyExc_TypeError, "'NoneType' object is not subscriptable");
+      __PYX_ERR(0, 22, __pyx_L1_error)
+    }
+    __pyx_t_4 = __Pyx_GetItemInt_List(__pyx_v_check_links, __pyx_v_s_idx, int, 1, __Pyx_PyInt_From_int, 1, 0, 1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 22, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_4);
+    if (!(likely(PyList_CheckExact(__pyx_t_4))||((__pyx_t_4) == Py_None) || __Pyx_RaiseUnexpectedTypeError("list", __pyx_t_4))) __PYX_ERR(0, 22, __pyx_L1_error)
+    __Pyx_XDECREF_SET(__pyx_v_t_link_names, ((PyObject*)__pyx_t_4));
+    __pyx_t_4 = 0;
+
+    /* "collision_handler.pyx":23
+ *     # Get target links as list
+ *     t_link_names = check_links[s_idx]
+ *     eval_link_list_len = len(t_link_names)             # <<<<<<<<<<<<<<
+ *     for e_idx in range(eval_link_list_len):
+ *       # Extract the evaluation robot link's collision object list for checking
+ */
+    if (unlikely(__pyx_v_t_link_names == Py_None)) {
+      PyErr_SetString(PyExc_TypeError, "object of type 'NoneType' has no len()");
+      __PYX_ERR(0, 23, __pyx_L1_error)
+    }
+    __pyx_t_6 = __Pyx_PyList_GET_SIZE(__pyx_v_t_link_names); if (unlikely(__pyx_t_6 == ((Py_ssize_t)-1))) __PYX_ERR(0, 23, __pyx_L1_error)
+    __pyx_v_eval_link_list_len = __pyx_t_6;
+
+    /* "collision_handler.pyx":24
+ *     t_link_names = check_links[s_idx]
+ *     eval_link_list_len = len(t_link_names)
+ *     for e_idx in range(eval_link_list_len):             # <<<<<<<<<<<<<<
+ *       # Extract the evaluation robot link's collision object list for checking
+ *       c_check_list = global_dict[t_link_names[e_idx]]
+ */
+    __pyx_t_7 = __pyx_v_eval_link_list_len;
+    __pyx_t_8 = __pyx_t_7;
+    for (__pyx_t_9 = 0; __pyx_t_9 < __pyx_t_8; __pyx_t_9+=1) {
+      __pyx_v_e_idx = __pyx_t_9;
+
+      /* "collision_handler.pyx":26
+ *     for e_idx in range(eval_link_list_len):
+ *       # Extract the evaluation robot link's collision object list for checking
+ *       c_check_list = global_dict[t_link_names[e_idx]]             # <<<<<<<<<<<<<<
+ *       chk_list_len = len(c_check_list)
+ * 
+ */
+      if (unlikely(__pyx_v_global_dict == Py_None)) {
+        PyErr_SetString(PyExc_TypeError, "'NoneType' object is not subscriptable");
+        __PYX_ERR(0, 26, __pyx_L1_error)
+      }
+      if (unlikely(__pyx_v_t_link_names == Py_None)) {
+        PyErr_SetString(PyExc_TypeError, "'NoneType' object is not subscriptable");
+        __PYX_ERR(0, 26, __pyx_L1_error)
+      }
+      __pyx_t_4 = __Pyx_GetItemInt_List(__pyx_v_t_link_names, __pyx_v_e_idx, int, 1, __Pyx_PyInt_From_int, 1, 0, 1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 26, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_4);
+      __pyx_t_5 = __Pyx_PyDict_GetItem(__pyx_v_global_dict, __pyx_t_4); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 26, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_5);
+      __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+      if (!(likely(PyList_CheckExact(__pyx_t_5))||((__pyx_t_5) == Py_None) || __Pyx_RaiseUnexpectedTypeError("list", __pyx_t_5))) __PYX_ERR(0, 26, __pyx_L1_error)
+      __Pyx_XDECREF_SET(__pyx_v_c_check_list, ((PyObject*)__pyx_t_5));
+      __pyx_t_5 = 0;
+
+      /* "collision_handler.pyx":27
+ *       # Extract the evaluation robot link's collision object list for checking
+ *       c_check_list = global_dict[t_link_names[e_idx]]
+ *       chk_list_len = len(c_check_list)             # <<<<<<<<<<<<<<
+ * 
+ *       for chk_idx in range(chk_list_len):
+ */
+      if (unlikely(__pyx_v_c_check_list == Py_None)) {
+        PyErr_SetString(PyExc_TypeError, "object of type 'NoneType' has no len()");
+        __PYX_ERR(0, 27, __pyx_L1_error)
+      }
+      __pyx_t_6 = __Pyx_PyList_GET_SIZE(__pyx_v_c_check_list); if (unlikely(__pyx_t_6 == ((Py_ssize_t)-1))) __PYX_ERR(0, 27, __pyx_L1_error)
+      __pyx_v_chk_list_len = __pyx_t_6;
+
+      /* "collision_handler.pyx":29
+ *       chk_list_len = len(c_check_list)
+ * 
+ *       for chk_idx in range(chk_list_len):             # <<<<<<<<<<<<<<
+ *         obj = c_check_list[chk_idx]
+ * 
+ */
+      __pyx_t_10 = __pyx_v_chk_list_len;
+      __pyx_t_11 = __pyx_t_10;
+      for (__pyx_t_12 = 0; __pyx_t_12 < __pyx_t_11; __pyx_t_12+=1) {
+        __pyx_v_chk_idx = __pyx_t_12;
+
+        /* "collision_handler.pyx":30
+ * 
+ *       for chk_idx in range(chk_list_len):
+ *         obj = c_check_list[chk_idx]             # <<<<<<<<<<<<<<
+ * 
+ *         for col_idx in range(col_list_len):
+ */
+        if (unlikely(__pyx_v_c_check_list == Py_None)) {
+          PyErr_SetString(PyExc_TypeError, "'NoneType' object is not subscriptable");
+          __PYX_ERR(0, 30, __pyx_L1_error)
+        }
+        __pyx_t_5 = __Pyx_GetItemInt_List(__pyx_v_c_check_list, __pyx_v_chk_idx, int, 1, __Pyx_PyInt_From_int, 1, 0, 1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 30, __pyx_L1_error)
+        __Pyx_GOTREF(__pyx_t_5);
+        __Pyx_XDECREF_SET(__pyx_v_obj, __pyx_t_5);
+        __pyx_t_5 = 0;
+
+        /* "collision_handler.pyx":32
+ *         obj = c_check_list[chk_idx]
+ * 
+ *         for col_idx in range(col_list_len):             # <<<<<<<<<<<<<<
+ *           t_obj = col_list[col_idx]
+ * 
+ */
+        __pyx_t_13 = __pyx_v_col_list_len;
+        __pyx_t_14 = __pyx_t_13;
+        for (__pyx_t_15 = 0; __pyx_t_15 < __pyx_t_14; __pyx_t_15+=1) {
+          __pyx_v_col_idx = __pyx_t_15;
+
+          /* "collision_handler.pyx":33
+ * 
+ *         for col_idx in range(col_list_len):
+ *           t_obj = col_list[col_idx]             # <<<<<<<<<<<<<<
+ * 
+ *           # Get the distance for comparison
+ */
+          __pyx_t_5 = __Pyx_GetItemInt_List(__pyx_v_col_list, __pyx_v_col_idx, int, 1, __Pyx_PyInt_From_int, 1, 0, 1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 33, __pyx_L1_error)
+          __Pyx_GOTREF(__pyx_t_5);
+          __Pyx_XDECREF_SET(__pyx_v_t_obj, __pyx_t_5);
+          __pyx_t_5 = 0;
+
+          /* "collision_handler.pyx":37
+ *           # Get the distance for comparison
+ *           # print(f"obj: {t_obj}")
+ *           d, _, _ = t_obj.closest_point(obj)             # <<<<<<<<<<<<<<
+ *           # print(f"d is: {d}")
+ *           if d is not None and d <= 0:
+ */
+          __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_v_t_obj, __pyx_n_s_closest_point); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 37, __pyx_L1_error)
+          __Pyx_GOTREF(__pyx_t_4);
+          __pyx_t_16 = NULL;
+          __pyx_t_17 = 0;
+          #if CYTHON_UNPACK_METHODS
+          if (likely(PyMethod_Check(__pyx_t_4))) {
+            __pyx_t_16 = PyMethod_GET_SELF(__pyx_t_4);
+            if (likely(__pyx_t_16)) {
+              PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_4);
+              __Pyx_INCREF(__pyx_t_16);
+              __Pyx_INCREF(function);
+              __Pyx_DECREF_SET(__pyx_t_4, function);
+              __pyx_t_17 = 1;
+            }
+          }
+          #endif
+          {
+            PyObject *__pyx_callargs[2] = {__pyx_t_16, __pyx_v_obj};
+            __pyx_t_5 = __Pyx_PyObject_FastCall(__pyx_t_4, __pyx_callargs+1-__pyx_t_17, 1+__pyx_t_17);
+            __Pyx_XDECREF(__pyx_t_16); __pyx_t_16 = 0;
+            if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 37, __pyx_L1_error)
+            __Pyx_GOTREF(__pyx_t_5);
+            __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+          }
+          if ((likely(PyTuple_CheckExact(__pyx_t_5))) || (PyList_CheckExact(__pyx_t_5))) {
+            PyObject* sequence = __pyx_t_5;
+            Py_ssize_t size = __Pyx_PySequence_SIZE(sequence);
+            if (unlikely(size != 3)) {
+              if (size > 3) __Pyx_RaiseTooManyValuesError(3);
+              else if (size >= 0) __Pyx_RaiseNeedMoreValuesError(size);
+              __PYX_ERR(0, 37, __pyx_L1_error)
+            }
+            #if CYTHON_ASSUME_SAFE_MACROS && !CYTHON_AVOID_BORROWED_REFS
+            if (likely(PyTuple_CheckExact(sequence))) {
+              __pyx_t_4 = PyTuple_GET_ITEM(sequence, 0); 
+              __pyx_t_16 = PyTuple_GET_ITEM(sequence, 1); 
+              __pyx_t_18 = PyTuple_GET_ITEM(sequence, 2); 
+            } else {
+              __pyx_t_4 = PyList_GET_ITEM(sequence, 0); 
+              __pyx_t_16 = PyList_GET_ITEM(sequence, 1); 
+              __pyx_t_18 = PyList_GET_ITEM(sequence, 2); 
+            }
+            __Pyx_INCREF(__pyx_t_4);
+            __Pyx_INCREF(__pyx_t_16);
+            __Pyx_INCREF(__pyx_t_18);
+            #else
+            __pyx_t_4 = PySequence_ITEM(sequence, 0); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 37, __pyx_L1_error)
+            __Pyx_GOTREF(__pyx_t_4);
+            __pyx_t_16 = PySequence_ITEM(sequence, 1); if (unlikely(!__pyx_t_16)) __PYX_ERR(0, 37, __pyx_L1_error)
+            __Pyx_GOTREF(__pyx_t_16);
+            __pyx_t_18 = PySequence_ITEM(sequence, 2); if (unlikely(!__pyx_t_18)) __PYX_ERR(0, 37, __pyx_L1_error)
+            __Pyx_GOTREF(__pyx_t_18);
+            #endif
+            __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+          } else {
+            Py_ssize_t index = -1;
+            __pyx_t_19 = PyObject_GetIter(__pyx_t_5); if (unlikely(!__pyx_t_19)) __PYX_ERR(0, 37, __pyx_L1_error)
+            __Pyx_GOTREF(__pyx_t_19);
+            __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+            __pyx_t_20 = __Pyx_PyObject_GetIterNextFunc(__pyx_t_19);
+            index = 0; __pyx_t_4 = __pyx_t_20(__pyx_t_19); if (unlikely(!__pyx_t_4)) goto __pyx_L11_unpacking_failed;
+            __Pyx_GOTREF(__pyx_t_4);
+            index = 1; __pyx_t_16 = __pyx_t_20(__pyx_t_19); if (unlikely(!__pyx_t_16)) goto __pyx_L11_unpacking_failed;
+            __Pyx_GOTREF(__pyx_t_16);
+            index = 2; __pyx_t_18 = __pyx_t_20(__pyx_t_19); if (unlikely(!__pyx_t_18)) goto __pyx_L11_unpacking_failed;
+            __Pyx_GOTREF(__pyx_t_18);
+            if (__Pyx_IternextUnpackEndCheck(__pyx_t_20(__pyx_t_19), 3) < 0) __PYX_ERR(0, 37, __pyx_L1_error)
+            __pyx_t_20 = NULL;
+            __Pyx_DECREF(__pyx_t_19); __pyx_t_19 = 0;
+            goto __pyx_L12_unpacking_done;
+            __pyx_L11_unpacking_failed:;
+            __Pyx_DECREF(__pyx_t_19); __pyx_t_19 = 0;
+            __pyx_t_20 = NULL;
+            if (__Pyx_IterFinish() == 0) __Pyx_RaiseNeedMoreValuesError(index);
+            __PYX_ERR(0, 37, __pyx_L1_error)
+            __pyx_L12_unpacking_done:;
+          }
+          __Pyx_XDECREF_SET(__pyx_v_d, __pyx_t_4);
+          __pyx_t_4 = 0;
+          __Pyx_XDECREF_SET(__pyx_v__, __pyx_t_16);
+          __pyx_t_16 = 0;
+          __Pyx_DECREF_SET(__pyx_v__, __pyx_t_18);
+          __pyx_t_18 = 0;
+
+          /* "collision_handler.pyx":39
+ *           d, _, _ = t_obj.closest_point(obj)
+ *           # print(f"d is: {d}")
+ *           if d is not None and d <= 0:             # <<<<<<<<<<<<<<
+ *             # Returns the link idx in collision
+ *             return s_idx
+ */
+          __pyx_t_22 = (__pyx_v_d != Py_None);
+          if (__pyx_t_22) {
+          } else {
+            __pyx_t_21 = __pyx_t_22;
+            goto __pyx_L14_bool_binop_done;
+          }
+          __pyx_t_5 = PyObject_RichCompare(__pyx_v_d, __pyx_int_0, Py_LE); __Pyx_XGOTREF(__pyx_t_5); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 39, __pyx_L1_error)
+          __pyx_t_22 = __Pyx_PyObject_IsTrue(__pyx_t_5); if (unlikely((__pyx_t_22 < 0))) __PYX_ERR(0, 39, __pyx_L1_error)
+          __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+          __pyx_t_21 = __pyx_t_22;
+          __pyx_L14_bool_binop_done:;
+          if (__pyx_t_21) {
+
+            /* "collision_handler.pyx":41
+ *           if d is not None and d <= 0:
+ *             # Returns the link idx in collision
+ *             return s_idx             # <<<<<<<<<<<<<<
+ * 
+ *   # Got here without issue
+ */
+            __pyx_r = __pyx_v_s_idx;
+            goto __pyx_L0;
+
+            /* "collision_handler.pyx":39
+ *           d, _, _ = t_obj.closest_point(obj)
+ *           # print(f"d is: {d}")
+ *           if d is not None and d <= 0:             # <<<<<<<<<<<<<<
+ *             # Returns the link idx in collision
+ *             return s_idx
+ */
+          }
+        }
+      }
+    }
+  }
+
+  /* "collision_handler.pyx":44
+ * 
+ *   # Got here without issue
+ *   return -1             # <<<<<<<<<<<<<<
+ * 
+ * # Ignore negative indice checking (i.e., a[-1])
+ */
+  __pyx_r = -1;
+  goto __pyx_L0;
+
+  /* "collision_handler.pyx":5
+ * # Ignore negative indice checking (i.e., a[-1])
+ * @cython.wraparound(False)
+ * cpdef int col_check(list sliced_links, list check_links, int len_links, dict global_dict):             # <<<<<<<<<<<<<<
+ * 
+ *   cdef int s_idx
+ */
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_4);
+  __Pyx_XDECREF(__pyx_t_5);
+  __Pyx_XDECREF(__pyx_t_16);
+  __Pyx_XDECREF(__pyx_t_18);
+  __Pyx_XDECREF(__pyx_t_19);
+  __Pyx_AddTraceback("collision_handler.col_check", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = -1;
+  __pyx_L0:;
+  __Pyx_XDECREF(__pyx_v_t_link_names);
+  __Pyx_XDECREF(__pyx_v_col_list);
+  __Pyx_XDECREF(__pyx_v_c_check_list);
+  __Pyx_XDECREF(__pyx_v_obj);
+  __Pyx_XDECREF(__pyx_v_t_obj);
+  __Pyx_XDECREF(__pyx_v_d);
+  __Pyx_XDECREF(__pyx_v__);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* Python wrapper */
+static PyObject *__pyx_pw_17collision_handler_1col_check(PyObject *__pyx_self, 
+#if CYTHON_METH_FASTCALL
+PyObject *const *__pyx_args, Py_ssize_t __pyx_nargs, PyObject *__pyx_kwds
+#else
+PyObject *__pyx_args, PyObject *__pyx_kwds
+#endif
+); /*proto*/
+static PyMethodDef __pyx_mdef_17collision_handler_1col_check = {"col_check", (PyCFunction)(void*)(__Pyx_PyCFunction_FastCallWithKeywords)__pyx_pw_17collision_handler_1col_check, __Pyx_METH_FASTCALL|METH_KEYWORDS, 0};
+static PyObject *__pyx_pw_17collision_handler_1col_check(PyObject *__pyx_self, 
+#if CYTHON_METH_FASTCALL
+PyObject *const *__pyx_args, Py_ssize_t __pyx_nargs, PyObject *__pyx_kwds
+#else
+PyObject *__pyx_args, PyObject *__pyx_kwds
+#endif
+) {
+  PyObject *__pyx_v_sliced_links = 0;
+  PyObject *__pyx_v_check_links = 0;
+  int __pyx_v_len_links;
+  PyObject *__pyx_v_global_dict = 0;
+  #if !CYTHON_METH_FASTCALL
+  CYTHON_UNUSED Py_ssize_t __pyx_nargs;
+  #endif
+  CYTHON_UNUSED PyObject *const *__pyx_kwvalues;
+  PyObject* values[4] = {0,0,0,0};
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  PyObject *__pyx_r = 0;
+  __Pyx_RefNannyDeclarations
+  __Pyx_RefNannySetupContext("col_check (wrapper)", 0);
+  #if !CYTHON_METH_FASTCALL
+  #if CYTHON_ASSUME_SAFE_MACROS
+  __pyx_nargs = PyTuple_GET_SIZE(__pyx_args);
+  #else
+  __pyx_nargs = PyTuple_Size(__pyx_args); if (unlikely(__pyx_nargs < 0)) return NULL;
+  #endif
+  #endif
+  __pyx_kwvalues = __Pyx_KwValues_FASTCALL(__pyx_args, __pyx_nargs);
+  {
+    PyObject **__pyx_pyargnames[] = {&__pyx_n_s_sliced_links,&__pyx_n_s_check_links,&__pyx_n_s_len_links,&__pyx_n_s_global_dict,0};
+    if (__pyx_kwds) {
+      Py_ssize_t kw_args;
+      switch (__pyx_nargs) {
+        case  4: values[3] = __Pyx_Arg_FASTCALL(__pyx_args, 3);
+        CYTHON_FALLTHROUGH;
+        case  3: values[2] = __Pyx_Arg_FASTCALL(__pyx_args, 2);
+        CYTHON_FALLTHROUGH;
+        case  2: values[1] = __Pyx_Arg_FASTCALL(__pyx_args, 1);
+        CYTHON_FALLTHROUGH;
+        case  1: values[0] = __Pyx_Arg_FASTCALL(__pyx_args, 0);
+        CYTHON_FALLTHROUGH;
+        case  0: break;
+        default: goto __pyx_L5_argtuple_error;
+      }
+      kw_args = __Pyx_NumKwargs_FASTCALL(__pyx_kwds);
+      switch (__pyx_nargs) {
+        case  0:
+        if (likely((values[0] = __Pyx_GetKwValue_FASTCALL(__pyx_kwds, __pyx_kwvalues, __pyx_n_s_sliced_links)) != 0)) {
+          (void)__Pyx_Arg_NewRef_FASTCALL(values[0]);
+          kw_args--;
+        }
+        else if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 5, __pyx_L3_error)
+        else goto __pyx_L5_argtuple_error;
+        CYTHON_FALLTHROUGH;
+        case  1:
+        if (likely((values[1] = __Pyx_GetKwValue_FASTCALL(__pyx_kwds, __pyx_kwvalues, __pyx_n_s_check_links)) != 0)) {
+          (void)__Pyx_Arg_NewRef_FASTCALL(values[1]);
+          kw_args--;
+        }
+        else if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 5, __pyx_L3_error)
+        else {
+          __Pyx_RaiseArgtupleInvalid("col_check", 1, 4, 4, 1); __PYX_ERR(0, 5, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  2:
+        if (likely((values[2] = __Pyx_GetKwValue_FASTCALL(__pyx_kwds, __pyx_kwvalues, __pyx_n_s_len_links)) != 0)) {
+          (void)__Pyx_Arg_NewRef_FASTCALL(values[2]);
+          kw_args--;
+        }
+        else if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 5, __pyx_L3_error)
+        else {
+          __Pyx_RaiseArgtupleInvalid("col_check", 1, 4, 4, 2); __PYX_ERR(0, 5, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  3:
+        if (likely((values[3] = __Pyx_GetKwValue_FASTCALL(__pyx_kwds, __pyx_kwvalues, __pyx_n_s_global_dict)) != 0)) {
+          (void)__Pyx_Arg_NewRef_FASTCALL(values[3]);
+          kw_args--;
+        }
+        else if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 5, __pyx_L3_error)
+        else {
+          __Pyx_RaiseArgtupleInvalid("col_check", 1, 4, 4, 3); __PYX_ERR(0, 5, __pyx_L3_error)
+        }
+      }
+      if (unlikely(kw_args > 0)) {
+        const Py_ssize_t kwd_pos_args = __pyx_nargs;
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values + 0, kwd_pos_args, "col_check") < 0)) __PYX_ERR(0, 5, __pyx_L3_error)
+      }
+    } else if (unlikely(__pyx_nargs != 4)) {
+      goto __pyx_L5_argtuple_error;
+    } else {
+      values[0] = __Pyx_Arg_FASTCALL(__pyx_args, 0);
+      values[1] = __Pyx_Arg_FASTCALL(__pyx_args, 1);
+      values[2] = __Pyx_Arg_FASTCALL(__pyx_args, 2);
+      values[3] = __Pyx_Arg_FASTCALL(__pyx_args, 3);
+    }
+    __pyx_v_sliced_links = ((PyObject*)values[0]);
+    __pyx_v_check_links = ((PyObject*)values[1]);
+    __pyx_v_len_links = __Pyx_PyInt_As_int(values[2]); if (unlikely((__pyx_v_len_links == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 5, __pyx_L3_error)
+    __pyx_v_global_dict = ((PyObject*)values[3]);
+  }
+  goto __pyx_L6_skip;
+  __pyx_L5_argtuple_error:;
+  __Pyx_RaiseArgtupleInvalid("col_check", 1, 4, 4, __pyx_nargs); __PYX_ERR(0, 5, __pyx_L3_error)
+  __pyx_L6_skip:;
+  goto __pyx_L4_argument_unpacking_done;
+  __pyx_L3_error:;
+  {
+    Py_ssize_t __pyx_temp;
+    for (__pyx_temp=0; __pyx_temp < (Py_ssize_t)(sizeof(values)/sizeof(values[0])); ++__pyx_temp) {
+      __Pyx_Arg_XDECREF_FASTCALL(values[__pyx_temp]);
+    }
+  }
+  __Pyx_AddTraceback("collision_handler.col_check", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_RefNannyFinishContext();
+  return NULL;
+  __pyx_L4_argument_unpacking_done:;
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_sliced_links), (&PyList_Type), 1, "sliced_links", 1))) __PYX_ERR(0, 5, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_check_links), (&PyList_Type), 1, "check_links", 1))) __PYX_ERR(0, 5, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_global_dict), (&PyDict_Type), 1, "global_dict", 1))) __PYX_ERR(0, 5, __pyx_L1_error)
+  __pyx_r = __pyx_pf_17collision_handler_col_check(__pyx_self, __pyx_v_sliced_links, __pyx_v_check_links, __pyx_v_len_links, __pyx_v_global_dict);
+
+  /* function exit code */
+  goto __pyx_L0;
+  __pyx_L1_error:;
+  __pyx_r = NULL;
+  __pyx_L0:;
+  {
+    Py_ssize_t __pyx_temp;
+    for (__pyx_temp=0; __pyx_temp < (Py_ssize_t)(sizeof(values)/sizeof(values[0])); ++__pyx_temp) {
+      __Pyx_Arg_XDECREF_FASTCALL(values[__pyx_temp]);
+    }
+  }
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+static PyObject *__pyx_pf_17collision_handler_col_check(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_sliced_links, PyObject *__pyx_v_check_links, int __pyx_v_len_links, PyObject *__pyx_v_global_dict) {
+  PyObject *__pyx_r = NULL;
+  __Pyx_RefNannyDeclarations
+  int __pyx_t_1;
+  PyObject *__pyx_t_2 = NULL;
+  int __pyx_lineno = 0;
+  const char *__pyx_filename = NULL;
+  int __pyx_clineno = 0;
+  __Pyx_RefNannySetupContext("col_check", 1);
+  __Pyx_XDECREF(__pyx_r);
+  __pyx_t_1 = __pyx_f_17collision_handler_col_check(__pyx_v_sliced_links, __pyx_v_check_links, __pyx_v_len_links, __pyx_v_global_dict, 0); if (unlikely(__pyx_t_1 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 5, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyInt_From_int(__pyx_t_1); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 5, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  __pyx_r = __pyx_t_2;
+  __pyx_t_2 = 0;
+  goto __pyx_L0;
+
+  /* function exit code */
+  __pyx_L1_error:;
+  __Pyx_XDECREF(__pyx_t_2);
+  __Pyx_AddTraceback("collision_handler.col_check", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __pyx_r = NULL;
+  __pyx_L0:;
+  __Pyx_XGIVEREF(__pyx_r);
+  __Pyx_RefNannyFinishContext();
+  return __pyx_r;
+}
+
+/* "collision_handler.pyx":48
  * # Ignore negative indice checking (i.e., a[-1])
  * @cython.wraparound(False)
  * cpdef int global_check(str robot_name,             # <<<<<<<<<<<<<<
@@ -2376,14 +2986,14 @@ static int __pyx_m_traverse(PyObject *m, visitproc visit, void *arg) {
  *                       int len_robots,
  */
 
-static PyObject *__pyx_pw_17collision_handler_1global_check(PyObject *__pyx_self, 
+static PyObject *__pyx_pw_17collision_handler_3global_check(PyObject *__pyx_self, 
 #if CYTHON_METH_FASTCALL
 PyObject *const *__pyx_args, Py_ssize_t __pyx_nargs, PyObject *__pyx_kwds
 #else
 PyObject *__pyx_args, PyObject *__pyx_kwds
 #endif
 ); /*proto*/
-static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name, PyObject *__pyx_v_robot_names, int __pyx_v_len_robots, PyObject *__pyx_v_robot_links, int __pyx_v_len_links, PyObject *__pyx_v_global_dict, PyObject *__pyx_v_overlap_dict, CYTHON_UNUSED int __pyx_skip_dispatch) {
+static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name, PyObject *__pyx_v_robot_names, int __pyx_v_len_robots, PyObject *__pyx_v_robot_links, int __pyx_v_len_links, PyObject *__pyx_v_global_dict, PyObject *__pyx_v_overlap_dict, PyObject *__pyx_v_check_links, CYTHON_UNUSED int __pyx_skip_dispatch) {
   PyObject *__pyx_v_c_ignore_list = 0;
   PyObject *__pyx_v_c_check_list = 0;
   PyObject *__pyx_v_col_list = 0;
@@ -2433,9 +3043,9 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("global_check", 1);
 
-  /* "collision_handler.pyx":29
- * 
- *   # Iterate through all instantiated robots
+  /* "collision_handler.pyx":76
+ *   # - for the current robot, we want to evaluate one of the sliced links over the current dictionary of links
+ *   #   - example, panda robot slice link 1 is panda_hand
  *   for r_idx in range(len_robots):             # <<<<<<<<<<<<<<
  *     # Get the robot name for evaluation
  *     r_name = robot_names[r_idx]
@@ -2445,7 +3055,7 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
   for (__pyx_t_3 = 0; __pyx_t_3 < __pyx_t_2; __pyx_t_3+=1) {
     __pyx_v_r_idx = __pyx_t_3;
 
-    /* "collision_handler.pyx":31
+    /* "collision_handler.pyx":78
  *   for r_idx in range(len_robots):
  *     # Get the robot name for evaluation
  *     r_name = robot_names[r_idx]             # <<<<<<<<<<<<<<
@@ -2454,15 +3064,15 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
  */
     if (unlikely(__pyx_v_robot_names == Py_None)) {
       PyErr_SetString(PyExc_TypeError, "'NoneType' object is not subscriptable");
-      __PYX_ERR(0, 31, __pyx_L1_error)
+      __PYX_ERR(0, 78, __pyx_L1_error)
     }
-    __pyx_t_4 = __Pyx_GetItemInt_List(__pyx_v_robot_names, __pyx_v_r_idx, int, 1, __Pyx_PyInt_From_int, 1, 0, 1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 31, __pyx_L1_error)
+    __pyx_t_4 = __Pyx_GetItemInt_List(__pyx_v_robot_names, __pyx_v_r_idx, int, 1, __Pyx_PyInt_From_int, 1, 0, 1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 78, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_4);
-    if (!(likely(PyString_CheckExact(__pyx_t_4))||((__pyx_t_4) == Py_None) || __Pyx_RaiseUnexpectedTypeError("str", __pyx_t_4))) __PYX_ERR(0, 31, __pyx_L1_error)
+    if (!(likely(PyString_CheckExact(__pyx_t_4))||((__pyx_t_4) == Py_None) || __Pyx_RaiseUnexpectedTypeError("str", __pyx_t_4))) __PYX_ERR(0, 78, __pyx_L1_error)
     __Pyx_XDECREF_SET(__pyx_v_r_name, ((PyObject*)__pyx_t_4));
     __pyx_t_4 = 0;
 
-    /* "collision_handler.pyx":36
+    /* "collision_handler.pyx":83
  * 
  *     # Loop though the global dictionary of links for robot in evaluation
  *     for l_name in global_dict[r_name].copy():             # <<<<<<<<<<<<<<
@@ -2471,11 +3081,11 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
  */
     if (unlikely(__pyx_v_global_dict == Py_None)) {
       PyErr_SetString(PyExc_TypeError, "'NoneType' object is not subscriptable");
-      __PYX_ERR(0, 36, __pyx_L1_error)
+      __PYX_ERR(0, 83, __pyx_L1_error)
     }
-    __pyx_t_5 = __Pyx_PyDict_GetItem(__pyx_v_global_dict, __pyx_v_r_name); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 36, __pyx_L1_error)
+    __pyx_t_5 = __Pyx_PyDict_GetItem(__pyx_v_global_dict, __pyx_v_r_name); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 83, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_5);
-    __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_n_s_copy); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 36, __pyx_L1_error)
+    __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_n_s_copy); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 83, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_6);
     __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
     __pyx_t_5 = NULL;
@@ -2496,7 +3106,7 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
       PyObject *__pyx_callargs[2] = {__pyx_t_5, NULL};
       __pyx_t_4 = __Pyx_PyObject_FastCall(__pyx_t_6, __pyx_callargs+1-__pyx_t_7, 0+__pyx_t_7);
       __Pyx_XDECREF(__pyx_t_5); __pyx_t_5 = 0;
-      if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 36, __pyx_L1_error)
+      if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 83, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_4);
       __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
     }
@@ -2505,9 +3115,9 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
       __pyx_t_8 = 0;
       __pyx_t_9 = NULL;
     } else {
-      __pyx_t_8 = -1; __pyx_t_6 = PyObject_GetIter(__pyx_t_4); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 36, __pyx_L1_error)
+      __pyx_t_8 = -1; __pyx_t_6 = PyObject_GetIter(__pyx_t_4); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 83, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_6);
-      __pyx_t_9 = __Pyx_PyObject_GetIterNextFunc(__pyx_t_6); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 36, __pyx_L1_error)
+      __pyx_t_9 = __Pyx_PyObject_GetIterNextFunc(__pyx_t_6); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 83, __pyx_L1_error)
     }
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     for (;;) {
@@ -2516,28 +3126,28 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
           {
             Py_ssize_t __pyx_temp = __Pyx_PyList_GET_SIZE(__pyx_t_6);
             #if !CYTHON_ASSUME_SAFE_MACROS
-            if (unlikely((__pyx_temp < 0))) __PYX_ERR(0, 36, __pyx_L1_error)
+            if (unlikely((__pyx_temp < 0))) __PYX_ERR(0, 83, __pyx_L1_error)
             #endif
             if (__pyx_t_8 >= __pyx_temp) break;
           }
           #if CYTHON_ASSUME_SAFE_MACROS && !CYTHON_AVOID_BORROWED_REFS
-          __pyx_t_4 = PyList_GET_ITEM(__pyx_t_6, __pyx_t_8); __Pyx_INCREF(__pyx_t_4); __pyx_t_8++; if (unlikely((0 < 0))) __PYX_ERR(0, 36, __pyx_L1_error)
+          __pyx_t_4 = PyList_GET_ITEM(__pyx_t_6, __pyx_t_8); __Pyx_INCREF(__pyx_t_4); __pyx_t_8++; if (unlikely((0 < 0))) __PYX_ERR(0, 83, __pyx_L1_error)
           #else
-          __pyx_t_4 = __Pyx_PySequence_ITEM(__pyx_t_6, __pyx_t_8); __pyx_t_8++; if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 36, __pyx_L1_error)
+          __pyx_t_4 = __Pyx_PySequence_ITEM(__pyx_t_6, __pyx_t_8); __pyx_t_8++; if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 83, __pyx_L1_error)
           __Pyx_GOTREF(__pyx_t_4);
           #endif
         } else {
           {
             Py_ssize_t __pyx_temp = __Pyx_PyTuple_GET_SIZE(__pyx_t_6);
             #if !CYTHON_ASSUME_SAFE_MACROS
-            if (unlikely((__pyx_temp < 0))) __PYX_ERR(0, 36, __pyx_L1_error)
+            if (unlikely((__pyx_temp < 0))) __PYX_ERR(0, 83, __pyx_L1_error)
             #endif
             if (__pyx_t_8 >= __pyx_temp) break;
           }
           #if CYTHON_ASSUME_SAFE_MACROS && !CYTHON_AVOID_BORROWED_REFS
-          __pyx_t_4 = PyTuple_GET_ITEM(__pyx_t_6, __pyx_t_8); __Pyx_INCREF(__pyx_t_4); __pyx_t_8++; if (unlikely((0 < 0))) __PYX_ERR(0, 36, __pyx_L1_error)
+          __pyx_t_4 = PyTuple_GET_ITEM(__pyx_t_6, __pyx_t_8); __Pyx_INCREF(__pyx_t_4); __pyx_t_8++; if (unlikely((0 < 0))) __PYX_ERR(0, 83, __pyx_L1_error)
           #else
-          __pyx_t_4 = __Pyx_PySequence_ITEM(__pyx_t_6, __pyx_t_8); __pyx_t_8++; if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 36, __pyx_L1_error)
+          __pyx_t_4 = __Pyx_PySequence_ITEM(__pyx_t_6, __pyx_t_8); __pyx_t_8++; if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 83, __pyx_L1_error)
           __Pyx_GOTREF(__pyx_t_4);
           #endif
         }
@@ -2547,44 +3157,44 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
           PyObject* exc_type = PyErr_Occurred();
           if (exc_type) {
             if (likely(__Pyx_PyErr_GivenExceptionMatches(exc_type, PyExc_StopIteration))) PyErr_Clear();
-            else __PYX_ERR(0, 36, __pyx_L1_error)
+            else __PYX_ERR(0, 83, __pyx_L1_error)
           }
           break;
         }
         __Pyx_GOTREF(__pyx_t_4);
       }
-      if (!(likely(PyString_CheckExact(__pyx_t_4))||((__pyx_t_4) == Py_None) || __Pyx_RaiseUnexpectedTypeError("str", __pyx_t_4))) __PYX_ERR(0, 36, __pyx_L1_error)
+      if (!(likely(PyString_CheckExact(__pyx_t_4))||((__pyx_t_4) == Py_None) || __Pyx_RaiseUnexpectedTypeError("str", __pyx_t_4))) __PYX_ERR(0, 83, __pyx_L1_error)
       __Pyx_XDECREF_SET(__pyx_v_l_name, ((PyObject*)__pyx_t_4));
       __pyx_t_4 = 0;
 
-      /* "collision_handler.pyx":41
+      /* "collision_handler.pyx":88
  * 
  *       # Extract the evaluation robot link's collision object list for checking
  *       c_check_list = global_dict[r_name][l_name]             # <<<<<<<<<<<<<<
+ * 
  *       # Handle self checking and populate overlap links for ignoring
- *       if robot_name == r_name and l_name in overlap_dict:
  */
       if (unlikely(__pyx_v_global_dict == Py_None)) {
         PyErr_SetString(PyExc_TypeError, "'NoneType' object is not subscriptable");
-        __PYX_ERR(0, 41, __pyx_L1_error)
+        __PYX_ERR(0, 88, __pyx_L1_error)
       }
-      __pyx_t_4 = __Pyx_PyDict_GetItem(__pyx_v_global_dict, __pyx_v_r_name); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 41, __pyx_L1_error)
+      __pyx_t_4 = __Pyx_PyDict_GetItem(__pyx_v_global_dict, __pyx_v_r_name); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 88, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_4);
-      __pyx_t_5 = __Pyx_PyObject_Dict_GetItem(__pyx_t_4, __pyx_v_l_name); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 41, __pyx_L1_error)
+      __pyx_t_5 = __Pyx_PyObject_Dict_GetItem(__pyx_t_4, __pyx_v_l_name); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 88, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_5);
       __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-      if (!(likely(PyList_CheckExact(__pyx_t_5))||((__pyx_t_5) == Py_None) || __Pyx_RaiseUnexpectedTypeError("list", __pyx_t_5))) __PYX_ERR(0, 41, __pyx_L1_error)
+      if (!(likely(PyList_CheckExact(__pyx_t_5))||((__pyx_t_5) == Py_None) || __Pyx_RaiseUnexpectedTypeError("list", __pyx_t_5))) __PYX_ERR(0, 88, __pyx_L1_error)
       __Pyx_XDECREF_SET(__pyx_v_c_check_list, ((PyObject*)__pyx_t_5));
       __pyx_t_5 = 0;
 
-      /* "collision_handler.pyx":43
- *       c_check_list = global_dict[r_name][l_name]
+      /* "collision_handler.pyx":91
+ * 
  *       # Handle self checking and populate overlap links for ignoring
  *       if robot_name == r_name and l_name in overlap_dict:             # <<<<<<<<<<<<<<
  *         c_ignore_list = overlap_dict[l_name]
  *       else:
  */
-      __pyx_t_11 = (__Pyx_PyString_Equals(__pyx_v_robot_name, __pyx_v_r_name, Py_EQ)); if (unlikely((__pyx_t_11 < 0))) __PYX_ERR(0, 43, __pyx_L1_error)
+      __pyx_t_11 = (__Pyx_PyString_Equals(__pyx_v_robot_name, __pyx_v_r_name, Py_EQ)); if (unlikely((__pyx_t_11 < 0))) __PYX_ERR(0, 91, __pyx_L1_error)
       if (__pyx_t_11) {
       } else {
         __pyx_t_10 = __pyx_t_11;
@@ -2592,32 +3202,32 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
       }
       if (unlikely(__pyx_v_overlap_dict == Py_None)) {
         PyErr_SetString(PyExc_TypeError, "'NoneType' object is not iterable");
-        __PYX_ERR(0, 43, __pyx_L1_error)
+        __PYX_ERR(0, 91, __pyx_L1_error)
       }
-      __pyx_t_11 = (__Pyx_PyDict_ContainsTF(__pyx_v_l_name, __pyx_v_overlap_dict, Py_EQ)); if (unlikely((__pyx_t_11 < 0))) __PYX_ERR(0, 43, __pyx_L1_error)
+      __pyx_t_11 = (__Pyx_PyDict_ContainsTF(__pyx_v_l_name, __pyx_v_overlap_dict, Py_EQ)); if (unlikely((__pyx_t_11 < 0))) __PYX_ERR(0, 91, __pyx_L1_error)
       __pyx_t_10 = __pyx_t_11;
       __pyx_L8_bool_binop_done:;
       if (__pyx_t_10) {
 
-        /* "collision_handler.pyx":44
+        /* "collision_handler.pyx":92
  *       # Handle self checking and populate overlap links for ignoring
  *       if robot_name == r_name and l_name in overlap_dict:
  *         c_ignore_list = overlap_dict[l_name]             # <<<<<<<<<<<<<<
  *       else:
- *         c_ignore_list = list()
+ *         c_ignore_list = []
  */
         if (unlikely(__pyx_v_overlap_dict == Py_None)) {
           PyErr_SetString(PyExc_TypeError, "'NoneType' object is not subscriptable");
-          __PYX_ERR(0, 44, __pyx_L1_error)
+          __PYX_ERR(0, 92, __pyx_L1_error)
         }
-        __pyx_t_5 = __Pyx_PyDict_GetItem(__pyx_v_overlap_dict, __pyx_v_l_name); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 44, __pyx_L1_error)
+        __pyx_t_5 = __Pyx_PyDict_GetItem(__pyx_v_overlap_dict, __pyx_v_l_name); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 92, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_5);
-        if (!(likely(PyList_CheckExact(__pyx_t_5))||((__pyx_t_5) == Py_None) || __Pyx_RaiseUnexpectedTypeError("list", __pyx_t_5))) __PYX_ERR(0, 44, __pyx_L1_error)
+        if (!(likely(PyList_CheckExact(__pyx_t_5))||((__pyx_t_5) == Py_None) || __Pyx_RaiseUnexpectedTypeError("list", __pyx_t_5))) __PYX_ERR(0, 92, __pyx_L1_error)
         __Pyx_XDECREF_SET(__pyx_v_c_ignore_list, ((PyObject*)__pyx_t_5));
         __pyx_t_5 = 0;
 
-        /* "collision_handler.pyx":43
- *       c_check_list = global_dict[r_name][l_name]
+        /* "collision_handler.pyx":91
+ * 
  *       # Handle self checking and populate overlap links for ignoring
  *       if robot_name == r_name and l_name in overlap_dict:             # <<<<<<<<<<<<<<
  *         c_ignore_list = overlap_dict[l_name]
@@ -2626,22 +3236,22 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
         goto __pyx_L7;
       }
 
-      /* "collision_handler.pyx":46
+      /* "collision_handler.pyx":94
  *         c_ignore_list = overlap_dict[l_name]
  *       else:
- *         c_ignore_list = list()             # <<<<<<<<<<<<<<
+ *         c_ignore_list = []             # <<<<<<<<<<<<<<
  * 
  *       # Local checking of evaluation robot's link with robot's target links
  */
       /*else*/ {
-        __pyx_t_5 = PyList_New(0); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 46, __pyx_L1_error)
+        __pyx_t_5 = PyList_New(0); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 94, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_5);
         __Pyx_XDECREF_SET(__pyx_v_c_ignore_list, ((PyObject*)__pyx_t_5));
         __pyx_t_5 = 0;
       }
       __pyx_L7:;
 
-      /* "collision_handler.pyx":52
+      /* "collision_handler.pyx":100
  *       #       speed up achived by limiting this list
  *       #       (search space from end-effector down to base_link, sliced as needed)
  *       for l_idx in range(len_links):             # <<<<<<<<<<<<<<
@@ -2653,7 +3263,7 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
       for (__pyx_t_13 = 0; __pyx_t_13 < __pyx_t_12; __pyx_t_13+=1) {
         __pyx_v_l_idx = __pyx_t_13;
 
-        /* "collision_handler.pyx":53
+        /* "collision_handler.pyx":101
  *       #       (search space from end-effector down to base_link, sliced as needed)
  *       for l_idx in range(len_links):
  *         link = robot_links[l_idx]             # <<<<<<<<<<<<<<
@@ -2662,37 +3272,72 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
  */
         if (unlikely(__pyx_v_robot_links == Py_None)) {
           PyErr_SetString(PyExc_TypeError, "'NoneType' object is not subscriptable");
-          __PYX_ERR(0, 53, __pyx_L1_error)
+          __PYX_ERR(0, 101, __pyx_L1_error)
         }
-        __pyx_t_5 = __Pyx_GetItemInt_List(__pyx_v_robot_links, __pyx_v_l_idx, int, 1, __Pyx_PyInt_From_int, 1, 0, 1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 53, __pyx_L1_error)
+        __pyx_t_5 = __Pyx_GetItemInt_List(__pyx_v_robot_links, __pyx_v_l_idx, int, 1, __Pyx_PyInt_From_int, 1, 0, 1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 101, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_5);
         __Pyx_XDECREF_SET(__pyx_v_link, __pyx_t_5);
         __pyx_t_5 = 0;
 
-        /* "collision_handler.pyx":54
+        /* "collision_handler.pyx":102
  *       for l_idx in range(len_links):
  *         link = robot_links[l_idx]
  *         t_l_name = link.name             # <<<<<<<<<<<<<<
  *         # DEBUGGING
  *         # print(f"checking {t_l_name}")
  */
-        __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_v_link, __pyx_n_s_name); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 54, __pyx_L1_error)
+        __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_v_link, __pyx_n_s_name); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 102, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_5);
-        if (!(likely(PyString_CheckExact(__pyx_t_5))||((__pyx_t_5) == Py_None) || __Pyx_RaiseUnexpectedTypeError("str", __pyx_t_5))) __PYX_ERR(0, 54, __pyx_L1_error)
+        if (!(likely(PyString_CheckExact(__pyx_t_5))||((__pyx_t_5) == Py_None) || __Pyx_RaiseUnexpectedTypeError("str", __pyx_t_5))) __PYX_ERR(0, 102, __pyx_L1_error)
         __Pyx_XDECREF_SET(__pyx_v_t_l_name, ((PyObject*)__pyx_t_5));
         __pyx_t_5 = 0;
 
-        /* "collision_handler.pyx":59
+        /* "collision_handler.pyx":107
+ * 
+ *         # TEST (break out if not one of the defined target links)
+ *         if l_name not in check_links[l_idx]:             # <<<<<<<<<<<<<<
+ *           break
+ * 
+ */
+        if (unlikely(__pyx_v_check_links == Py_None)) {
+          PyErr_SetString(PyExc_TypeError, "'NoneType' object is not subscriptable");
+          __PYX_ERR(0, 107, __pyx_L1_error)
+        }
+        __pyx_t_5 = __Pyx_GetItemInt_List(__pyx_v_check_links, __pyx_v_l_idx, int, 1, __Pyx_PyInt_From_int, 1, 0, 1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 107, __pyx_L1_error)
+        __Pyx_GOTREF(__pyx_t_5);
+        __pyx_t_10 = (__Pyx_PySequence_ContainsTF(__pyx_v_l_name, __pyx_t_5, Py_NE)); if (unlikely((__pyx_t_10 < 0))) __PYX_ERR(0, 107, __pyx_L1_error)
+        __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+        if (__pyx_t_10) {
+
+          /* "collision_handler.pyx":108
+ *         # TEST (break out if not one of the defined target links)
+ *         if l_name not in check_links[l_idx]:
+ *           break             # <<<<<<<<<<<<<<
+ * 
+ *         # Skip to next target link if it is to be ignored
+ */
+          goto __pyx_L11_break;
+
+          /* "collision_handler.pyx":107
+ * 
+ *         # TEST (break out if not one of the defined target links)
+ *         if l_name not in check_links[l_idx]:             # <<<<<<<<<<<<<<
+ *           break
+ * 
+ */
+        }
+
+        /* "collision_handler.pyx":111
  * 
  *         # Skip to next target link if it is to be ignored
  *         if t_l_name in c_ignore_list:             # <<<<<<<<<<<<<<
  *           continue
  * 
  */
-        __pyx_t_10 = (__Pyx_PySequence_ContainsTF(__pyx_v_t_l_name, __pyx_v_c_ignore_list, Py_EQ)); if (unlikely((__pyx_t_10 < 0))) __PYX_ERR(0, 59, __pyx_L1_error)
+        __pyx_t_10 = (__Pyx_PySequence_ContainsTF(__pyx_v_t_l_name, __pyx_v_c_ignore_list, Py_EQ)); if (unlikely((__pyx_t_10 < 0))) __PYX_ERR(0, 111, __pyx_L1_error)
         if (__pyx_t_10) {
 
-          /* "collision_handler.pyx":60
+          /* "collision_handler.pyx":112
  *         # Skip to next target link if it is to be ignored
  *         if t_l_name in c_ignore_list:
  *           continue             # <<<<<<<<<<<<<<
@@ -2701,7 +3346,7 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
  */
           goto __pyx_L10_continue;
 
-          /* "collision_handler.pyx":59
+          /* "collision_handler.pyx":111
  * 
  *         # Skip to next target link if it is to be ignored
  *         if t_l_name in c_ignore_list:             # <<<<<<<<<<<<<<
@@ -2710,17 +3355,17 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
  */
         }
 
-        /* "collision_handler.pyx":63
+        /* "collision_handler.pyx":115
  * 
  *         # Skip to next target link if it is the same link as current being checked
  *         if t_l_name == l_name:             # <<<<<<<<<<<<<<
  *           continue
  * 
  */
-        __pyx_t_10 = (__Pyx_PyString_Equals(__pyx_v_t_l_name, __pyx_v_l_name, Py_EQ)); if (unlikely((__pyx_t_10 < 0))) __PYX_ERR(0, 63, __pyx_L1_error)
+        __pyx_t_10 = (__Pyx_PyString_Equals(__pyx_v_t_l_name, __pyx_v_l_name, Py_EQ)); if (unlikely((__pyx_t_10 < 0))) __PYX_ERR(0, 115, __pyx_L1_error)
         if (__pyx_t_10) {
 
-          /* "collision_handler.pyx":64
+          /* "collision_handler.pyx":116
  *         # Skip to next target link if it is the same link as current being checked
  *         if t_l_name == l_name:
  *           continue             # <<<<<<<<<<<<<<
@@ -2729,7 +3374,7 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
  */
           goto __pyx_L10_continue;
 
-          /* "collision_handler.pyx":63
+          /* "collision_handler.pyx":115
  * 
  *         # Skip to next target link if it is the same link as current being checked
  *         if t_l_name == l_name:             # <<<<<<<<<<<<<<
@@ -2738,7 +3383,7 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
  */
         }
 
-        /* "collision_handler.pyx":67
+        /* "collision_handler.pyx":119
  * 
  *         # Evaluate current link's collision shapes
  *         chk_list_len = len(c_check_list)             # <<<<<<<<<<<<<<
@@ -2747,12 +3392,12 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
  */
         if (unlikely(__pyx_v_c_check_list == Py_None)) {
           PyErr_SetString(PyExc_TypeError, "object of type 'NoneType' has no len()");
-          __PYX_ERR(0, 67, __pyx_L1_error)
+          __PYX_ERR(0, 119, __pyx_L1_error)
         }
-        __pyx_t_14 = __Pyx_PyList_GET_SIZE(__pyx_v_c_check_list); if (unlikely(__pyx_t_14 == ((Py_ssize_t)-1))) __PYX_ERR(0, 67, __pyx_L1_error)
+        __pyx_t_14 = __Pyx_PyList_GET_SIZE(__pyx_v_c_check_list); if (unlikely(__pyx_t_14 == ((Py_ssize_t)-1))) __PYX_ERR(0, 119, __pyx_L1_error)
         __pyx_v_chk_list_len = __pyx_t_14;
 
-        /* "collision_handler.pyx":68
+        /* "collision_handler.pyx":120
  *         # Evaluate current link's collision shapes
  *         chk_list_len = len(c_check_list)
  *         for chk_idx in range(chk_list_len):             # <<<<<<<<<<<<<<
@@ -2764,7 +3409,7 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
         for (__pyx_t_17 = 0; __pyx_t_17 < __pyx_t_16; __pyx_t_17+=1) {
           __pyx_v_chk_idx = __pyx_t_17;
 
-          /* "collision_handler.pyx":69
+          /* "collision_handler.pyx":121
  *         chk_list_len = len(c_check_list)
  *         for chk_idx in range(chk_list_len):
  *           obj = c_check_list[chk_idx]             # <<<<<<<<<<<<<<
@@ -2773,39 +3418,39 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
  */
           if (unlikely(__pyx_v_c_check_list == Py_None)) {
             PyErr_SetString(PyExc_TypeError, "'NoneType' object is not subscriptable");
-            __PYX_ERR(0, 69, __pyx_L1_error)
+            __PYX_ERR(0, 121, __pyx_L1_error)
           }
-          __pyx_t_5 = __Pyx_GetItemInt_List(__pyx_v_c_check_list, __pyx_v_chk_idx, int, 1, __Pyx_PyInt_From_int, 1, 0, 1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 69, __pyx_L1_error)
+          __pyx_t_5 = __Pyx_GetItemInt_List(__pyx_v_c_check_list, __pyx_v_chk_idx, int, 1, __Pyx_PyInt_From_int, 1, 0, 1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 121, __pyx_L1_error)
           __Pyx_GOTREF(__pyx_t_5);
           __Pyx_XDECREF_SET(__pyx_v_obj, __pyx_t_5);
           __pyx_t_5 = 0;
 
-          /* "collision_handler.pyx":70
+          /* "collision_handler.pyx":122
  *         for chk_idx in range(chk_list_len):
  *           obj = c_check_list[chk_idx]
  *           col_list = list(link.collision)             # <<<<<<<<<<<<<<
  *           col_list_len = len(col_list)
  *           for col_idx in range(col_list_len):
  */
-          __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_v_link, __pyx_n_s_collision); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 70, __pyx_L1_error)
+          __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_v_link, __pyx_n_s_collision); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 122, __pyx_L1_error)
           __Pyx_GOTREF(__pyx_t_5);
-          __pyx_t_4 = __Pyx_PySequence_ListKeepNew(__pyx_t_5); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 70, __pyx_L1_error)
+          __pyx_t_4 = __Pyx_PySequence_ListKeepNew(__pyx_t_5); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 122, __pyx_L1_error)
           __Pyx_GOTREF(__pyx_t_4);
           __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
           __Pyx_XDECREF_SET(__pyx_v_col_list, ((PyObject*)__pyx_t_4));
           __pyx_t_4 = 0;
 
-          /* "collision_handler.pyx":71
+          /* "collision_handler.pyx":123
  *           obj = c_check_list[chk_idx]
  *           col_list = list(link.collision)
  *           col_list_len = len(col_list)             # <<<<<<<<<<<<<<
  *           for col_idx in range(col_list_len):
  *             t_obj = col_list[col_idx]
  */
-          __pyx_t_14 = __Pyx_PyList_GET_SIZE(__pyx_v_col_list); if (unlikely(__pyx_t_14 == ((Py_ssize_t)-1))) __PYX_ERR(0, 71, __pyx_L1_error)
+          __pyx_t_14 = __Pyx_PyList_GET_SIZE(__pyx_v_col_list); if (unlikely(__pyx_t_14 == ((Py_ssize_t)-1))) __PYX_ERR(0, 123, __pyx_L1_error)
           __pyx_v_col_list_len = __pyx_t_14;
 
-          /* "collision_handler.pyx":72
+          /* "collision_handler.pyx":124
  *           col_list = list(link.collision)
  *           col_list_len = len(col_list)
  *           for col_idx in range(col_list_len):             # <<<<<<<<<<<<<<
@@ -2817,26 +3462,26 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
           for (__pyx_t_20 = 0; __pyx_t_20 < __pyx_t_19; __pyx_t_20+=1) {
             __pyx_v_col_idx = __pyx_t_20;
 
-            /* "collision_handler.pyx":73
+            /* "collision_handler.pyx":125
  *           col_list_len = len(col_list)
  *           for col_idx in range(col_list_len):
  *             t_obj = col_list[col_idx]             # <<<<<<<<<<<<<<
  * 
  *             # Get the distance for comparison
  */
-            __pyx_t_4 = __Pyx_GetItemInt_List(__pyx_v_col_list, __pyx_v_col_idx, int, 1, __Pyx_PyInt_From_int, 1, 0, 1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 73, __pyx_L1_error)
+            __pyx_t_4 = __Pyx_GetItemInt_List(__pyx_v_col_list, __pyx_v_col_idx, int, 1, __Pyx_PyInt_From_int, 1, 0, 1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 125, __pyx_L1_error)
             __Pyx_GOTREF(__pyx_t_4);
             __Pyx_XDECREF_SET(__pyx_v_t_obj, __pyx_t_4);
             __pyx_t_4 = 0;
 
-            /* "collision_handler.pyx":77
+            /* "collision_handler.pyx":129
  *             # Get the distance for comparison
  *             # print(f"obj: {t_obj}")
  *             d, _, _ = t_obj.closest_point(obj)             # <<<<<<<<<<<<<<
  *             # print(f"d is: {d}")
  *             if d is not None and d <= 0:
  */
-            __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_v_t_obj, __pyx_n_s_closest_point); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 77, __pyx_L1_error)
+            __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_v_t_obj, __pyx_n_s_closest_point); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 129, __pyx_L1_error)
             __Pyx_GOTREF(__pyx_t_5);
             __pyx_t_21 = NULL;
             __pyx_t_22 = 0;
@@ -2856,7 +3501,7 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
               PyObject *__pyx_callargs[2] = {__pyx_t_21, __pyx_v_obj};
               __pyx_t_4 = __Pyx_PyObject_FastCall(__pyx_t_5, __pyx_callargs+1-__pyx_t_22, 1+__pyx_t_22);
               __Pyx_XDECREF(__pyx_t_21); __pyx_t_21 = 0;
-              if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 77, __pyx_L1_error)
+              if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 129, __pyx_L1_error)
               __Pyx_GOTREF(__pyx_t_4);
               __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
             }
@@ -2866,7 +3511,7 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
               if (unlikely(size != 3)) {
                 if (size > 3) __Pyx_RaiseTooManyValuesError(3);
                 else if (size >= 0) __Pyx_RaiseNeedMoreValuesError(size);
-                __PYX_ERR(0, 77, __pyx_L1_error)
+                __PYX_ERR(0, 129, __pyx_L1_error)
               }
               #if CYTHON_ASSUME_SAFE_MACROS && !CYTHON_AVOID_BORROWED_REFS
               if (likely(PyTuple_CheckExact(sequence))) {
@@ -2882,36 +3527,36 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
               __Pyx_INCREF(__pyx_t_21);
               __Pyx_INCREF(__pyx_t_23);
               #else
-              __pyx_t_5 = PySequence_ITEM(sequence, 0); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 77, __pyx_L1_error)
+              __pyx_t_5 = PySequence_ITEM(sequence, 0); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 129, __pyx_L1_error)
               __Pyx_GOTREF(__pyx_t_5);
-              __pyx_t_21 = PySequence_ITEM(sequence, 1); if (unlikely(!__pyx_t_21)) __PYX_ERR(0, 77, __pyx_L1_error)
+              __pyx_t_21 = PySequence_ITEM(sequence, 1); if (unlikely(!__pyx_t_21)) __PYX_ERR(0, 129, __pyx_L1_error)
               __Pyx_GOTREF(__pyx_t_21);
-              __pyx_t_23 = PySequence_ITEM(sequence, 2); if (unlikely(!__pyx_t_23)) __PYX_ERR(0, 77, __pyx_L1_error)
+              __pyx_t_23 = PySequence_ITEM(sequence, 2); if (unlikely(!__pyx_t_23)) __PYX_ERR(0, 129, __pyx_L1_error)
               __Pyx_GOTREF(__pyx_t_23);
               #endif
               __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
             } else {
               Py_ssize_t index = -1;
-              __pyx_t_24 = PyObject_GetIter(__pyx_t_4); if (unlikely(!__pyx_t_24)) __PYX_ERR(0, 77, __pyx_L1_error)
+              __pyx_t_24 = PyObject_GetIter(__pyx_t_4); if (unlikely(!__pyx_t_24)) __PYX_ERR(0, 129, __pyx_L1_error)
               __Pyx_GOTREF(__pyx_t_24);
               __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
               __pyx_t_25 = __Pyx_PyObject_GetIterNextFunc(__pyx_t_24);
-              index = 0; __pyx_t_5 = __pyx_t_25(__pyx_t_24); if (unlikely(!__pyx_t_5)) goto __pyx_L18_unpacking_failed;
+              index = 0; __pyx_t_5 = __pyx_t_25(__pyx_t_24); if (unlikely(!__pyx_t_5)) goto __pyx_L19_unpacking_failed;
               __Pyx_GOTREF(__pyx_t_5);
-              index = 1; __pyx_t_21 = __pyx_t_25(__pyx_t_24); if (unlikely(!__pyx_t_21)) goto __pyx_L18_unpacking_failed;
+              index = 1; __pyx_t_21 = __pyx_t_25(__pyx_t_24); if (unlikely(!__pyx_t_21)) goto __pyx_L19_unpacking_failed;
               __Pyx_GOTREF(__pyx_t_21);
-              index = 2; __pyx_t_23 = __pyx_t_25(__pyx_t_24); if (unlikely(!__pyx_t_23)) goto __pyx_L18_unpacking_failed;
+              index = 2; __pyx_t_23 = __pyx_t_25(__pyx_t_24); if (unlikely(!__pyx_t_23)) goto __pyx_L19_unpacking_failed;
               __Pyx_GOTREF(__pyx_t_23);
-              if (__Pyx_IternextUnpackEndCheck(__pyx_t_25(__pyx_t_24), 3) < 0) __PYX_ERR(0, 77, __pyx_L1_error)
+              if (__Pyx_IternextUnpackEndCheck(__pyx_t_25(__pyx_t_24), 3) < 0) __PYX_ERR(0, 129, __pyx_L1_error)
               __pyx_t_25 = NULL;
               __Pyx_DECREF(__pyx_t_24); __pyx_t_24 = 0;
-              goto __pyx_L19_unpacking_done;
-              __pyx_L18_unpacking_failed:;
+              goto __pyx_L20_unpacking_done;
+              __pyx_L19_unpacking_failed:;
               __Pyx_DECREF(__pyx_t_24); __pyx_t_24 = 0;
               __pyx_t_25 = NULL;
               if (__Pyx_IterFinish() == 0) __Pyx_RaiseNeedMoreValuesError(index);
-              __PYX_ERR(0, 77, __pyx_L1_error)
-              __pyx_L19_unpacking_done:;
+              __PYX_ERR(0, 129, __pyx_L1_error)
+              __pyx_L20_unpacking_done:;
             }
             __Pyx_XDECREF_SET(__pyx_v_d, __pyx_t_5);
             __pyx_t_5 = 0;
@@ -2920,7 +3565,7 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
             __Pyx_DECREF_SET(__pyx_v__, __pyx_t_23);
             __pyx_t_23 = 0;
 
-            /* "collision_handler.pyx":79
+            /* "collision_handler.pyx":131
  *             d, _, _ = t_obj.closest_point(obj)
  *             # print(f"d is: {d}")
  *             if d is not None and d <= 0:             # <<<<<<<<<<<<<<
@@ -2931,16 +3576,16 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
             if (__pyx_t_11) {
             } else {
               __pyx_t_10 = __pyx_t_11;
-              goto __pyx_L21_bool_binop_done;
+              goto __pyx_L22_bool_binop_done;
             }
-            __pyx_t_4 = PyObject_RichCompare(__pyx_v_d, __pyx_int_0, Py_LE); __Pyx_XGOTREF(__pyx_t_4); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 79, __pyx_L1_error)
-            __pyx_t_11 = __Pyx_PyObject_IsTrue(__pyx_t_4); if (unlikely((__pyx_t_11 < 0))) __PYX_ERR(0, 79, __pyx_L1_error)
+            __pyx_t_4 = PyObject_RichCompare(__pyx_v_d, __pyx_int_0, Py_LE); __Pyx_XGOTREF(__pyx_t_4); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 131, __pyx_L1_error)
+            __pyx_t_11 = __Pyx_PyObject_IsTrue(__pyx_t_4); if (unlikely((__pyx_t_11 < 0))) __PYX_ERR(0, 131, __pyx_L1_error)
             __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
             __pyx_t_10 = __pyx_t_11;
-            __pyx_L21_bool_binop_done:;
+            __pyx_L22_bool_binop_done:;
             if (__pyx_t_10) {
 
-              /* "collision_handler.pyx":81
+              /* "collision_handler.pyx":133
  *             if d is not None and d <= 0:
  *               # Returns the link idx in collision
  *               return l_idx             # <<<<<<<<<<<<<<
@@ -2951,7 +3596,7 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
               __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
               goto __pyx_L0;
 
-              /* "collision_handler.pyx":79
+              /* "collision_handler.pyx":131
  *             d, _, _ = t_obj.closest_point(obj)
  *             # print(f"d is: {d}")
  *             if d is not None and d <= 0:             # <<<<<<<<<<<<<<
@@ -2963,8 +3608,9 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
         }
         __pyx_L10_continue:;
       }
+      __pyx_L11_break:;
 
-      /* "collision_handler.pyx":36
+      /* "collision_handler.pyx":83
  * 
  *     # Loop though the global dictionary of links for robot in evaluation
  *     for l_name in global_dict[r_name].copy():             # <<<<<<<<<<<<<<
@@ -2975,7 +3621,7 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
     __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
   }
 
-  /* "collision_handler.pyx":84
+  /* "collision_handler.pyx":136
  * 
  *   # Got here without issue
  *   return -1             # <<<<<<<<<<<<<<
@@ -2985,7 +3631,7 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
   __pyx_r = -1;
   goto __pyx_L0;
 
-  /* "collision_handler.pyx":5
+  /* "collision_handler.pyx":48
  * # Ignore negative indice checking (i.e., a[-1])
  * @cython.wraparound(False)
  * cpdef int global_check(str robot_name,             # <<<<<<<<<<<<<<
@@ -3020,15 +3666,15 @@ static int __pyx_f_17collision_handler_global_check(PyObject *__pyx_v_robot_name
 }
 
 /* Python wrapper */
-static PyObject *__pyx_pw_17collision_handler_1global_check(PyObject *__pyx_self, 
+static PyObject *__pyx_pw_17collision_handler_3global_check(PyObject *__pyx_self, 
 #if CYTHON_METH_FASTCALL
 PyObject *const *__pyx_args, Py_ssize_t __pyx_nargs, PyObject *__pyx_kwds
 #else
 PyObject *__pyx_args, PyObject *__pyx_kwds
 #endif
 ); /*proto*/
-static PyMethodDef __pyx_mdef_17collision_handler_1global_check = {"global_check", (PyCFunction)(void*)(__Pyx_PyCFunction_FastCallWithKeywords)__pyx_pw_17collision_handler_1global_check, __Pyx_METH_FASTCALL|METH_KEYWORDS, 0};
-static PyObject *__pyx_pw_17collision_handler_1global_check(PyObject *__pyx_self, 
+static PyMethodDef __pyx_mdef_17collision_handler_3global_check = {"global_check", (PyCFunction)(void*)(__Pyx_PyCFunction_FastCallWithKeywords)__pyx_pw_17collision_handler_3global_check, __Pyx_METH_FASTCALL|METH_KEYWORDS, 0};
+static PyObject *__pyx_pw_17collision_handler_3global_check(PyObject *__pyx_self, 
 #if CYTHON_METH_FASTCALL
 PyObject *const *__pyx_args, Py_ssize_t __pyx_nargs, PyObject *__pyx_kwds
 #else
@@ -3042,11 +3688,12 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   int __pyx_v_len_links;
   PyObject *__pyx_v_global_dict = 0;
   PyObject *__pyx_v_overlap_dict = 0;
+  PyObject *__pyx_v_check_links = 0;
   #if !CYTHON_METH_FASTCALL
   CYTHON_UNUSED Py_ssize_t __pyx_nargs;
   #endif
   CYTHON_UNUSED PyObject *const *__pyx_kwvalues;
-  PyObject* values[7] = {0,0,0,0,0,0,0};
+  PyObject* values[8] = {0,0,0,0,0,0,0,0};
   int __pyx_lineno = 0;
   const char *__pyx_filename = NULL;
   int __pyx_clineno = 0;
@@ -3062,10 +3709,12 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   #endif
   __pyx_kwvalues = __Pyx_KwValues_FASTCALL(__pyx_args, __pyx_nargs);
   {
-    PyObject **__pyx_pyargnames[] = {&__pyx_n_s_robot_name,&__pyx_n_s_robot_names,&__pyx_n_s_len_robots,&__pyx_n_s_robot_links,&__pyx_n_s_len_links,&__pyx_n_s_global_dict,&__pyx_n_s_overlap_dict,0};
+    PyObject **__pyx_pyargnames[] = {&__pyx_n_s_robot_name,&__pyx_n_s_robot_names,&__pyx_n_s_len_robots,&__pyx_n_s_robot_links,&__pyx_n_s_len_links,&__pyx_n_s_global_dict,&__pyx_n_s_overlap_dict,&__pyx_n_s_check_links,0};
     if (__pyx_kwds) {
       Py_ssize_t kw_args;
       switch (__pyx_nargs) {
+        case  8: values[7] = __Pyx_Arg_FASTCALL(__pyx_args, 7);
+        CYTHON_FALLTHROUGH;
         case  7: values[6] = __Pyx_Arg_FASTCALL(__pyx_args, 6);
         CYTHON_FALLTHROUGH;
         case  6: values[5] = __Pyx_Arg_FASTCALL(__pyx_args, 5);
@@ -3090,7 +3739,7 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
           (void)__Pyx_Arg_NewRef_FASTCALL(values[0]);
           kw_args--;
         }
-        else if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 5, __pyx_L3_error)
+        else if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 48, __pyx_L3_error)
         else goto __pyx_L5_argtuple_error;
         CYTHON_FALLTHROUGH;
         case  1:
@@ -3098,9 +3747,9 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
           (void)__Pyx_Arg_NewRef_FASTCALL(values[1]);
           kw_args--;
         }
-        else if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 5, __pyx_L3_error)
+        else if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 48, __pyx_L3_error)
         else {
-          __Pyx_RaiseArgtupleInvalid("global_check", 1, 7, 7, 1); __PYX_ERR(0, 5, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("global_check", 1, 8, 8, 1); __PYX_ERR(0, 48, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  2:
@@ -3108,9 +3757,9 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
           (void)__Pyx_Arg_NewRef_FASTCALL(values[2]);
           kw_args--;
         }
-        else if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 5, __pyx_L3_error)
+        else if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 48, __pyx_L3_error)
         else {
-          __Pyx_RaiseArgtupleInvalid("global_check", 1, 7, 7, 2); __PYX_ERR(0, 5, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("global_check", 1, 8, 8, 2); __PYX_ERR(0, 48, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  3:
@@ -3118,9 +3767,9 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
           (void)__Pyx_Arg_NewRef_FASTCALL(values[3]);
           kw_args--;
         }
-        else if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 5, __pyx_L3_error)
+        else if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 48, __pyx_L3_error)
         else {
-          __Pyx_RaiseArgtupleInvalid("global_check", 1, 7, 7, 3); __PYX_ERR(0, 5, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("global_check", 1, 8, 8, 3); __PYX_ERR(0, 48, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  4:
@@ -3128,9 +3777,9 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
           (void)__Pyx_Arg_NewRef_FASTCALL(values[4]);
           kw_args--;
         }
-        else if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 5, __pyx_L3_error)
+        else if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 48, __pyx_L3_error)
         else {
-          __Pyx_RaiseArgtupleInvalid("global_check", 1, 7, 7, 4); __PYX_ERR(0, 5, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("global_check", 1, 8, 8, 4); __PYX_ERR(0, 48, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  5:
@@ -3138,9 +3787,9 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
           (void)__Pyx_Arg_NewRef_FASTCALL(values[5]);
           kw_args--;
         }
-        else if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 5, __pyx_L3_error)
+        else if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 48, __pyx_L3_error)
         else {
-          __Pyx_RaiseArgtupleInvalid("global_check", 1, 7, 7, 5); __PYX_ERR(0, 5, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("global_check", 1, 8, 8, 5); __PYX_ERR(0, 48, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  6:
@@ -3148,16 +3797,26 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
           (void)__Pyx_Arg_NewRef_FASTCALL(values[6]);
           kw_args--;
         }
-        else if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 5, __pyx_L3_error)
+        else if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 48, __pyx_L3_error)
         else {
-          __Pyx_RaiseArgtupleInvalid("global_check", 1, 7, 7, 6); __PYX_ERR(0, 5, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("global_check", 1, 8, 8, 6); __PYX_ERR(0, 48, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  7:
+        if (likely((values[7] = __Pyx_GetKwValue_FASTCALL(__pyx_kwds, __pyx_kwvalues, __pyx_n_s_check_links)) != 0)) {
+          (void)__Pyx_Arg_NewRef_FASTCALL(values[7]);
+          kw_args--;
+        }
+        else if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 48, __pyx_L3_error)
+        else {
+          __Pyx_RaiseArgtupleInvalid("global_check", 1, 8, 8, 7); __PYX_ERR(0, 48, __pyx_L3_error)
         }
       }
       if (unlikely(kw_args > 0)) {
         const Py_ssize_t kwd_pos_args = __pyx_nargs;
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values + 0, kwd_pos_args, "global_check") < 0)) __PYX_ERR(0, 5, __pyx_L3_error)
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values + 0, kwd_pos_args, "global_check") < 0)) __PYX_ERR(0, 48, __pyx_L3_error)
       }
-    } else if (unlikely(__pyx_nargs != 7)) {
+    } else if (unlikely(__pyx_nargs != 8)) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = __Pyx_Arg_FASTCALL(__pyx_args, 0);
@@ -3167,18 +3826,20 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
       values[4] = __Pyx_Arg_FASTCALL(__pyx_args, 4);
       values[5] = __Pyx_Arg_FASTCALL(__pyx_args, 5);
       values[6] = __Pyx_Arg_FASTCALL(__pyx_args, 6);
+      values[7] = __Pyx_Arg_FASTCALL(__pyx_args, 7);
     }
     __pyx_v_robot_name = ((PyObject*)values[0]);
     __pyx_v_robot_names = ((PyObject*)values[1]);
-    __pyx_v_len_robots = __Pyx_PyInt_As_int(values[2]); if (unlikely((__pyx_v_len_robots == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 7, __pyx_L3_error)
+    __pyx_v_len_robots = __Pyx_PyInt_As_int(values[2]); if (unlikely((__pyx_v_len_robots == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 50, __pyx_L3_error)
     __pyx_v_robot_links = ((PyObject*)values[3]);
-    __pyx_v_len_links = __Pyx_PyInt_As_int(values[4]); if (unlikely((__pyx_v_len_links == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 9, __pyx_L3_error)
+    __pyx_v_len_links = __Pyx_PyInt_As_int(values[4]); if (unlikely((__pyx_v_len_links == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 52, __pyx_L3_error)
     __pyx_v_global_dict = ((PyObject*)values[5]);
     __pyx_v_overlap_dict = ((PyObject*)values[6]);
+    __pyx_v_check_links = ((PyObject*)values[7]);
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("global_check", 1, 7, 7, __pyx_nargs); __PYX_ERR(0, 5, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("global_check", 1, 8, 8, __pyx_nargs); __PYX_ERR(0, 48, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -3192,12 +3853,13 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_robot_name), (&PyString_Type), 1, "robot_name", 1))) __PYX_ERR(0, 5, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_robot_names), (&PyList_Type), 1, "robot_names", 1))) __PYX_ERR(0, 6, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_robot_links), (&PyList_Type), 1, "robot_links", 1))) __PYX_ERR(0, 8, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_global_dict), (&PyDict_Type), 1, "global_dict", 1))) __PYX_ERR(0, 10, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_overlap_dict), (&PyDict_Type), 1, "overlap_dict", 1))) __PYX_ERR(0, 11, __pyx_L1_error)
-  __pyx_r = __pyx_pf_17collision_handler_global_check(__pyx_self, __pyx_v_robot_name, __pyx_v_robot_names, __pyx_v_len_robots, __pyx_v_robot_links, __pyx_v_len_links, __pyx_v_global_dict, __pyx_v_overlap_dict);
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_robot_name), (&PyString_Type), 1, "robot_name", 1))) __PYX_ERR(0, 48, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_robot_names), (&PyList_Type), 1, "robot_names", 1))) __PYX_ERR(0, 49, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_robot_links), (&PyList_Type), 1, "robot_links", 1))) __PYX_ERR(0, 51, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_global_dict), (&PyDict_Type), 1, "global_dict", 1))) __PYX_ERR(0, 53, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_overlap_dict), (&PyDict_Type), 1, "overlap_dict", 1))) __PYX_ERR(0, 54, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_check_links), (&PyList_Type), 1, "check_links", 1))) __PYX_ERR(0, 55, __pyx_L1_error)
+  __pyx_r = __pyx_pf_17collision_handler_2global_check(__pyx_self, __pyx_v_robot_name, __pyx_v_robot_names, __pyx_v_len_robots, __pyx_v_robot_links, __pyx_v_len_links, __pyx_v_global_dict, __pyx_v_overlap_dict, __pyx_v_check_links);
 
   /* function exit code */
   goto __pyx_L0;
@@ -3214,7 +3876,7 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_17collision_handler_global_check(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_robot_name, PyObject *__pyx_v_robot_names, int __pyx_v_len_robots, PyObject *__pyx_v_robot_links, int __pyx_v_len_links, PyObject *__pyx_v_global_dict, PyObject *__pyx_v_overlap_dict) {
+static PyObject *__pyx_pf_17collision_handler_2global_check(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_robot_name, PyObject *__pyx_v_robot_names, int __pyx_v_len_robots, PyObject *__pyx_v_robot_links, int __pyx_v_len_links, PyObject *__pyx_v_global_dict, PyObject *__pyx_v_overlap_dict, PyObject *__pyx_v_check_links) {
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   int __pyx_t_1;
@@ -3224,8 +3886,8 @@ static PyObject *__pyx_pf_17collision_handler_global_check(CYTHON_UNUSED PyObjec
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("global_check", 1);
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = __pyx_f_17collision_handler_global_check(__pyx_v_robot_name, __pyx_v_robot_names, __pyx_v_len_robots, __pyx_v_robot_links, __pyx_v_len_links, __pyx_v_global_dict, __pyx_v_overlap_dict, 0); if (unlikely(__pyx_t_1 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 5, __pyx_L1_error)
-  __pyx_t_2 = __Pyx_PyInt_From_int(__pyx_t_1); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 5, __pyx_L1_error)
+  __pyx_t_1 = __pyx_f_17collision_handler_global_check(__pyx_v_robot_name, __pyx_v_robot_names, __pyx_v_len_robots, __pyx_v_robot_links, __pyx_v_len_links, __pyx_v_global_dict, __pyx_v_overlap_dict, __pyx_v_check_links, 0); if (unlikely(__pyx_t_1 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 48, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyInt_From_int(__pyx_t_1); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 48, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __pyx_r = __pyx_t_2;
   __pyx_t_2 = 0;
@@ -3242,14 +3904,14 @@ static PyObject *__pyx_pf_17collision_handler_global_check(CYTHON_UNUSED PyObjec
   return __pyx_r;
 }
 
-/* "collision_handler.pyx":86
+/* "collision_handler.pyx":138
  *   return -1
  * 
  * cpdef int test (int val1, int val2):             # <<<<<<<<<<<<<<
  *   return val1 + val2
  */
 
-static PyObject *__pyx_pw_17collision_handler_3test(PyObject *__pyx_self, 
+static PyObject *__pyx_pw_17collision_handler_5test(PyObject *__pyx_self, 
 #if CYTHON_METH_FASTCALL
 PyObject *const *__pyx_args, Py_ssize_t __pyx_nargs, PyObject *__pyx_kwds
 #else
@@ -3259,7 +3921,7 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
 static int __pyx_f_17collision_handler_test(int __pyx_v_val1, int __pyx_v_val2, CYTHON_UNUSED int __pyx_skip_dispatch) {
   int __pyx_r;
 
-  /* "collision_handler.pyx":87
+  /* "collision_handler.pyx":139
  * 
  * cpdef int test (int val1, int val2):
  *   return val1 + val2             # <<<<<<<<<<<<<<
@@ -3267,7 +3929,7 @@ static int __pyx_f_17collision_handler_test(int __pyx_v_val1, int __pyx_v_val2, 
   __pyx_r = (__pyx_v_val1 + __pyx_v_val2);
   goto __pyx_L0;
 
-  /* "collision_handler.pyx":86
+  /* "collision_handler.pyx":138
  *   return -1
  * 
  * cpdef int test (int val1, int val2):             # <<<<<<<<<<<<<<
@@ -3280,15 +3942,15 @@ static int __pyx_f_17collision_handler_test(int __pyx_v_val1, int __pyx_v_val2, 
 }
 
 /* Python wrapper */
-static PyObject *__pyx_pw_17collision_handler_3test(PyObject *__pyx_self, 
+static PyObject *__pyx_pw_17collision_handler_5test(PyObject *__pyx_self, 
 #if CYTHON_METH_FASTCALL
 PyObject *const *__pyx_args, Py_ssize_t __pyx_nargs, PyObject *__pyx_kwds
 #else
 PyObject *__pyx_args, PyObject *__pyx_kwds
 #endif
 ); /*proto*/
-static PyMethodDef __pyx_mdef_17collision_handler_3test = {"test", (PyCFunction)(void*)(__Pyx_PyCFunction_FastCallWithKeywords)__pyx_pw_17collision_handler_3test, __Pyx_METH_FASTCALL|METH_KEYWORDS, 0};
-static PyObject *__pyx_pw_17collision_handler_3test(PyObject *__pyx_self, 
+static PyMethodDef __pyx_mdef_17collision_handler_5test = {"test", (PyCFunction)(void*)(__Pyx_PyCFunction_FastCallWithKeywords)__pyx_pw_17collision_handler_5test, __Pyx_METH_FASTCALL|METH_KEYWORDS, 0};
+static PyObject *__pyx_pw_17collision_handler_5test(PyObject *__pyx_self, 
 #if CYTHON_METH_FASTCALL
 PyObject *const *__pyx_args, Py_ssize_t __pyx_nargs, PyObject *__pyx_kwds
 #else
@@ -3335,7 +3997,7 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
           (void)__Pyx_Arg_NewRef_FASTCALL(values[0]);
           kw_args--;
         }
-        else if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 86, __pyx_L3_error)
+        else if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 138, __pyx_L3_error)
         else goto __pyx_L5_argtuple_error;
         CYTHON_FALLTHROUGH;
         case  1:
@@ -3343,14 +4005,14 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
           (void)__Pyx_Arg_NewRef_FASTCALL(values[1]);
           kw_args--;
         }
-        else if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 86, __pyx_L3_error)
+        else if (unlikely(PyErr_Occurred())) __PYX_ERR(0, 138, __pyx_L3_error)
         else {
-          __Pyx_RaiseArgtupleInvalid("test", 1, 2, 2, 1); __PYX_ERR(0, 86, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("test", 1, 2, 2, 1); __PYX_ERR(0, 138, __pyx_L3_error)
         }
       }
       if (unlikely(kw_args > 0)) {
         const Py_ssize_t kwd_pos_args = __pyx_nargs;
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values + 0, kwd_pos_args, "test") < 0)) __PYX_ERR(0, 86, __pyx_L3_error)
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values + 0, kwd_pos_args, "test") < 0)) __PYX_ERR(0, 138, __pyx_L3_error)
       }
     } else if (unlikely(__pyx_nargs != 2)) {
       goto __pyx_L5_argtuple_error;
@@ -3358,12 +4020,12 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
       values[0] = __Pyx_Arg_FASTCALL(__pyx_args, 0);
       values[1] = __Pyx_Arg_FASTCALL(__pyx_args, 1);
     }
-    __pyx_v_val1 = __Pyx_PyInt_As_int(values[0]); if (unlikely((__pyx_v_val1 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 86, __pyx_L3_error)
-    __pyx_v_val2 = __Pyx_PyInt_As_int(values[1]); if (unlikely((__pyx_v_val2 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 86, __pyx_L3_error)
+    __pyx_v_val1 = __Pyx_PyInt_As_int(values[0]); if (unlikely((__pyx_v_val1 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 138, __pyx_L3_error)
+    __pyx_v_val2 = __Pyx_PyInt_As_int(values[1]); if (unlikely((__pyx_v_val2 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 138, __pyx_L3_error)
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("test", 1, 2, 2, __pyx_nargs); __PYX_ERR(0, 86, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("test", 1, 2, 2, __pyx_nargs); __PYX_ERR(0, 138, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -3377,7 +4039,7 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  __pyx_r = __pyx_pf_17collision_handler_2test(__pyx_self, __pyx_v_val1, __pyx_v_val2);
+  __pyx_r = __pyx_pf_17collision_handler_4test(__pyx_self, __pyx_v_val1, __pyx_v_val2);
 
   /* function exit code */
   {
@@ -3390,7 +4052,7 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_17collision_handler_2test(CYTHON_UNUSED PyObject *__pyx_self, int __pyx_v_val1, int __pyx_v_val2) {
+static PyObject *__pyx_pf_17collision_handler_4test(CYTHON_UNUSED PyObject *__pyx_self, int __pyx_v_val1, int __pyx_v_val2) {
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   int __pyx_t_1;
@@ -3400,8 +4062,8 @@ static PyObject *__pyx_pf_17collision_handler_2test(CYTHON_UNUSED PyObject *__py
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("test", 1);
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = __pyx_f_17collision_handler_test(__pyx_v_val1, __pyx_v_val2, 0); if (unlikely(__pyx_t_1 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 86, __pyx_L1_error)
-  __pyx_t_2 = __Pyx_PyInt_From_int(__pyx_t_1); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 86, __pyx_L1_error)
+  __pyx_t_1 = __pyx_f_17collision_handler_test(__pyx_v_val1, __pyx_v_val2, 0); if (unlikely(__pyx_t_1 == ((int)-1) && PyErr_Occurred())) __PYX_ERR(0, 138, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyInt_From_int(__pyx_t_1); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 138, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __pyx_r = __pyx_t_2;
   __pyx_t_2 = 0;
@@ -3434,11 +4096,13 @@ static PyMethodDef __pyx_methods[] = {
 
 static int __Pyx_CreateStringTabAndInitStrings(void) {
   __Pyx_StringTabEntry __pyx_string_tab[] = {
-    {&__pyx_n_s__5, __pyx_k__5, sizeof(__pyx_k__5), 0, 0, 1, 1},
+    {&__pyx_n_s__7, __pyx_k__7, sizeof(__pyx_k__7), 0, 0, 1, 1},
     {&__pyx_kp_s_armer_cython_collision_handler_p, __pyx_k_armer_cython_collision_handler_p, sizeof(__pyx_k_armer_cython_collision_handler_p), 0, 0, 1, 0},
     {&__pyx_n_s_asyncio_coroutines, __pyx_k_asyncio_coroutines, sizeof(__pyx_k_asyncio_coroutines), 0, 0, 1, 1},
+    {&__pyx_n_s_check_links, __pyx_k_check_links, sizeof(__pyx_k_check_links), 0, 0, 1, 1},
     {&__pyx_n_s_cline_in_traceback, __pyx_k_cline_in_traceback, sizeof(__pyx_k_cline_in_traceback), 0, 0, 1, 1},
     {&__pyx_n_s_closest_point, __pyx_k_closest_point, sizeof(__pyx_k_closest_point), 0, 0, 1, 1},
+    {&__pyx_n_s_col_check, __pyx_k_col_check, sizeof(__pyx_k_col_check), 0, 0, 1, 1},
     {&__pyx_n_s_collision, __pyx_k_collision, sizeof(__pyx_k_collision), 0, 0, 1, 1},
     {&__pyx_n_s_collision_handler, __pyx_k_collision_handler, sizeof(__pyx_k_collision_handler), 0, 0, 1, 1},
     {&__pyx_n_s_copy, __pyx_k_copy, sizeof(__pyx_k_copy), 0, 0, 1, 1},
@@ -3455,6 +4119,7 @@ static int __Pyx_CreateStringTabAndInitStrings(void) {
     {&__pyx_n_s_robot_links, __pyx_k_robot_links, sizeof(__pyx_k_robot_links), 0, 0, 1, 1},
     {&__pyx_n_s_robot_name, __pyx_k_robot_name, sizeof(__pyx_k_robot_name), 0, 0, 1, 1},
     {&__pyx_n_s_robot_names, __pyx_k_robot_names, sizeof(__pyx_k_robot_names), 0, 0, 1, 1},
+    {&__pyx_n_s_sliced_links, __pyx_k_sliced_links, sizeof(__pyx_k_sliced_links), 0, 0, 1, 1},
     {&__pyx_n_s_test, __pyx_k_test, sizeof(__pyx_k_test), 0, 0, 1, 1},
     {&__pyx_n_s_test_2, __pyx_k_test_2, sizeof(__pyx_k_test_2), 0, 0, 1, 1},
     {&__pyx_n_s_val1, __pyx_k_val1, sizeof(__pyx_k_val1), 0, 0, 1, 1},
@@ -3465,7 +4130,7 @@ static int __Pyx_CreateStringTabAndInitStrings(void) {
 }
 /* #### Code section: cached_builtins ### */
 static CYTHON_SMALL_CODE int __Pyx_InitCachedBuiltins(void) {
-  __pyx_builtin_range = __Pyx_GetBuiltinName(__pyx_n_s_range); if (!__pyx_builtin_range) __PYX_ERR(0, 29, __pyx_L1_error)
+  __pyx_builtin_range = __Pyx_GetBuiltinName(__pyx_n_s_range); if (!__pyx_builtin_range) __PYX_ERR(0, 16, __pyx_L1_error)
   return 0;
   __pyx_L1_error:;
   return -1;
@@ -3479,25 +4144,37 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   /* "collision_handler.pyx":5
  * # Ignore negative indice checking (i.e., a[-1])
  * @cython.wraparound(False)
+ * cpdef int col_check(list sliced_links, list check_links, int len_links, dict global_dict):             # <<<<<<<<<<<<<<
+ * 
+ *   cdef int s_idx
+ */
+  __pyx_tuple_ = PyTuple_Pack(4, __pyx_n_s_sliced_links, __pyx_n_s_check_links, __pyx_n_s_len_links, __pyx_n_s_global_dict); if (unlikely(!__pyx_tuple_)) __PYX_ERR(0, 5, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple_);
+  __Pyx_GIVEREF(__pyx_tuple_);
+  __pyx_codeobj__2 = (PyObject*)__Pyx_PyCode_New(4, 0, 0, 4, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple_, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_armer_cython_collision_handler_p, __pyx_n_s_col_check, 5, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__2)) __PYX_ERR(0, 5, __pyx_L1_error)
+
+  /* "collision_handler.pyx":48
+ * # Ignore negative indice checking (i.e., a[-1])
+ * @cython.wraparound(False)
  * cpdef int global_check(str robot_name,             # <<<<<<<<<<<<<<
  *                       list robot_names,
  *                       int len_robots,
  */
-  __pyx_tuple_ = PyTuple_Pack(7, __pyx_n_s_robot_name, __pyx_n_s_robot_names, __pyx_n_s_len_robots, __pyx_n_s_robot_links, __pyx_n_s_len_links, __pyx_n_s_global_dict, __pyx_n_s_overlap_dict); if (unlikely(!__pyx_tuple_)) __PYX_ERR(0, 5, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple_);
-  __Pyx_GIVEREF(__pyx_tuple_);
-  __pyx_codeobj__2 = (PyObject*)__Pyx_PyCode_New(7, 0, 0, 7, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple_, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_armer_cython_collision_handler_p, __pyx_n_s_global_check, 5, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__2)) __PYX_ERR(0, 5, __pyx_L1_error)
+  __pyx_tuple__3 = PyTuple_Pack(8, __pyx_n_s_robot_name, __pyx_n_s_robot_names, __pyx_n_s_len_robots, __pyx_n_s_robot_links, __pyx_n_s_len_links, __pyx_n_s_global_dict, __pyx_n_s_overlap_dict, __pyx_n_s_check_links); if (unlikely(!__pyx_tuple__3)) __PYX_ERR(0, 48, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__3);
+  __Pyx_GIVEREF(__pyx_tuple__3);
+  __pyx_codeobj__4 = (PyObject*)__Pyx_PyCode_New(8, 0, 0, 8, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__3, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_armer_cython_collision_handler_p, __pyx_n_s_global_check, 48, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__4)) __PYX_ERR(0, 48, __pyx_L1_error)
 
-  /* "collision_handler.pyx":86
+  /* "collision_handler.pyx":138
  *   return -1
  * 
  * cpdef int test (int val1, int val2):             # <<<<<<<<<<<<<<
  *   return val1 + val2
  */
-  __pyx_tuple__3 = PyTuple_Pack(2, __pyx_n_s_val1, __pyx_n_s_val2); if (unlikely(!__pyx_tuple__3)) __PYX_ERR(0, 86, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__3);
-  __Pyx_GIVEREF(__pyx_tuple__3);
-  __pyx_codeobj__4 = (PyObject*)__Pyx_PyCode_New(2, 0, 0, 2, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__3, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_armer_cython_collision_handler_p, __pyx_n_s_test, 86, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__4)) __PYX_ERR(0, 86, __pyx_L1_error)
+  __pyx_tuple__5 = PyTuple_Pack(2, __pyx_n_s_val1, __pyx_n_s_val2); if (unlikely(!__pyx_tuple__5)) __PYX_ERR(0, 138, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__5);
+  __Pyx_GIVEREF(__pyx_tuple__5);
+  __pyx_codeobj__6 = (PyObject*)__Pyx_PyCode_New(2, 0, 0, 2, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__5, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_armer_cython_collision_handler_p, __pyx_n_s_test, 138, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__6)) __PYX_ERR(0, 138, __pyx_L1_error)
   __Pyx_RefNannyFinishContext();
   return 0;
   __pyx_L1_error:;
@@ -3865,24 +4542,36 @@ if (!__Pyx_RefNanny) {
   /* "collision_handler.pyx":5
  * # Ignore negative indice checking (i.e., a[-1])
  * @cython.wraparound(False)
+ * cpdef int col_check(list sliced_links, list check_links, int len_links, dict global_dict):             # <<<<<<<<<<<<<<
+ * 
+ *   cdef int s_idx
+ */
+  __pyx_t_2 = __Pyx_CyFunction_New(&__pyx_mdef_17collision_handler_1col_check, 0, __pyx_n_s_col_check, NULL, __pyx_n_s_collision_handler, __pyx_d, ((PyObject *)__pyx_codeobj__2)); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 5, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_col_check, __pyx_t_2) < 0) __PYX_ERR(0, 5, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+
+  /* "collision_handler.pyx":48
+ * # Ignore negative indice checking (i.e., a[-1])
+ * @cython.wraparound(False)
  * cpdef int global_check(str robot_name,             # <<<<<<<<<<<<<<
  *                       list robot_names,
  *                       int len_robots,
  */
-  __pyx_t_2 = __Pyx_CyFunction_New(&__pyx_mdef_17collision_handler_1global_check, 0, __pyx_n_s_global_check, NULL, __pyx_n_s_collision_handler, __pyx_d, ((PyObject *)__pyx_codeobj__2)); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 5, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_CyFunction_New(&__pyx_mdef_17collision_handler_3global_check, 0, __pyx_n_s_global_check, NULL, __pyx_n_s_collision_handler, __pyx_d, ((PyObject *)__pyx_codeobj__4)); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 48, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_global_check, __pyx_t_2) < 0) __PYX_ERR(0, 5, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_global_check, __pyx_t_2) < 0) __PYX_ERR(0, 48, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "collision_handler.pyx":86
+  /* "collision_handler.pyx":138
  *   return -1
  * 
  * cpdef int test (int val1, int val2):             # <<<<<<<<<<<<<<
  *   return val1 + val2
  */
-  __pyx_t_2 = __Pyx_CyFunction_New(&__pyx_mdef_17collision_handler_3test, 0, __pyx_n_s_test, NULL, __pyx_n_s_collision_handler, __pyx_d, ((PyObject *)__pyx_codeobj__4)); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 86, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_CyFunction_New(&__pyx_mdef_17collision_handler_5test, 0, __pyx_n_s_test, NULL, __pyx_n_s_collision_handler, __pyx_d, ((PyObject *)__pyx_codeobj__6)); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 138, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_test, __pyx_t_2) < 0) __PYX_ERR(0, 86, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_test, __pyx_t_2) < 0) __PYX_ERR(0, 138, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
   /* "collision_handler.pyx":1
@@ -4503,6 +5192,80 @@ static CYTHON_INLINE PyObject* __Pyx_PyObject_FastCallDict(PyObject *func, PyObj
     #endif
 }
 
+/* RaiseTooManyValuesToUnpack */
+static CYTHON_INLINE void __Pyx_RaiseTooManyValuesError(Py_ssize_t expected) {
+    PyErr_Format(PyExc_ValueError,
+                 "too many values to unpack (expected %" CYTHON_FORMAT_SSIZE_T "d)", expected);
+}
+
+/* RaiseNeedMoreValuesToUnpack */
+static CYTHON_INLINE void __Pyx_RaiseNeedMoreValuesError(Py_ssize_t index) {
+    PyErr_Format(PyExc_ValueError,
+                 "need more than %" CYTHON_FORMAT_SSIZE_T "d value%.1s to unpack",
+                 index, (index == 1) ? "" : "s");
+}
+
+/* IterFinish */
+static CYTHON_INLINE int __Pyx_IterFinish(void) {
+    __Pyx_PyThreadState_declare
+    __Pyx_PyThreadState_assign
+    PyObject* exc_type = __Pyx_PyErr_CurrentExceptionType();
+    if (unlikely(exc_type)) {
+        if (unlikely(!__Pyx_PyErr_GivenExceptionMatches(exc_type, PyExc_StopIteration)))
+            return -1;
+        __Pyx_PyErr_Clear();
+        return 0;
+    }
+    return 0;
+}
+
+/* UnpackItemEndCheck */
+static int __Pyx_IternextUnpackEndCheck(PyObject *retval, Py_ssize_t expected) {
+    if (unlikely(retval)) {
+        Py_DECREF(retval);
+        __Pyx_RaiseTooManyValuesError(expected);
+        return -1;
+    }
+    return __Pyx_IterFinish();
+}
+
+/* TupleAndListFromArray */
+#if CYTHON_COMPILING_IN_CPYTHON
+static CYTHON_INLINE void __Pyx_copy_object_array(PyObject *const *CYTHON_RESTRICT src, PyObject** CYTHON_RESTRICT dest, Py_ssize_t length) {
+    PyObject *v;
+    Py_ssize_t i;
+    for (i = 0; i < length; i++) {
+        v = dest[i] = src[i];
+        Py_INCREF(v);
+    }
+}
+static CYTHON_INLINE PyObject *
+__Pyx_PyTuple_FromArray(PyObject *const *src, Py_ssize_t n)
+{
+    PyObject *res;
+    if (n <= 0) {
+        Py_INCREF(__pyx_empty_tuple);
+        return __pyx_empty_tuple;
+    }
+    res = PyTuple_New(n);
+    if (unlikely(res == NULL)) return NULL;
+    __Pyx_copy_object_array(src, ((PyTupleObject*)res)->ob_item, n);
+    return res;
+}
+static CYTHON_INLINE PyObject *
+__Pyx_PyList_FromArray(PyObject *const *src, Py_ssize_t n)
+{
+    PyObject *res;
+    if (n <= 0) {
+        return PyList_New(0);
+    }
+    res = PyList_New(n);
+    if (unlikely(res == NULL)) return NULL;
+    __Pyx_copy_object_array(src, ((PyListObject*)res)->ob_item, n);
+    return res;
+}
+#endif
+
 /* BytesEquals */
 static CYTHON_INLINE int __Pyx_PyBytes_Equals(PyObject* s1, PyObject* s2, int equals) {
 #if CYTHON_COMPILING_IN_PYPY || CYTHON_COMPILING_IN_LIMITED_API
@@ -4651,80 +5414,6 @@ return_ne:
     return (equals == Py_NE);
 #endif
 }
-
-/* RaiseTooManyValuesToUnpack */
-static CYTHON_INLINE void __Pyx_RaiseTooManyValuesError(Py_ssize_t expected) {
-    PyErr_Format(PyExc_ValueError,
-                 "too many values to unpack (expected %" CYTHON_FORMAT_SSIZE_T "d)", expected);
-}
-
-/* RaiseNeedMoreValuesToUnpack */
-static CYTHON_INLINE void __Pyx_RaiseNeedMoreValuesError(Py_ssize_t index) {
-    PyErr_Format(PyExc_ValueError,
-                 "need more than %" CYTHON_FORMAT_SSIZE_T "d value%.1s to unpack",
-                 index, (index == 1) ? "" : "s");
-}
-
-/* IterFinish */
-static CYTHON_INLINE int __Pyx_IterFinish(void) {
-    __Pyx_PyThreadState_declare
-    __Pyx_PyThreadState_assign
-    PyObject* exc_type = __Pyx_PyErr_CurrentExceptionType();
-    if (unlikely(exc_type)) {
-        if (unlikely(!__Pyx_PyErr_GivenExceptionMatches(exc_type, PyExc_StopIteration)))
-            return -1;
-        __Pyx_PyErr_Clear();
-        return 0;
-    }
-    return 0;
-}
-
-/* UnpackItemEndCheck */
-static int __Pyx_IternextUnpackEndCheck(PyObject *retval, Py_ssize_t expected) {
-    if (unlikely(retval)) {
-        Py_DECREF(retval);
-        __Pyx_RaiseTooManyValuesError(expected);
-        return -1;
-    }
-    return __Pyx_IterFinish();
-}
-
-/* TupleAndListFromArray */
-#if CYTHON_COMPILING_IN_CPYTHON
-static CYTHON_INLINE void __Pyx_copy_object_array(PyObject *const *CYTHON_RESTRICT src, PyObject** CYTHON_RESTRICT dest, Py_ssize_t length) {
-    PyObject *v;
-    Py_ssize_t i;
-    for (i = 0; i < length; i++) {
-        v = dest[i] = src[i];
-        Py_INCREF(v);
-    }
-}
-static CYTHON_INLINE PyObject *
-__Pyx_PyTuple_FromArray(PyObject *const *src, Py_ssize_t n)
-{
-    PyObject *res;
-    if (n <= 0) {
-        Py_INCREF(__pyx_empty_tuple);
-        return __pyx_empty_tuple;
-    }
-    res = PyTuple_New(n);
-    if (unlikely(res == NULL)) return NULL;
-    __Pyx_copy_object_array(src, ((PyTupleObject*)res)->ob_item, n);
-    return res;
-}
-static CYTHON_INLINE PyObject *
-__Pyx_PyList_FromArray(PyObject *const *src, Py_ssize_t n)
-{
-    PyObject *res;
-    if (n <= 0) {
-        return PyList_New(0);
-    }
-    res = PyList_New(n);
-    if (unlikely(res == NULL)) return NULL;
-    __Pyx_copy_object_array(src, ((PyListObject*)res)->ob_item, n);
-    return res;
-}
-#endif
 
 /* fastcall */
 #if CYTHON_METH_FASTCALL
@@ -6950,7 +7639,7 @@ __Pyx_PyType_GetName(PyTypeObject* tp)
     if (unlikely(name == NULL) || unlikely(!PyUnicode_Check(name))) {
         PyErr_Clear();
         Py_XDECREF(name);
-        name = __Pyx_NewRef(__pyx_n_s__5);
+        name = __Pyx_NewRef(__pyx_n_s__7);
     }
     return name;
 }
