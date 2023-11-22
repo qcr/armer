@@ -2177,7 +2177,7 @@ class ROSRobot(rtb.Robot):
             tree = KDTree(data=target_shape_translations)
             target_position = self.ets(start=self.base_link, end=sliced_link).eval(self.q)[:3, 3]
             # Test query of nearest neighbors for a specific shape (3D) as origin (given tree is from source)
-            dist, ind = tree.query(X=[target_position], k=dim)
+            dist, ind = tree.query(X=[target_position], k=dim, dualtree=True)
             # print(f"dist: {dist} | links: {[list(link_pose_dict.keys())[i] for i in ind[0]]}")
 
             check_links.append([list(link_pose_dict.keys())[i] for i in ind[0]])
