@@ -1091,32 +1091,27 @@ class ROSRobot(rtb.Robot):
             # Generate trajectory from successful solution
             traj = self.traj_generator(self, qf=solution.q, max_speed=goal.speed if goal.speed else 0.2)
 
-            # Construct a joint trajectory representation
-            # TODO: test and implement this with joint trajectory controller
-            print(f"traj time: {traj.t}")
+            # Take max time from trajectory and convert to array based on traj length
+            # NOTE: this is needed to then construct a JointTrajectory type
             max_time = np.max(traj.t)
             time_array = np.linspace(0, max_time, len(traj.s))
-            print(f"time array: {time_array}")
+            #print(f"time array: {time_array}")
 
-            # NOTE: adding one waypoint works, but adding all waypoints is an issue as time value is not correct per step
+            # Iterates through calculated trajectory and converts to a JointTrajectory type
+            # NOTE: a standard delay of 1 second needed so controller can execute correctly
+            #       otherwise, issues with physical panda motion
             jt_traj = JointTrajectory()
             jt_traj.header.stamp = rospy.Time.now()
             jt_traj.joint_names = list(self.joint_names)
-            print(f"traj joint names: {jt_traj.joint_names}")
-            #for idx in range(0,len(traj.s)):
+            #print(f"traj joint names: {jt_traj.joint_names}")
+            for idx in range(0,len(traj.s)):
             #    print(f"current time array: {time_array[idx]} | rospy duration: {rospy.Duration(time_array[idx])}")
-                #jt_traj_point = JointTrajectoryPoint()
-                #jt_traj_point.time_from_start = rospy.Duration(time_array[idx])
-                #jt_traj_point.positions = list(traj.s[idx])
-                #jt_traj_point.velocities = list(traj.sd[idx])
-                #jt_traj.points.append(jt_traj_point)
+                jt_traj_point = JointTrajectoryPoint()
+                jt_traj_point.time_from_start = rospy.Duration(time_array[idx] + 1)
+                jt_traj_point.positions = list(traj.s[idx])
+                jt_traj_point.velocities = list(traj.sd[idx])
+                jt_traj.points.append(jt_traj_point)
 
-            jt_traj_point = JointTrajectoryPoint()
-            jt_traj_point.time_from_start = rospy.Duration(np.max(traj.t))
-            jt_traj_point.positions = list(traj.s[-1])
-            #jt_traj_point.velocities = traj.sd[idx]
-            jt_traj.points.append(jt_traj_point)
-            
             # Conduct 'Ghost' Robot Check for Collision throughout trajectory
             # NOTE: also publishes marker representation of trajectory for visual confirmation (Rviz)
             go_signal = self.trajectory_collision_checker(traj=traj)
@@ -1140,10 +1135,8 @@ class ROSRobot(rtb.Robot):
             # display_traj.trajectory_start = robot_state
 
             #self.display_moveit_traj_publisher.publish(display_traj)
-
-            # Check for collision only at end for speed
-            # go_signal = self.check_collision_per_state(q=solution.q)
-            #go_signal = False 
+            
+            # If valid (no collisions detected) then continue with action
             if go_signal:
                 # ---- TESTING NEW IMPLEMENTATION
                 # Create a client to loaded controller
@@ -1158,13 +1151,19 @@ class ROSRobot(rtb.Robot):
 
                 # Send Joint Trajectory to position controller for execution
                 client.send_goal(goal)
-
+                
+                # TODO: currently the collision preempt (or any armer preempt)
+                #       does not stop the motion as it is being externally controlled
+                #       through the joint trajectory controller. Best to add a supervisor
+                #       to stop action (trajectory controller) on any events here
                 # Wait for controller to finish
                 client.wait_for_result()
+                result = client.get_result()
 
                 # Debugging out of result
-                print(f"result: {client.get_result()}")
+                #print(f"result: {result}")
                 
+                # Existing Method (Sim)
                 # self.executor = TrajectoryExecutor(
                 #     self,
                 #     traj=traj,
@@ -1174,16 +1173,21 @@ class ROSRobot(rtb.Robot):
                 # while not self.executor.is_finished():
                 #     rospy.sleep(0.01)
 
+                #result = self.executor.is_succeeded()
 
                 # Send empty data at end to clear visual trajectory
                 marker_traj = Marker()
                 marker_traj.points = []
                 self.display_traj_publisher.publish(marker_traj)
 
-                # if self.executor.is_succeeded():
-                self.pose_server.set_succeeded(MoveToPoseResult(success=True))
-                # else:
-                #     self.pose_server.set_aborted(MoveToPoseResult(success=False))
+                if hasattr(result, 'error_code') and result.error_code == 0:
+                    #print(f"result has error code and is safe")
+                    self.pose_server.set_succeeded(MoveToPoseResult(success=True))
+                elif isinstance(result, bool) and result:
+                    #print(f"result is of type bool and is safe")
+                    self.pose_server.set_succeeded(MoveToPoseResult(success=True))
+                else:
+                    self.pose_server.set_aborted(MoveToPoseResult(success=False))
             else:
                 self.pose_server.set_aborted(MoveToPoseResult(success=False))
                 self.executor = None
