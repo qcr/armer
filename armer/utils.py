@@ -31,13 +31,19 @@ def ikine(robot, target, q0, end):
 
     return type('obj', (object,), {'q' : np.array(result[0])})
 
-def trapezoidal(robot: rtb.Robot, qf: np.ndarray, max_speed=None, frequency=500, move_time_sec: float=5):
+def trapezoidal(robot: rtb.Robot, qf: np.ndarray, frequency=500, move_time_sec: float=5, t_vec: list = []):
     rospy.loginfo(f"TESTING Hotfix 96fd293")
 
     # ------------ NOTE: determine a joint trajectory (curved) based on time request
     # Solve a trapezoidal trajectory in joint space based on provided solution based on defined number of steps (t)
     # NOTE: this takes into account the robot's defined joint angle limits (defined in each robot's config as qlim_min and qlim_max)
-    traj = rtb.mtraj(rtb.trapezoidal, q0=robot.q, qf=qf, t=frequency)
+    if t_vec == []:
+        traj = rtb.mtraj(rtb.trapezoidal, q0=robot.q, qf=qf, t=frequency)
+    else:
+        traj = rtb.mtraj(rtb.trapezoidal, q0=robot.q, qf=qf, t=t_vec)
+
+    # print(f"traj t from trapezoidal function: {traj.t}")
+    # print(f"traj sd is: {traj.sd}")
 
     # Check if trajectory is valid
     if np.max(traj.qd) != 0 and move_time_sec != 0:
@@ -45,7 +51,7 @@ def trapezoidal(robot: rtb.Robot, qf: np.ndarray, max_speed=None, frequency=500,
         scaled_qd = traj.qd*(frequency/move_time_sec)
         # print(f"max scaled qd: {np.max(scaled_qd)}")
         # return the generated trajectory scaled with expected speed/time
-        return Trajectory(name='trapezoidal-v1', t=move_time_sec, s=traj.q, sd=scaled_qd, sdd=None, istime=True)
+        return Trajectory(name='trapezoidal-v1', t=traj.t, s=traj.q, sd=scaled_qd, sdd=None, istime=False)
     else:
         rospy.logerr(f"Trajectory is invalid --> Cannot Solve. Given Move Time: [{move_time_sec}]")
         return Trajectory(name='invalid', t=1, s=robot.q, sd=None, sdd=None, istime=False)

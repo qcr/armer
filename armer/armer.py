@@ -310,7 +310,7 @@ class Armer:
 
         # Alternative Method
         # NOTE: this has between 1-6% increase in speed of execution
-        start = timeit.default_timer()
+        # start = timeit.default_timer()
         col_link_id = collision_handler.global_check(
             robot_name = robot.name,
             robot_names = list(self.global_collision_dict.keys()),
@@ -321,8 +321,8 @@ class Armer:
             overlap_dict = robot.overlapped_link_dict,
             check_links = check_links
         )
-        end = timeit.default_timer()
-        print(f"[OLD] full collision check: {1/(end-start)} hz")
+        # end = timeit.default_timer()
+        # print(f"[OLD] full collision check: {1/(end-start)} hz")
     
         if col_link_id >= 0:
             rospy.logwarn(f"Global Collision Check -> Robot [{robot.name}] in collision with link {robot.collision_sliced_links[col_link_id].name}")

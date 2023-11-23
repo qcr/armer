@@ -1089,55 +1089,58 @@ class ROSRobot(rtb.Robot):
                 rospy.logwarn(f"IK solution within singularity threshold [{self.singularity_thresh}] -> ill-advised motion")
 
             # Generate trajectory from successful solution
-            traj = self.traj_generator(self, qf=solution.q, max_speed=goal.speed if goal.speed else 0.2)
+            # traj = self.traj_generator(self, qf=solution.q, max_speed=goal.speed if goal.speed else 0.2)
+            # Aiming for 500 steps (frequency) with a set max time (input from user)
+            time_array = np.linspace(0, 5, 500)
+            traj = self.traj_generator(self, qf=solution.q, move_time_sec=5, frequency=500, t_vec=time_array)
 
             # Construct a joint trajectory representation
             # TODO: test and implement this with joint trajectory controller
             print(f"traj time: {traj.t}")
             max_time = np.max(traj.t)
-            time_array = np.linspace(0, max_time, len(traj.s))
-            print(f"time array: {time_array}")
+            # time_array = np.linspace(0, max_time, len(traj.s))
+            # print(f"time array: {time_array}")
 
             # NOTE: adding one waypoint works, but adding all waypoints is an issue as time value is not correct per step
             jt_traj = JointTrajectory()
             jt_traj.header.stamp = rospy.Time.now()
             jt_traj.joint_names = list(self.joint_names)
             print(f"traj joint names: {jt_traj.joint_names}")
-            #for idx in range(0,len(traj.s)):
-            #    print(f"current time array: {time_array[idx]} | rospy duration: {rospy.Duration(time_array[idx])}")
-                #jt_traj_point = JointTrajectoryPoint()
-                #jt_traj_point.time_from_start = rospy.Duration(time_array[idx])
-                #jt_traj_point.positions = list(traj.s[idx])
-                #jt_traj_point.velocities = list(traj.sd[idx])
-                #jt_traj.points.append(jt_traj_point)
+            for idx in range(0,len(traj.s)):
+                print(f"current time array: {time_array[idx]} | rospy duration: {rospy.Duration(time_array[idx])}")
+                jt_traj_point = JointTrajectoryPoint()
+                jt_traj_point.time_from_start = rospy.Duration(traj.t[idx])
+                jt_traj_point.positions = list(traj.s[idx])
+                # jt_traj_point.velocities = list(traj.sd[idx])
+                jt_traj.points.append(jt_traj_point)
 
-            jt_traj_point = JointTrajectoryPoint()
-            jt_traj_point.time_from_start = rospy.Duration(np.max(traj.t))
-            jt_traj_point.positions = list(traj.s[-1])
-            #jt_traj_point.velocities = traj.sd[idx]
-            jt_traj.points.append(jt_traj_point)
+            # jt_traj_point = JointTrajectoryPoint()
+            # jt_traj_point.time_from_start = rospy.Duration(np.max(traj.t))
+            # jt_traj_point.positions = list(traj.s[-1])
+            # #jt_traj_point.velocities = traj.sd[idx]
+            # jt_traj.points.append(jt_traj_point)
             
             # Conduct 'Ghost' Robot Check for Collision throughout trajectory
             # NOTE: also publishes marker representation of trajectory for visual confirmation (Rviz)
             go_signal = self.trajectory_collision_checker(traj=traj)
             
-            ## TESTING MOVEIT VISUALISATION
-            robot_traj = RobotTrajectory()
-            robot_traj.joint_trajectory = jt_traj
-            # print(f"jt_traj: {len(jt_traj)}")
+            # ## TESTING MOVEIT VISUALISATION
+            # robot_traj = RobotTrajectory()
+            # robot_traj.joint_trajectory = jt_traj
+            # # print(f"jt_traj: {len(jt_traj)}")
 
-            robot_state = RobotState()
-            state = JointState()
-            state.position = list(self.q)
-            state.velocity = list(self.qd)
-            state.effort = np.zeros(self.n)
-            robot_state.joint_state = state
-            robot_state.is_diff = False
+            # robot_state = RobotState()
+            # state = JointState()
+            # state.position = list(self.q)
+            # state.velocity = list(self.qd)
+            # state.effort = np.zeros(self.n)
+            # robot_state.joint_state = state
+            # robot_state.is_diff = False
 
-            display_traj = DisplayTrajectory()
-            display_traj.model_id = self.name
-            display_traj.trajectory = robot_traj
-            display_traj.trajectory_start = robot_state
+            # display_traj = DisplayTrajectory()
+            # display_traj.model_id = self.name
+            # display_traj.trajectory = robot_traj
+            # display_traj.trajectory_start = robot_state
 
             #self.display_moveit_traj_publisher.publish(display_traj)
 
