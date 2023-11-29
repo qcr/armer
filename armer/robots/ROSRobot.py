@@ -2165,61 +2165,76 @@ class ROSRobot(rtb.Robot):
             check_links.append([list(link_pose_dict.keys())[i] for i in ind[0]])
        
         # print(f"single shape collision check: {1/(end-start)} hz")
+        # print(f"sliced links: {sliced_links}")
         if debug:
-            #### -- DEBUGGING DISPLAY IN RVIZ OF TARGET MARKERS --- ####
-            marker_array=[]
+            marker_array = []
+            captured = []
             counter = 0
-            for idx in ind[0]:
-                link_to_map = list(link_pose_dict.keys())[idx]
+            sliced_link_names = [link.name for link in sliced_links]
+            for links in check_links:
+                # These are the links associated with the respective idx sliced link
+                for link in links:
+                    # Check if we have already created a marker
+                    if link in captured:
+                        continue
 
-                for shape in self.collision_dict[link_to_map]:
-                    # Default setup of marker header
-                    marker = Marker()
+                    # Get all the shape objects and create a marker for each
+                    for shape in self.collision_dict[link]:
+                        # Default setup of marker header
+                        marker = Marker()
 
-                    # NOTE: this is currently an assumption as dynamic objects as easily added with respect to base link
-                    # TODO: add with respect to any frame would be good
-                    if link_to_map not in self.link_dict.keys():
-                        marker.header.frame_id = self.base_link.name
-                    else:
-                        marker.header.frame_id = link_to_map
+                        # NOTE: this is currently an assumption as dynamic objects as easily added with respect to base link
+                        # TODO: add with respect to any frame would be good
+                        if link not in self.link_dict.keys():
+                            marker.header.frame_id = self.base_link.name
+                        else:
+                            marker.header.frame_id = link
 
-                    marker.header.stamp = rospy.Time.now()
-                    if shape.stype == 'sphere':
-                        marker.type = 2
-                        # Expects diameter (m)
-                        marker.scale.x = shape.radius * 2
-                        marker.scale.y = shape.radius * 2
-                        marker.scale.z = shape.radius * 2
-                    elif shape.stype == 'cylinder':
-                        marker.type = 3
+                        marker.header.stamp = rospy.Time.now()
+                        if shape.stype == 'sphere':
+                            marker.type = 2
+                            # Expects diameter (m)
+                            marker.scale.x = shape.radius * 2
+                            marker.scale.y = shape.radius * 2
+                            marker.scale.z = shape.radius * 2
+                        elif shape.stype == 'cylinder':
+                            marker.type = 3
 
-                        # Expects diameter (m)
-                        marker.scale.x = shape.radius * 2
-                        marker.scale.y = shape.radius * 2
-                        marker.scale.z = shape.length
-                    # elif shape.stype == 'mesh':
-                    #     marker.type = 10
+                            # Expects diameter (m)
+                            marker.scale.x = shape.radius * 2
+                            marker.scale.y = shape.radius * 2
+                            marker.scale.z = shape.length
+                        # elif shape.stype == 'mesh':
+                        #     marker.type = 10
 
-                    #     marker.scale.x = shape.scale[0]
-                    #     marker.scale.y = shape.scale[1]
-                    #     marker.scale.z = shape.scale[2]
-                    #     # TODO: this needs to be a package:// path for RVIZ to work
-                    #     #       absolute paths do not work...
-                    #     marker.mesh_resource = shape.filename
-                    #     marker.mesh_use_embedded_materials = True
-                    else:
-                        break
+                        #     marker.scale.x = shape.scale[0]
+                        #     marker.scale.y = shape.scale[1]
+                        #     marker.scale.z = shape.scale[2]
+                        #     # TODO: this needs to be a package:// path for RVIZ to work
+                        #     #       absolute paths do not work...
+                        #     marker.mesh_resource = shape.filename
+                        #     marker.mesh_use_embedded_materials = True
+                        else:
+                            break
+                    
+                        marker.id = counter
+                        pose_se3 = sm.SE3(shape.T[:3, 3])
+                        marker.pose.position = Point(*pose_se3.t)
+
+                        if link in sliced_link_names:
+                            marker.color.r = 0.5
+                            marker.color.g = 0.5
+                        else:
+                            marker.color.r = 0
+                            marker.color.g = 1
+                        
+                        marker.color.b = 0
+                        marker.color.a = 0.25
+                        counter+=1
+
+                        marker_array.append(marker)
                 
-                    marker.id = counter
-                    pose_se3 = sm.SE3(shape.T[:3, 3])
-                    marker.pose.position = Point(*pose_se3.t)
-                    marker.color.r = 0
-                    marker.color.g = 1
-                    marker.color.b = 0
-                    marker.color.a = 0.25
-                    counter+=1
-
-                    marker_array.append(marker)
+                    captured.append(link)
 
             # Publish array of markers
             self.collision_debug_publisher.publish(marker_array)
