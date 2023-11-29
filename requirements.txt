@@ -7,3 +7,4 @@ qpsolvers>=3.4.0
 pyyaml
 pybullet>=3.2.5
 Cython>=3.0.5
+open3d>=0.14.0

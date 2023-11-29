@@ -177,11 +177,13 @@ class ROSRobot(rtb.Robot):
         # Initialise a 'ghost' robot instance for trajectory collision checking
         # NOTE: could also use this for visualising the trajectory (TBD)
         # NOTE: there was an issue identified around using the latest franka-emika panda description
-        self.robot_ghost = URDFRobot(
-            wait_for_description=False, 
-            collision_check_start_link=self.collision_sliced_links[0].name, 
-            collision_check_stop_link=self.collision_sliced_links[-1].name
-        )
+        # print(f"the urdf filepath is: {self.urdf_filepath}")
+        # self.robot_ghost = URDFRobot(
+        #     wait_for_description=False, 
+        #     urdf_file=self.urdf_filepath,
+        #     collision_check_start_link=self.collision_sliced_links[-1].name, 
+        #     collision_check_stop_link=self.collision_sliced_links[0].name
+        # )
         
         # Define a list of dynamic objects (to be added in at runtime)
         self.dynamic_collision_dict = dict()
@@ -2129,7 +2131,10 @@ class ROSRobot(rtb.Robot):
             return []
 
         # print(f"cylinder link check: {self.link_dict['cylinder_link']}")
-
+        # Iterate through each sliced link (target link) 
+        # For the current sliced link; find the closest point between one of the link's shapes
+        # NOTE: each link can have multiple shapes, but in the first instance, we take only one shape per link to 
+        #       understand the distance to then calculate the target links via the KDTree
         check_links = []
         for sliced_link in sliced_links:
             # Early termination on error
@@ -2137,45 +2142,18 @@ class ROSRobot(rtb.Robot):
                 rospy.logerr(f"Given sliced link: {sliced_link.name} is not valid. Skipping...")
                 continue
 
-            # Debugging print of the shapes within collision
-            # start = timeit.default_timer()
-            updated_ignore_list = self.overlapped_link_dict[sliced_link.name]
-            updated_ignore_list.append(sliced_link.name)
-            # print(updated_ignore_list)
-
-            # Create a new dictionary of target links ignoring known collision links (and self)
-            new_dict = {key: val for key, val in self.collision_dict.items() if key not in updated_ignore_list}
-            # print(f"new dict: {new_dict}")
-
-            # Get distance of each link (within new dictionary) to provided target
-            # link_pose_dict = {
-            #     link_name: self.ets(start=self.link_dict[sliced_link.name], end=self.link_dict[link_name]).eval(self.q)[:3, 3] 
-            #     for link_name in new_dict.keys() if link_name in self.link_dict.keys()
-            # }
-
-            # print(f"link pose dict from target: {link_pose_dict}")
             target_shape_translations = []
             link_pose_dict = {}
-            for link, shapes in new_dict.items():
-                if link not in new_dict.keys():
-                    continue
+            for link in self.collision_dict.keys():
                 
-                # Link is in our dictionary (new_dict) but not in the robot's link dict (not part of the robot by default)
-                # This would represent a object added dynamically during runtime (as other objects would belong to the robot)
-                # TODO: find a solution that doesn't need this added 'fix'
-                if link not in self.link_dict.keys():
-                    for shape in new_dict[link]:
-                        translation = shape.T[:3,3]
-                        target_shape_translations.append(shape.T[:3,3])
-
-                    # Takes the last shape for main translation check (for now)
-                    # TODO: handle this better for multi-shape representations of dynamic objects
-                    link_pose_dict[link] = translation
-                else:
-                    # Link is part of current robot tree. Get ETS from target 
-                    translation = self.ets(start=self.base_link, end=self.link_dict[link]).eval(self.q)[:3, 3]
-                    link_pose_dict[link] = translation
-                    target_shape_translations.append(translation)
+                # Test closest point on existing mesh link
+                if self.collision_dict[link] != [] and link not in self.overlapped_link_dict[sliced_link.name]:
+                    # print(f"current sliced link [{sliced_link.name}] shape 1: {self.collision_dict[sliced_link.name][0]}")
+                    # print(f"test link [{link}] shape 1: {self.collision_dict[link][0]}")
+                    dist = self.collision_dict[sliced_link.name][0].closest_point(self.collision_dict[link][0])
+                    # print(f"p2: {dist[2]}")
+                    target_shape_translations.append(dist[2])
+                    link_pose_dict[link] = dist[2]
 
             # Create a tree for look up
             tree = KDTree(data=target_shape_translations)
@@ -2194,7 +2172,7 @@ class ROSRobot(rtb.Robot):
             for idx in ind[0]:
                 link_to_map = list(link_pose_dict.keys())[idx]
 
-                for shape in new_dict[link_to_map]:
+                for shape in self.collision_dict[link_to_map]:
                     # Default setup of marker header
                     marker = Marker()
 
@@ -2219,6 +2197,16 @@ class ROSRobot(rtb.Robot):
                         marker.scale.x = shape.radius * 2
                         marker.scale.y = shape.radius * 2
                         marker.scale.z = shape.length
+                    # elif shape.stype == 'mesh':
+                    #     marker.type = 10
+
+                    #     marker.scale.x = shape.scale[0]
+                    #     marker.scale.y = shape.scale[1]
+                    #     marker.scale.z = shape.scale[2]
+                    #     # TODO: this needs to be a package:// path for RVIZ to work
+                    #     #       absolute paths do not work...
+                    #     marker.mesh_resource = shape.filename
+                    #     marker.mesh_use_embedded_materials = True
                     else:
                         break
                 
