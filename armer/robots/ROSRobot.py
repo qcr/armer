@@ -2120,6 +2120,127 @@ class ROSRobot(rtb.Robot):
         """
         self.collision_obj_list.append(obj)
 
+    def closest_dist_query(self, sliced_link_name):
+        # target_shape_translations = []
+        # start = timeit.default_timer()
+        # link_pose_dict = {}
+        # for link in self.collision_dict.keys():
+            
+        #     # Test closest point on existing mesh link
+        #     if self.collision_dict[link] != [] and link not in self.overlapped_link_dict[sliced_link_name]:
+        #         # print(f"current sliced link [{sliced_link.name}] shape 1: {self.collision_dict[sliced_link.name][0]}")
+        #         # print(f"test link [{link}] shape 1: {self.collision_dict[link][0]}")
+        #         dist = self.collision_dict[sliced_link_name][0].closest_point(self.collision_dict[link][0])
+        #         print(f"p2: {dist[2]}")
+        #         # target_shape_translations.append(dist[2])
+        #         link_pose_dict[link] = dist[2]
+        # end = timeit.default_timer()
+        # print(f"[OLD] closest dist list comp version: {1/(end-start)} hz")
+
+        # start = timeit.default_timer()
+        translation_dict = {
+            link: self.collision_dict[sliced_link_name][0].closest_point(self.collision_dict[link][0])[2]
+            for link in self.collision_dict.keys() 
+            if self.collision_dict[link] != [] and link not in self.overlapped_link_dict[sliced_link_name]
+        }
+        # end = timeit.default_timer()
+        # print(f"[NEW] closest dist list comp version: {1/(end-start)} hz")
+        # print(f"[OLD] target_shape_translation: {target_shape_translations}")
+        # print(f"[NEW] target_shape_translation: {target_shape_translations_new}")
+        # print(f"comparison: {np.all(target_shape_translations) == np.all(target_shape_translations_new)}")
+
+        return translation_dict
+    
+    def closest_dist_query_old(self, sliced_link_name):
+        translation_dict = {}
+        for link in self.collision_dict.keys():
+            
+            # Test closest point on existing mesh link
+            # NOTE: this method only cares about existing links in robot tree (not dynamically added). 
+            #       Robot tree can include 'external' items by being included in the robot's description.
+            if link in self.link_dict.keys() and self.collision_dict[link] != [] and link not in self.overlapped_link_dict[sliced_link_name]:
+                # print(f"current sliced link [{sliced_link.name}] shape 1: {self.collision_dict[sliced_link.name][0]}")
+                # print(f"test link [{link}] shape 1: {self.collision_dict[link][0]}")
+                # dist = self.collision_dict[sliced_link_name][0].closest_point(self.collision_dict[link][0])
+                dist = self.ets(start=sliced_link_name, end=link).eval(self.q)[:3, 3] 
+                # print(f"p2: {dist[2]}")
+                translation_dict[link] = dist
+
+        return translation_dict
+    
+    def collision_marker_debugger(self, sliced_link_names: list = [], check_link_names: list = []):
+        marker_array = []
+        captured = []
+        counter = 0
+        for links in check_link_names:
+            # These are the links associated with the respective idx sliced link
+            for link in links:
+                # Check if we have already created a marker
+                if link in captured:
+                    continue
+
+                # Get all the shape objects and create a marker for each
+                for shape in self.collision_dict[link]:
+                    # Default setup of marker header
+                    marker = Marker()
+
+                    # NOTE: this is currently an assumption as dynamic objects as easily added with respect to base link
+                    # TODO: add with respect to any frame would be good
+                    if link not in self.link_dict.keys():
+                        marker.header.frame_id = self.base_link.name
+                    else:
+                        marker.header.frame_id = link
+
+                    marker.header.stamp = rospy.Time.now()
+                    if shape.stype == 'sphere':
+                        marker.type = 2
+                        # Expects diameter (m)
+                        marker.scale.x = shape.radius * 2
+                        marker.scale.y = shape.radius * 2
+                        marker.scale.z = shape.radius * 2
+                    elif shape.stype == 'cylinder':
+                        marker.type = 3
+
+                        # Expects diameter (m)
+                        marker.scale.x = shape.radius * 2
+                        marker.scale.y = shape.radius * 2
+                        marker.scale.z = shape.length
+                    # elif shape.stype == 'mesh':
+                    #     marker.type = 10
+
+                    #     marker.scale.x = shape.scale[0]
+                    #     marker.scale.y = shape.scale[1]
+                    #     marker.scale.z = shape.scale[2]
+                    #     # TODO: this needs to be a package:// path for RVIZ to work
+                    #     #       absolute paths do not work...
+                    #     marker.mesh_resource = shape.filename
+                    #     marker.mesh_use_embedded_materials = True
+                    else:
+                        break
+                
+                    marker.id = counter
+                    pose_se3 = sm.SE3(shape.T[:3, 3])
+                    marker.pose.position = Point(*pose_se3.t)
+
+                    if link in sliced_link_names:
+                        marker.color.r = 0.5
+                        marker.color.g = 0.5
+                    else:
+                        marker.color.r = 0
+                        marker.color.g = 1
+                    
+                    marker.color.b = 0
+                    marker.color.a = 0.25
+                    counter+=1
+
+                    marker_array.append(marker)
+            
+                captured.append(link)
+
+        # Publish array of markers
+        self.collision_debug_publisher.publish(marker_array)
+
+
     def query_kd_nn_collision_tree(self, sliced_links: list = [], dim: int = 5, debug: bool = False) -> list:
         """
         Given a list of links (sliced), this method returns nearest neighbor links for collision checking
@@ -2142,102 +2263,48 @@ class ROSRobot(rtb.Robot):
                 rospy.logerr(f"Given sliced link: {sliced_link.name} is not valid. Skipping...")
                 continue
 
-            target_shape_translations = []
-            link_pose_dict = {}
-            for link in self.collision_dict.keys():
-                
-                # Test closest point on existing mesh link
-                if self.collision_dict[link] != [] and link not in self.overlapped_link_dict[sliced_link.name]:
-                    # print(f"current sliced link [{sliced_link.name}] shape 1: {self.collision_dict[sliced_link.name][0]}")
-                    # print(f"test link [{link}] shape 1: {self.collision_dict[link][0]}")
-                    dist = self.collision_dict[sliced_link.name][0].closest_point(self.collision_dict[link][0])
-                    # print(f"p2: {dist[2]}")
-                    target_shape_translations.append(dist[2])
-                    link_pose_dict[link] = dist[2]
+            # Get the closest distances to each link based on each link's initial shape
+            # NOTE: a link can have more than 1 shape, so this aims to only get a general distance to the first
+            #       in order to characterise the distance to that link in a general way
+            # TODO: instead of shapes, we could look at the mesh, but this needs to be collision enabled to work 
+            #       using the built-in methods of the Shape class.
+            # start = timeit.default_timer()
+            # translation_dict = self.closest_dist_query(sliced_link_name=sliced_link.name)
+            # end = timeit.default_timer()
+            # print(f"[NEW] Get distances to links from target: {1/(end-start)} hz")
 
+            # # Initial approach to get closest link (based on origin, not surface)
+            # # NOTE: as it is based on origin, the size/shape of collision object matters
+            # start = timeit.default_timer()
+            # _ = self.closest_dist_query_old(sliced_link_name=sliced_link.name)
+            # end = timeit.default_timer()
+            # print(f"[OLD] Get distances to links from target: {1/(end-start)} hz")
+
+            # Cython implementation of above
+            start = timeit.default_timer()
+            translation_dict = collision_handler.closest_dist_query(
+                sliced_link_name=sliced_link.name,
+                col_link_names=list(self.collision_dict.keys()),
+                col_link_name_len=len(list(self.collision_dict.keys())),
+                col_dict=self.collision_dict,
+                overlap_dict=self.overlapped_link_dict)
+            end = timeit.default_timer()
+            print(f"[CYTHON] Get distances to links from target: {1/(end-start)} hz")
+            # print(f"translation_dict from cython: {translation_dict}")
             # Create a tree for look up
-            tree = KDTree(data=target_shape_translations)
+            tree = KDTree(data=list(translation_dict.values()))
             target_position = self.ets(start=self.base_link, end=sliced_link).eval(self.q)[:3, 3]
             # Test query of nearest neighbors for a specific shape (3D) as origin (given tree is from source)
             dist, ind = tree.query(X=[target_position], k=dim, dualtree=True)
-            # print(f"dist: {dist} | links: {[list(link_pose_dict.keys())[i] for i in ind[0]]}")
+            # print(f"dist: {dist} | links: {[list(translation_dict.keys())[i] for i in ind[0]]} | ind[0]: {ind[0]}")
 
-            check_links.append([list(link_pose_dict.keys())[i] for i in ind[0]])
+            check_links.append([list(translation_dict.keys())[i] for i in ind[0]])
        
-        # print(f"single shape collision check: {1/(end-start)} hz")
-        # print(f"sliced links: {sliced_links}")
         if debug:
-            marker_array = []
-            captured = []
-            counter = 0
-            sliced_link_names = [link.name for link in sliced_links]
-            for links in check_links:
-                # These are the links associated with the respective idx sliced link
-                for link in links:
-                    # Check if we have already created a marker
-                    if link in captured:
-                        continue
-
-                    # Get all the shape objects and create a marker for each
-                    for shape in self.collision_dict[link]:
-                        # Default setup of marker header
-                        marker = Marker()
-
-                        # NOTE: this is currently an assumption as dynamic objects as easily added with respect to base link
-                        # TODO: add with respect to any frame would be good
-                        if link not in self.link_dict.keys():
-                            marker.header.frame_id = self.base_link.name
-                        else:
-                            marker.header.frame_id = link
-
-                        marker.header.stamp = rospy.Time.now()
-                        if shape.stype == 'sphere':
-                            marker.type = 2
-                            # Expects diameter (m)
-                            marker.scale.x = shape.radius * 2
-                            marker.scale.y = shape.radius * 2
-                            marker.scale.z = shape.radius * 2
-                        elif shape.stype == 'cylinder':
-                            marker.type = 3
-
-                            # Expects diameter (m)
-                            marker.scale.x = shape.radius * 2
-                            marker.scale.y = shape.radius * 2
-                            marker.scale.z = shape.length
-                        # elif shape.stype == 'mesh':
-                        #     marker.type = 10
-
-                        #     marker.scale.x = shape.scale[0]
-                        #     marker.scale.y = shape.scale[1]
-                        #     marker.scale.z = shape.scale[2]
-                        #     # TODO: this needs to be a package:// path for RVIZ to work
-                        #     #       absolute paths do not work...
-                        #     marker.mesh_resource = shape.filename
-                        #     marker.mesh_use_embedded_materials = True
-                        else:
-                            break
-                    
-                        marker.id = counter
-                        pose_se3 = sm.SE3(shape.T[:3, 3])
-                        marker.pose.position = Point(*pose_se3.t)
-
-                        if link in sliced_link_names:
-                            marker.color.r = 0.5
-                            marker.color.g = 0.5
-                        else:
-                            marker.color.r = 0
-                            marker.color.g = 1
-                        
-                        marker.color.b = 0
-                        marker.color.a = 0.25
-                        counter+=1
-
-                        marker_array.append(marker)
-                
-                    captured.append(link)
-
-            # Publish array of markers
-            self.collision_debug_publisher.publish(marker_array)
+            self.collision_marker_debugger(
+                sliced_link_names=[link.name for link in sliced_links],
+                check_link_names=check_links
+            )
 
         return check_links
 

@@ -1,4 +1,60 @@
+from libc.math cimport log
+from libcpp.list cimport list as cpplist
+from libcpp.string cimport string
 cimport cython
+
+import numpy as np
+cimport numpy as cnp
+cnp.import_array()
+DTYPE = np.float64
+ctypedef cnp.float64_t DTYPE_t
+
+cdef extern from "<vector>" namespace "std":
+  cdef cppclass vector[T]:
+    void push_back(T&) nogil
+    size_t size()
+    T& operator[](size_t)
+
+@cython.wraparound(False)
+cpdef dict closest_dist_query(str sliced_link_name, 
+                              list col_link_names, 
+                              int col_link_name_len, 
+                              dict col_dict,
+                              dict overlap_dict):
+
+  cdef int col_link_idx
+  cdef cnp.ndarray dist
+  cdef list c_obj_list
+  cdef list slice_obj_list
+  # cdef list out_list
+  # cdef vector[float] dist_list
+  # cdef vector[vector[DTYPE_t]] out_list
+  cdef dict out_dict = {}
+  # cdef float temp
+  cdef str link
+
+  # Method definition
+  # push_back_main = out_list.push_back
+  # push_back = dist_list.push_back
+  for col_link_idx in range(col_link_name_len):
+    # Only add to output list if within the following criteria
+    link = col_link_names[col_link_idx]
+    c_obj_list = col_dict[link]
+    slice_obj_list = col_dict[sliced_link_name]
+    if c_obj_list == [] or slice_obj_list == []:
+      continue
+
+    if link in overlap_dict[sliced_link_name]:
+      continue
+
+    # if col_link_names[col_link_idx] not in overlap_dict[sliced_link_name]:
+      # Calculate the closest point distance between first shape available
+    _, _, dist = slice_obj_list[0].closest_point(c_obj_list[0])
+    # out_dict[col_link_names[col_link_idx]] = dist[2]
+    # out_list.push_back(dist[2])
+    out_dict[link] = dist
+
+  return out_dict
 
 # Ignore negative indice checking (i.e., a[-1])
 @cython.wraparound(False)

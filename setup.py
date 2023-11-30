@@ -95,7 +95,7 @@ setup(
              ' control simulation robot-manipulator mobile-robot ros',
     packages=find_packages(exclude=['tests']),
     package_data={'armer': extra_files},
-    ext_modules=cythonize("armer/cython/*.pyx", annotate=True),
+    ext_modules=cythonize("armer/cython/*.pyx", annotate=True, language="c++"),
     include_package_data=True,
     install_requires=req,
     extras_require={
