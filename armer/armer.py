@@ -306,7 +306,7 @@ class Armer:
             debug=True
         )
         end = timeit.default_timer()
-        print(f"[KD Setup] full collision check: {1/(end-start)} hz")
+        # print(f"[KD Setup] full collision check: {1/(end-start)} hz")
         # print(f"[Check Links] -> {check_links}")
 
         # Alternative Method
@@ -323,7 +323,7 @@ class Armer:
             check_links = check_links
         )
         end = timeit.default_timer()
-        print(f"[Actual Link Check] full collision check: {1/(end-start)} hz")
+        # print(f"[Actual Link Check] full collision check: {1/(end-start)} hz")
     
         if col_link_id >= 0:
             rospy.logwarn(f"Global Collision Check -> Robot [{robot.name}] in collision with link {robot.collision_sliced_links[col_link_id].name}")
@@ -435,7 +435,7 @@ class Armer:
         else:
             # Check if the current robot has any newly added objects to add to the backend
             # NOTE: this loop is run everytime at the moment (not an issue with limited shapes but needs better optimisation for scale)
-            for dynamic_obj in robot.dynamic_collision_dict.values():
+            for dynamic_obj in robot.dynamic_collision_dict.copy().values():
                 if dynamic_obj.is_added == False:
                     rospy.loginfo(f"Adding Dynamic Object: {dynamic_obj}")
                     dynamic_obj.id = self.backend.add(dynamic_obj.shape)

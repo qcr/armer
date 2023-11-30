@@ -2028,7 +2028,7 @@ class ROSRobot(rtb.Robot):
         # Handle radius and length defaulting on 0
         radius = req.radius if req.radius else 0.05 #default in m
         length = req.length if req.length else 0.1 #default in m
-        rospy.loginfo(f"radius is: {radius} | length is: {length}")
+        # rospy.loginfo(f"radius is: {radius} | length is: {length}")
         
         # Handle pose input error
         if req.pose == None or req.pose == Pose():
@@ -2071,15 +2071,16 @@ class ROSRobot(rtb.Robot):
         # Create a Dynamic Collision Object and add the configured shape to the scene
         dynamic_obj = DynamicCollisionObj(shape=shape, key=req.name, pose=req.pose, is_added=False)
         # NOTE: these dictionaries are accessed and checked by Armer's main loop for addition to a backend.
-        self.dynamic_collision_dict[req.name] = dynamic_obj
-        self.collision_dict[req.name] = [dynamic_obj.shape]
+        with self.lock:
+            self.dynamic_collision_dict[req.name] = dynamic_obj
+            self.collision_dict[req.name] = [dynamic_obj.shape]
 
         # Add to list of objects for NEO
         # NOTE: NEO needs more work to avoid local minima
         # NOTE: Also, existing description shapes (not part of the robot tree) need to be peeled out and added here as well
         self.collision_obj_list.append(shape)
 
-        print(f"Current collision objects: {self.collision_obj_list}")
+        # print(f"Current collision objects: {self.collision_obj_list}")
 
         return AddCollisionObjectResponse(success=True)
     
@@ -2121,50 +2122,22 @@ class ROSRobot(rtb.Robot):
         self.collision_obj_list.append(obj)
 
     def closest_dist_query(self, sliced_link_name):
-        # target_shape_translations = []
-        # start = timeit.default_timer()
-        # link_pose_dict = {}
-        # for link in self.collision_dict.keys():
-            
-        #     # Test closest point on existing mesh link
-        #     if self.collision_dict[link] != [] and link not in self.overlapped_link_dict[sliced_link_name]:
-        #         # print(f"current sliced link [{sliced_link.name}] shape 1: {self.collision_dict[sliced_link.name][0]}")
-        #         # print(f"test link [{link}] shape 1: {self.collision_dict[link][0]}")
-        #         dist = self.collision_dict[sliced_link_name][0].closest_point(self.collision_dict[link][0])
-        #         print(f"p2: {dist[2]}")
-        #         # target_shape_translations.append(dist[2])
-        #         link_pose_dict[link] = dist[2]
-        # end = timeit.default_timer()
-        # print(f"[OLD] closest dist list comp version: {1/(end-start)} hz")
-
-        # start = timeit.default_timer()
         translation_dict = {
             link: self.collision_dict[sliced_link_name][0].closest_point(self.collision_dict[link][0])[2]
             for link in self.collision_dict.keys() 
             if self.collision_dict[link] != [] and link not in self.overlapped_link_dict[sliced_link_name]
         }
-        # end = timeit.default_timer()
-        # print(f"[NEW] closest dist list comp version: {1/(end-start)} hz")
-        # print(f"[OLD] target_shape_translation: {target_shape_translations}")
-        # print(f"[NEW] target_shape_translation: {target_shape_translations_new}")
-        # print(f"comparison: {np.all(target_shape_translations) == np.all(target_shape_translations_new)}")
-
         return translation_dict
     
     def closest_dist_query_old(self, sliced_link_name):
-        translation_dict = {}
-        for link in self.collision_dict.keys():
-            
-            # Test closest point on existing mesh link
-            # NOTE: this method only cares about existing links in robot tree (not dynamically added). 
-            #       Robot tree can include 'external' items by being included in the robot's description.
-            if link in self.link_dict.keys() and self.collision_dict[link] != [] and link not in self.overlapped_link_dict[sliced_link_name]:
-                # print(f"current sliced link [{sliced_link.name}] shape 1: {self.collision_dict[sliced_link.name][0]}")
-                # print(f"test link [{link}] shape 1: {self.collision_dict[link][0]}")
-                # dist = self.collision_dict[sliced_link_name][0].closest_point(self.collision_dict[link][0])
-                dist = self.ets(start=sliced_link_name, end=link).eval(self.q)[:3, 3] 
-                # print(f"p2: {dist[2]}")
-                translation_dict[link] = dist
+        # Test closest point on existing mesh link
+        # NOTE: this method only cares about existing links in robot tree (not dynamically added). 
+        #       Robot tree can include 'external' items by being included in the robot's description.
+        translation_dict = {
+            link: self.ets(start=sliced_link_name, end=link).eval(self.q)[:3, 3]
+            for link in self.collision_dict.keys()
+            if link in self.link_dict.keys() and self.collision_dict[link] != [] and link not in self.overlapped_link_dict[sliced_link_name]
+        }
 
         return translation_dict
     
@@ -2256,23 +2229,14 @@ class ROSRobot(rtb.Robot):
         # For the current sliced link; find the closest point between one of the link's shapes
         # NOTE: each link can have multiple shapes, but in the first instance, we take only one shape per link to 
         #       understand the distance to then calculate the target links via the KDTree
+        col_dict_copy = self.collision_dict.copy()
+
         check_links = []
         for sliced_link in sliced_links:
             # Early termination on error
             if sliced_link.name not in self.link_dict.keys():
                 rospy.logerr(f"Given sliced link: {sliced_link.name} is not valid. Skipping...")
                 continue
-
-            # Get the closest distances to each link based on each link's initial shape
-            # NOTE: a link can have more than 1 shape, so this aims to only get a general distance to the first
-            #       in order to characterise the distance to that link in a general way
-            # TODO: instead of shapes, we could look at the mesh, but this needs to be collision enabled to work 
-            #       using the built-in methods of the Shape class.
-            # start = timeit.default_timer()
-            # translation_dict = self.closest_dist_query(sliced_link_name=sliced_link.name)
-            # end = timeit.default_timer()
-            # print(f"[NEW] Get distances to links from target: {1/(end-start)} hz")
-
             # # Initial approach to get closest link (based on origin, not surface)
             # # NOTE: as it is based on origin, the size/shape of collision object matters
             # start = timeit.default_timer()
@@ -2280,19 +2244,17 @@ class ROSRobot(rtb.Robot):
             # end = timeit.default_timer()
             # print(f"[OLD] Get distances to links from target: {1/(end-start)} hz")
 
-            # Cython implementation of above
+            # Get the closest distances to each link based on each link's initial shape
+            # NOTE: a link can have more than 1 shape, so this aims to only get a general distance to the first
+            #       in order to characterise the distance to that link in a general way
+            # TODO: instead of shapes, we could look at the mesh, but this needs to be collision enabled to work 
+            #       using the built-in methods of the Shape class.
             start = timeit.default_timer()
-            translation_dict = collision_handler.closest_dist_query(
-                sliced_link_name=sliced_link.name,
-                col_link_names=list(self.collision_dict.keys()),
-                col_link_name_len=len(list(self.collision_dict.keys())),
-                col_dict=self.collision_dict,
-                overlap_dict=self.overlapped_link_dict)
+            translation_dict = self.closest_dist_query(sliced_link_name=sliced_link.name)
             end = timeit.default_timer()
-            print(f"[CYTHON] Get distances to links from target: {1/(end-start)} hz")
-            # print(f"translation_dict from cython: {translation_dict}")
-            # Create a tree for look up
-            tree = KDTree(data=list(translation_dict.values()))
+            # print(f"[NEW] Get distances to links from target: {1/(end-start)} hz")
+         
+            tree = KDTree(data=list(translation_dict.copy().values()))
             target_position = self.ets(start=self.base_link, end=sliced_link).eval(self.q)[:3, 3]
             # Test query of nearest neighbors for a specific shape (3D) as origin (given tree is from source)
             dist, ind = tree.query(X=[target_position], k=dim, dualtree=True)
