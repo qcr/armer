@@ -306,7 +306,7 @@ class Armer:
             debug=True
         )
         end = timeit.default_timer()
-        # print(f"[KD Setup] full collision check: {1/(end-start)} hz")
+        print(f"[KD Setup] full collision check: {1/(end-start)} hz")
         # print(f"[Check Links] -> {check_links}")
 
         # Alternative Method

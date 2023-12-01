@@ -2123,11 +2123,13 @@ class ROSRobot(rtb.Robot):
         """
         self.collision_obj_list.append(obj)
 
-    def closest_dist_query(self, sliced_link_name, target_links):
-        # start = timeit.default_timer()
-        # self.collision_dict[sliced_link_name][0].closest_point(self.collision_dict[self.base_link.name][0])[2]
-        # end = timeit.default_timer()
-        # print(f"[Surface Shape Based] Get Distance Query to Base Link: {1/(end-start)} hz")
+    def closest_dist_query_shape_based(self, sliced_link_name, target_links):
+        """
+        This method uses the closest point method of a Shape object to extract translation to a link.
+        NOTE: only a single shape is used per link (defaulting to the first one). This is needed to
+        keep the speed of this process as fast as possible. This may not be the best method if the 
+        shape being used is not 'representative' of the entire link.
+        """
         translation_dict = {
             link: self.collision_dict[sliced_link_name][0].closest_point(self.collision_dict[link][0])[2]
             for link in target_links 
@@ -2135,24 +2137,67 @@ class ROSRobot(rtb.Robot):
         }
         return translation_dict
     
-    def closest_dist_query_old(self, sliced_link_name):
-        # Test closest point on existing mesh link
-        # NOTE: this method only cares about existing links in robot tree (not dynamically added). 
-        #       Robot tree can include 'external' items by being included in the robot's description.
-        # start = timeit.default_timer()
-        # self.ets(start=sliced_link_name, end=self.base_link.name).eval(self.q)[:3, 3]
-        # end = timeit.default_timer()
-        # print(f"[Pose Based] Get Distance Query to Base Link: {1/(end-start)} hz")
+    def closest_dist_query_pose_based(self, sliced_link_name, magnitude_thresh: float = 0.4, refine: bool = False):
+        """
+        This method uses the built-in recursive search (ets) for links within the robot tree
+        to quickly get the translation from a specified sliced link. Note that this method
+        gets the translation to the link's origin, which may not be as representative as possibe with
+        respect to the surface of the link.
+        NOTE: an additional external dictionary is needed for dynamically added shapes, or shapes/links not
+        within the robot tree (fails at the ets method)
+        NOTE: currently the fastest method as of 2023-12-1
+        """
+        col_dict_cp = self.collision_dict.copy()
+        # If asked to refine, then base the link dictionary creation on the magnitude threshold value (m)
+        # NOTE: refining can lead to slow down on large number of multiple shapes
+        if refine:
+            translation_dict = {
+                link: self.ets(start=sliced_link_name, end=link).eval(self.q)[:3, 3]
+                for link in col_dict_cp.keys()
+                if link in self.link_dict.keys() 
+                    and col_dict_cp[link] != [] 
+                    and link not in self.overlapped_link_dict[sliced_link_name]
+                    and link != sliced_link_name
+                    and np.linalg.norm(self.ets(start=sliced_link_name, end=link).eval(self.q)[:3, 3]) < magnitude_thresh
+            }
 
-        translation_dict = {
-            link: self.ets(start=sliced_link_name, end=link).eval(self.q)[:3, 3]
-            for link in self.collision_dict.keys()
-            if link in self.link_dict.keys() and self.collision_dict[link] != [] and link not in self.overlapped_link_dict[sliced_link_name]
-        }
+            # This is the external objects translation from the base_link
+            external_dict = {
+                link: col_dict_cp[link][0].T[:3,3]
+                for link in col_dict_cp.keys()
+                if link not in self.link_dict.keys()
+                    and col_dict_cp[link] != []
+                    and link not in self.overlapped_link_dict[sliced_link_name]
+                    and link != sliced_link_name
+                    and np.linalg.norm(distance.cdist([self.ets(start=self.base_link.name, end=sliced_link_name).eval(self.q)[:3, 3]],[col_dict_cp[link][0].T[:3,3]])) < magnitude_thresh
+            }
+        else:
+            translation_dict = {
+                link: self.ets(start=sliced_link_name, end=link).eval(self.q)[:3, 3]
+                for link in col_dict_cp.keys()
+                if link in self.link_dict.keys() 
+                    and col_dict_cp[link] != [] 
+                    and link not in self.overlapped_link_dict[sliced_link_name]
+                    and link != sliced_link_name
+            }
 
+            # This is the external objects translation from the base_link
+            external_dict = {
+                link: col_dict_cp[link][0].T[:3,3]
+                for link in col_dict_cp.keys()
+                if link not in self.link_dict.keys()
+                    and col_dict_cp[link] != []
+                    and link not in self.overlapped_link_dict[sliced_link_name]
+                    and link != sliced_link_name
+            }
+
+        translation_dict.update(external_dict)
         return translation_dict
     
     def collision_marker_debugger(self, sliced_link_names: list = [], check_link_names: list = []):
+        """
+        A simple debugging method to output to RVIZ the current link shapes being checked
+        """
         marker_array = []
         captured = []
         counter = 0
@@ -2223,42 +2268,18 @@ class ROSRobot(rtb.Robot):
 
         # Publish array of markers
         self.collision_debug_publisher.publish(marker_array)
-
-    def creation_of_pose_link_distances(self, sliced_links: list = []) -> dict():
-        """
-        This method is intended to be run once, and will create a dictionary of references per configured
-        sliced links (i.e., links we want to track collisions for) to all links with respect to vector distances
-        Note that the vector distances are between each link's base position as defined in the Link object
-        """
-        main_dict = dict()
-        sub_dict = dict()
-        for sliced_link in sliced_links:
-            # Create a sub-dictionary of all link distance vectors (to their origins) for the current sliced link
-            sub_dict = {
-                link: self.ets(start=sliced_link.name, end=link).eval(self.q)[:3, 3]
-                for link in self.collision_dict.keys()
-                if link in self.link_dict.keys() 
-                and self.collision_dict[link] != [] 
-                and link not in self.overlapped_link_dict[sliced_link.name]
-                and link != sliced_link.name
-            }
-
-            # Update the main dictionary of sliced links with its respective distances to each target link
-            main_dict[sliced_link.name] = sub_dict
-
-        return main_dict
     
     def query_target_link_check(self, sliced_link_name: str = "", magnitude_tresh: float = 0.2):
         """
         This method is intended to run per cycle of operation and is expected to find changes to distances
         based on the original main dictionary (as created by creation_of_pose_link_distances)
         """
-
+        col_dict_cp = self.collision_dict.copy()
         target_list = [
             link
-            for link in self.collision_dict.keys()
+            for link in col_dict_cp.keys()
             if link in self.link_dict.keys() 
-                and self.collision_dict[link] != [] 
+                and col_dict_cp[link] != [] 
                 and link not in self.overlapped_link_dict[sliced_link_name]
                 and link != sliced_link_name
                 and np.linalg.norm(self.ets(start=sliced_link_name, end=link).eval(self.q)[:3, 3]) < magnitude_tresh
@@ -2266,18 +2287,13 @@ class ROSRobot(rtb.Robot):
 
         external_list =[
             link
-            for link in self.collision_dict.keys()
+            for link in col_dict_cp.keys()
             if link not in self.link_dict.keys()
-                and self.collision_dict[link] != []
+                and col_dict_cp[link] != []
                 and link not in self.overlapped_link_dict[sliced_link_name]
                 and link != sliced_link_name
-                and np.linalg.norm(distance.cdist([self.ets(start=self.base_link.name, end=sliced_link_name).eval(self.q)[:3, 3]],[self.collision_dict[link][0].T[:3,3]])) < magnitude_tresh
+                and np.linalg.norm(distance.cdist([self.ets(start=self.base_link.name, end=sliced_link_name).eval(self.q)[:3, 3]],[col_dict_cp[link][0].T[:3,3]])) < magnitude_tresh
         ]
-        # if 'test' in self.collision_dict.keys():
-        #     dist = distance.cdist([self.ets(start=self.base_link.name, end=sliced_link_name).eval(self.q)[:3, 3]],[self.collision_dict['test'][0].T[:3,3]])
-        #     test = np.linalg.norm(dist)
-        #     print(f"test object mag: {test}")
-        # print(f"external list: {external_list}")
 
         return target_list + external_list
 
@@ -2302,36 +2318,25 @@ class ROSRobot(rtb.Robot):
             if sliced_link.name not in self.link_dict.keys():
                 rospy.logerr(f"Given sliced link: {sliced_link.name} is not valid. Skipping...")
                 continue
-            # Initial approach to get closest link (based on origin, not surface)
-            # NOTE: as it is based on origin, the size/shape of collision object matters
+
+            # Testing refinement using link poses (Individual method needed for shape-based version)
             # start = timeit.default_timer()
-            # translation_dict = self.closest_dist_query_old(sliced_link_name=sliced_link.name)
+            # target_link_list = self.query_target_link_check(sliced_link_name=sliced_link.name, magnitude_tresh=0.4)
             # end = timeit.default_timer()
-            # print(f"[OLD] Get distances to links from target: {1/(end-start)} hz")
-
-            # Testing refinement using link poses
-            start = timeit.default_timer()
-            target_link_list = self.query_target_link_check(sliced_link_name=sliced_link.name, magnitude_tresh=0.4)
-            end = timeit.default_timer()
             # print(f"[Link Pose Based] Extraction of Target Links for Surface Check: {1/(end-start)} hz")
-            # print(f"[Target Links Based on 0.2m Distance]: {target_link_list}")
-            # print(f"[OLD all check links]: {list(self.collision_dict.keys())}")
 
-            # Get the closest distances to each link based on each link's initial shape
-            # NOTE: a link can have more than 1 shape, so this aims to only get a general distance to the first
-            #       in order to characterise the distance to that link in a general way
-            # TODO: instead of shapes, we could look at the mesh, but this needs to be collision enabled to work 
-            #       using the built-in methods of the Shape class.
+            # Initial approach to get closest link (based on link origin, not surface)
+            # NOTE: as it is based on origin, the size/shape of collision object matters
+            # NOTE: fastest method as of 2023-12-1
             start = timeit.default_timer()
-            translation_dict = self.closest_dist_query(sliced_link_name=sliced_link.name, target_links=target_link_list)
+            translation_dict = self.closest_dist_query_pose_based(sliced_link_name=sliced_link.name)
             end = timeit.default_timer()
-            # print(f"[Single Shape Surface Query] Get distances to links from target: {1/(end-start)} hz")
-            # print(f"translation dict for tree selection: {translation_dict}")
+            # print(f"[OLD] Get distances to links from target: {1/(end-start)} hz")
          
             tree = KDTree(data=list(translation_dict.copy().values()))
             target_position = self.ets(start=self.base_link, end=sliced_link).eval(self.q)[:3, 3]
             # Test query of nearest neighbors for a specific shape (3D) as origin (given tree is from source)
-            dist, ind = tree.query(X=[target_position], k=len(target_link_list) if len(target_link_list) < dim else dim, dualtree=True)
+            dist, ind = tree.query(X=[target_position], k=len(translation_dict.keys()) if len(translation_dict.keys()) < dim else dim, dualtree=True)
             # print(f"dist: {dist} | links: {[list(translation_dict.keys())[i] for i in ind[0]]} | ind[0]: {ind[0]}")
 
             check_links.append([list(translation_dict.keys())[i] for i in ind[0]])
@@ -2546,7 +2551,6 @@ class ROSRobot(rtb.Robot):
 
             # using json.dumps() to Pretty Print O(n) time complexity
             rospy.loginfo(f"Characterise Collision Overlaps per link: {json.dumps(self.overlapped_link_dict, indent=4)}")
-            self.sliced_link_pose_map = self.creation_of_pose_link_distances(sliced_links=self.collision_sliced_links)
 
         # Reached end in success
         return True
