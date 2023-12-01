@@ -306,7 +306,7 @@ class Armer:
             debug=True
         )
         end = timeit.default_timer()
-        print(f"[KD Setup] full collision check: {1/(end-start)} hz")
+        # print(f"[KD Setup] full collision check: {1/(end-start)} hz")
         # print(f"[Check Links] -> {check_links}")
 
         # Alternative Method
@@ -326,7 +326,7 @@ class Armer:
         # print(f"[Actual Link Check] full collision check: {1/(end-start)} hz")
     
         if col_link_id >= 0:
-            rospy.logwarn(f"Global Collision Check -> Robot [{robot.name}] in collision with link {robot.collision_sliced_links[col_link_id].name}")
+            # rospy.logwarn(f"Global Collision Check -> Robot [{robot.name}] in collision with link {robot.collision_sliced_links[col_link_id].name}")
             return True
         else:
             # No collisions found with no errors identified.
@@ -463,14 +463,14 @@ class Armer:
                     # TODO: Each robot performs its own self check (possibly saves some time?)
                     # Each robot is then checked with a global collision check (environment and other robots)
                     # If collisions are found (self or with global) preemption signal sent to each robot object.
-                    # start = timeit.default_timer()
                     if self.global_collision_check(robot=robot) and robot.preempted == False:
                         # Current robot found to be in collision so preempt
                         robot.collision_approached = True
                         robot.preempt()
-                        
-                    # end = timeit.default_timer()
-                    # print(f"[Current] full collision check: {1/(end-start)} hz")  
+
+                    if robot.preempted == False:
+                        # Set the safe state of robot for recovery on collisions if needed
+                        robot.set_safe_state()
 
                     # Check if the current robot has any  dynamic objects that need backend update
                     self.update_dynamic_objects(robot=robot)

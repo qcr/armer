@@ -107,8 +107,18 @@ class ROS(Connector):  # pragma nocover
             # NOTE: the following two lines are needed in order for collision checking to work
             self.robots[robot_name]._update_link_tf()
             self.robots[robot_name]._propogate_scene_tree()
-            # Publishes out to ROS via configured control topic (joint_group_vel_controller)
-            self.robots[robot_name].publish()
+
+            
+            if self.robots[robot_name].controller_type_request == 1:
+                # Joint Trajectory control
+                self.robots[robot_name].controller_select(1)
+                self.robots[robot_name].execute_trajectory()
+
+                # Reset back to standard joint group velocity controller
+                self.robots[robot_name].controller_select(0)
+            else:
+                # Publishes out to ROS via configured control topic (joint_group_vel_controller)
+                self.robots[robot_name].publish()
 
         # Update world transforms of dynamic objects
         # TODO: test with real robot

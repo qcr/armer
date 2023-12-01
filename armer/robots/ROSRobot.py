@@ -56,7 +56,7 @@ from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryG
 # TESTING NEW IMPORTS FOR KD TREE COLLISION SEARCH METHOD
 from sklearn.neighbors import KDTree
 from armer.cython import collision_handler
-from scipy.spatial import distance
+import math
 
 import tf2_ros
 
@@ -64,6 +64,10 @@ class ControlMode:
    ERROR=0
    JOINTS=1
    CARTESIAN=2
+
+class ControllerType:
+    JOINT_GROUP_VEL=0
+    JOINT_TRAJECTORY=1
 
 # Test class of dynamic objects
 @dataclass
@@ -179,12 +183,12 @@ class ROSRobot(rtb.Robot):
         # NOTE: could also use this for visualising the trajectory (TBD)
         # NOTE: there was an issue identified around using the latest franka-emika panda description
         # print(f"the urdf filepath is: {self.urdf_filepath}")
-        # self.robot_ghost = URDFRobot(
-        #     wait_for_description=False, 
-        #     urdf_file=self.urdf_filepath,
-        #     collision_check_start_link=self.collision_sliced_links[-1].name, 
-        #     collision_check_stop_link=self.collision_sliced_links[0].name
-        # )
+        self.robot_ghost = URDFRobot(
+            wait_for_description=False, 
+            urdf_file=self.urdf_filepath,
+            collision_check_start_link=self.collision_sliced_links[-1].name, 
+            collision_check_stop_link=self.collision_sliced_links[0].name
+        )
         
         # Define a list of dynamic objects (to be added in at runtime)
         self.dynamic_collision_dict = dict()
@@ -269,6 +273,16 @@ class ROSRobot(rtb.Robot):
                 if joint_velocity_topic \
                 else '/joint_group_velocity_controller/command'
         
+        # Default to joint group velocity control
+        self.controller_type = ControllerType.JOINT_GROUP_VEL
+        self.controller_type_request = ControllerType.JOINT_GROUP_VEL
+        self.jt_traj = JointTrajectory()
+        # Collision Safe State Window
+        # NOTE: the size of the window (default of 200) dictates how far back we move to get out
+        # of a collision situation, based on previously executed joint states that were safe
+        self.q_safe_window = np.zeros([200,len(self.q)])
+        self.q_safe_window_p = 0
+
         if not self.readonly:
             # Create Transform Listener
             self.tf_listener = tf.TransformListener()
@@ -542,19 +556,15 @@ class ROSRobot(rtb.Robot):
                 GetCollisionObjects,
                 self.get_collision_obj_cb
             )
+
+            rospy.Service(
+                '{}/collision_recover'.format(self.name.lower()),
+                Empty,
+                self.collision_recover_cb
+            )
     # --------------------------------------------------------------------- #
     # --------- ROS Topic Callback Methods -------------------------------- #
     # --------------------------------------------------------------------- #
-    # Implementation from: https://github.com/ros-controls/ros_control/issues/511 
-    def controller_switch_service(self, ns, cls, **kwargs):
-        rospy.wait_for_service(ns)
-        service = rospy.ServiceProxy(ns, cls)
-        response = service(**kwargs)
-        if not response.ok:
-            rospy.logwarn(f"Attempting controller switch failed...")
-        else:
-            rospy.loginfo(f"Controller switched successfully")
-
     def _state_cb(self, msg):
         if not self.joint_indexes:
             for joint_name in self.joint_names:
@@ -1047,22 +1057,6 @@ class ROSRobot(rtb.Robot):
             )
             
             pose = goal_pose.pose
-
-            # Attempt to swtich to trajectory controller
-            # NOTE: works but needs to be peeled out so simulation can still work
-            try:
-               self.controller_switch_service("/controller_manager/switch_controller",
-                       SwitchController,
-                       start_controllers=["position_joint_trajectory_controller"],
-                       stop_controllers=["joint_group_velocity_controller"],
-                       strictness=1, start_asap=False, timeout=0.0)
-            except rospy.ServiceException as e:
-               rospy.logerr(f"-- Could not switch controllers: {e}")
-               self.executor = None
-               self.moving = False
-               self.pose_server.set_succeeded(
-                 MoveToPoseResult(success=False), 'Could not switch controllers to run'
-               )
                 
             # IS THE GOAL POSE WITHIN THE BOUNDRY?...
             if self.pose_within_workspace(pose) == False:
@@ -1092,125 +1086,20 @@ class ROSRobot(rtb.Robot):
             if self.check_singularity(solution.q):
                 rospy.logwarn(f"IK solution within singularity threshold [{self.singularity_thresh}] -> ill-advised motion")
 
-            # Generate trajectory from successful solution
-            traj = self.traj_generator(self, qf=solution.q, max_speed=goal.speed if goal.speed else 0.2)
-
-            # Take max time from trajectory and convert to array based on traj length
-            # NOTE: this is needed to then construct a JointTrajectory type
-            max_time = np.max(traj.t)
-            time_array = np.linspace(0, max_time, len(traj.s))
-            #print(f"time array: {time_array}")
-
-            # Iterates through calculated trajectory and converts to a JointTrajectory type
-            # NOTE: a standard delay of 1 second needed so controller can execute correctly
-            #       otherwise, issues with physical panda motion
-            jt_traj = JointTrajectory()
-            jt_traj.header.stamp = rospy.Time.now()
-            jt_traj.joint_names = list(self.joint_names)
-            #print(f"traj joint names: {jt_traj.joint_names}")
-            for idx in range(0,len(traj.s)):
-            #    print(f"current time array: {time_array[idx]} | rospy duration: {rospy.Duration(time_array[idx])}")
-                jt_traj_point = JointTrajectoryPoint()
-                jt_traj_point.time_from_start = rospy.Duration(time_array[idx] + 1)
-                jt_traj_point.positions = list(traj.s[idx])
-                jt_traj_point.velocities = list(traj.sd[idx])
-                jt_traj.points.append(jt_traj_point)
-
-            # Conduct 'Ghost' Robot Check for Collision throughout trajectory
-            # NOTE: also publishes marker representation of trajectory for visual confirmation (Rviz)
-            go_signal = self.trajectory_collision_checker(traj=traj)
             
-            # ## TESTING MOVEIT VISUALISATION
-            # robot_traj = RobotTrajectory()
-            # robot_traj.joint_trajectory = jt_traj
-            # # print(f"jt_traj: {len(jt_traj)}")
-
-            # robot_state = RobotState()
-            # state = JointState()
-            # state.position = list(self.q)
-            # state.velocity = list(self.qd)
-            # state.effort = np.zeros(self.n)
-            # robot_state.joint_state = state
-            # robot_state.is_diff = False
-
-            # display_traj = DisplayTrajectory()
-            # display_traj.model_id = self.name
-            # display_traj.trajectory = robot_traj
-            # display_traj.trajectory_start = robot_state
-
-            #self.display_moveit_traj_publisher.publish(display_traj)
-            
-            # If valid (no collisions detected) then continue with action
-            if go_signal:
-                # ---- TESTING NEW IMPLEMENTATION
-                # Create a client to loaded controller
-                client = actionlib.SimpleActionClient('/position_joint_trajectory_controller/follow_joint_trajectory', FollowJointTrajectoryAction)
-
-                # Wait for client server connection
-                client.wait_for_server()
-
-                # Create goal
-                goal = FollowJointTrajectoryGoal()
-                goal.trajectory = jt_traj
-
-                # Send Joint Trajectory to position controller for execution
-                client.send_goal(goal)
+            result = self.general_exectutor(q=solution.q)
                 
-                # TODO: currently the collision preempt (or any armer preempt)
-                #       does not stop the motion as it is being externally controlled
-                #       through the joint trajectory controller. Best to add a supervisor
-                #       to stop action (trajectory controller) on any events here
-                # Wait for controller to finish
-                client.wait_for_result()
-                result = client.get_result()
-
-                # Debugging out of result
-                #print(f"result: {result}")
-                
-                # Existing Method (Sim)
-                # self.executor = TrajectoryExecutor(
-                #     self,
-                #     traj=traj,
-                #     cutoff=self.trajectory_end_cutoff
-                # )
-
-                # while not self.executor.is_finished():
-                #     rospy.sleep(0.01)
-
-                #result = self.executor.is_succeeded()
-
-                # Send empty data at end to clear visual trajectory
-                marker_traj = Marker()
-                marker_traj.points = []
-                self.display_traj_publisher.publish(marker_traj)
-
-                if hasattr(result, 'error_code') and result.error_code == 0:
-                    #print(f"result has error code and is safe")
-                    self.pose_server.set_succeeded(MoveToPoseResult(success=True))
-                elif isinstance(result, bool) and result:
-                    #print(f"result is of type bool and is safe")
-                    self.pose_server.set_succeeded(MoveToPoseResult(success=True))
-                else:
-                    self.pose_server.set_aborted(MoveToPoseResult(success=False))
+            if hasattr(result, 'error_code') and result.error_code == 0:
+                #print(f"result has error code and is safe")
+                self.pose_server.set_succeeded(MoveToPoseResult(success=True))
+            elif isinstance(result, bool) and result:
+                #print(f"result is of type bool and is safe")
+                self.pose_server.set_succeeded(MoveToPoseResult(success=True))
             else:
                 self.pose_server.set_aborted(MoveToPoseResult(success=False))
-                self.executor = None
-                self.moving = False
-            
-            # Attempt to swtich back to joint group velocity controller
-            try:
-               self.controller_switch_service("/controller_manager/switch_controller",
-                       SwitchController,
-                       start_controllers=["joint_group_velocity_controller"],
-                       stop_controllers=["position_joint_trajectory_controller"],
-                       strictness=1, start_asap=False, timeout=0.0)
-            except rospy.ServiceException as e:
-               rospy.logerr(f"Could not switch controllers: {e}")
-               self.executor = None
-               self.moving = False
-               self.pose_server.set_succeeded(
-                 MoveToPoseResult(success=False), 'Could not switch controllers to run'
-               )
+                
+            self.executor = None
+            self.moving = False
 
     def step_cb(self, goal: MoveToPoseGoal) -> None:
         """
@@ -1373,17 +1262,9 @@ class ROSRobot(rtb.Robot):
             # TODO: prevent motion on this bool? Needs to be thought about
             if self.check_singularity(goal.joints):
                 rospy.logwarn(f"IK solution within singularity threshold [{self.singularity_thresh}] -> ill-advised motion")
-
-            self.executor = TrajectoryExecutor(
-              self,
-              self.traj_generator(self, np.array(goal.joints), goal.speed if goal.speed else 0.2),
-              cutoff=self.trajectory_end_cutoff
-            )
-
-            while not self.executor.is_finished():
-              rospy.sleep(0.01)
-
-            if self.executor.is_succeeded():
+            
+            result = self.general_exectutor(q=goal.joints)
+            if result:
                 self.joint_pose_server.set_succeeded(
                     MoveToJointPoseResult(success=True)
                 )
@@ -2030,6 +1911,9 @@ class ROSRobot(rtb.Robot):
         # Handle radius and length defaulting on 0
         radius = req.radius if req.radius else 0.05 #default in m
         length = req.length if req.length else 0.1 #default in m
+        scale_x = req.scale_x if req.scale_x else 0.1 #default in m
+        scale_y = req.scale_y if req.scale_y else 0.1 #default in m
+        scale_z = req.scale_z if req.scale_z else 0.1 #default in m
         # rospy.loginfo(f"radius is: {radius} | length is: {length}")
         
         # Handle pose input error
@@ -2051,6 +1935,8 @@ class ROSRobot(rtb.Robot):
             shape = sg.Sphere(radius=radius, pose=pose_se3)
         elif req.type == "cylinder":
             shape = sg.Cylinder(radius=radius, length=length, pose=pose_se3)
+        elif req.type == "cuboid" or req.type == "cube":
+            shape = sg.Cuboid(scale=[scale_x, scale_y, scale_z], pose=pose_se3)
         elif req.type == "mesh":
             rospy.logwarn(f"In progress -> not yet implemented. Exiting...")
             return AddCollisionObjectResponse(success=False)
@@ -2082,6 +1968,8 @@ class ROSRobot(rtb.Robot):
         # NOTE: Also, existing description shapes (not part of the robot tree) need to be peeled out and added here as well
         self.collision_obj_list.append(shape)
 
+        self.characterise_collision_overlaps()
+
         # print(f"Current collision objects: {self.collision_obj_list}")
 
         return AddCollisionObjectResponse(success=True)
@@ -2112,7 +2000,27 @@ class ROSRobot(rtb.Robot):
         # Dump list out
         # return GetCollisionObjectsResponse(list(self.dynamic_collision_dict.keys()))
         return GetCollisionObjectsResponse(out_list)
-     
+    
+    def collision_recover_cb(self, req: EmptyRequest) -> EmptyResponse:
+        """
+        This will attempt to move the arm to a previous 'non-collision' state
+        """
+        # Get the last 'non' collision state and send this to a joint pose move
+        print(f"Last safe state: {self.q_safe_window[0]} | current in collision state: {self.q}")
+
+        # Attempt recovery
+        self.general_exectutor(q=self.q_safe_window[0], collision_ignore=True)
+        
+        # Recover from Error if set
+        if self._controller_mode == ControlMode.ERROR:
+            rospy.loginfo(f"Resetting from ERROR state to JOINTS [Default]")
+            self._controller_mode = ControlMode.JOINTS
+            self.preempted = False
+
+        self.executor = None
+        self.moving = False
+
+        return EmptyResponse()
     # --------------------------------------------------------------------- #
     # --------- Collision and Singularity Checking Methods ---------------- #
     # --------------------------------------------------------------------- #
@@ -2158,7 +2066,9 @@ class ROSRobot(rtb.Robot):
                     and col_dict_cp[link] != [] 
                     and link not in self.overlapped_link_dict[sliced_link_name]
                     and link != sliced_link_name
-                    and np.linalg.norm(self.ets(start=sliced_link_name, end=link).eval(self.q)[:3, 3]) < magnitude_thresh
+                    and np.linalg.norm(
+                        self.ets(start=sliced_link_name, end=link).eval(self.q)[:3, 3]
+                    ) < magnitude_thresh
             }
 
             # This is the external objects translation from the base_link
@@ -2169,7 +2079,12 @@ class ROSRobot(rtb.Robot):
                     and col_dict_cp[link] != []
                     and link not in self.overlapped_link_dict[sliced_link_name]
                     and link != sliced_link_name
-                    and np.linalg.norm(distance.cdist([self.ets(start=self.base_link.name, end=sliced_link_name).eval(self.q)[:3, 3]],[col_dict_cp[link][0].T[:3,3]])) < magnitude_thresh
+                    and np.linalg.norm(
+                        math.dist(
+                            self.ets(start=self.base_link.name, end=sliced_link_name).eval(self.q)[:3, 3],
+                            col_dict_cp[link][0].T[:3,3]
+                        )
+                    ) < magnitude_thresh
             }
         else:
             translation_dict = {
@@ -2215,6 +2130,7 @@ class ROSRobot(rtb.Robot):
 
                     # NOTE: this is currently an assumption as dynamic objects as easily added with respect to base link
                     # TODO: add with respect to any frame would be good
+                    # NOTE: mesh objects not working (need relative pathing, not absolute)
                     if link not in self.link_dict.keys():
                         marker.header.frame_id = self.base_link.name
                     else:
@@ -2234,16 +2150,13 @@ class ROSRobot(rtb.Robot):
                         marker.scale.x = shape.radius * 2
                         marker.scale.y = shape.radius * 2
                         marker.scale.z = shape.length
-                    # elif shape.stype == 'mesh':
-                    #     marker.type = 10
+                    elif shape.stype == 'cuboid':
+                        marker.type = 1
 
-                    #     marker.scale.x = shape.scale[0]
-                    #     marker.scale.y = shape.scale[1]
-                    #     marker.scale.z = shape.scale[2]
-                    #     # TODO: this needs to be a package:// path for RVIZ to work
-                    #     #       absolute paths do not work...
-                    #     marker.mesh_resource = shape.filename
-                    #     marker.mesh_use_embedded_materials = True
+                        # Expects diameter (m)
+                        marker.scale.x = shape.scale[0]
+                        marker.scale.y = shape.scale[1]
+                        marker.scale.z = shape.scale[2]
                     else:
                         break
                 
@@ -2269,7 +2182,7 @@ class ROSRobot(rtb.Robot):
         # Publish array of markers
         self.collision_debug_publisher.publish(marker_array)
     
-    def query_target_link_check(self, sliced_link_name: str = "", magnitude_tresh: float = 0.2):
+    def query_target_link_check(self, sliced_link_name: str = "", magnitude_thresh: float = 0.2):
         """
         This method is intended to run per cycle of operation and is expected to find changes to distances
         based on the original main dictionary (as created by creation_of_pose_link_distances)
@@ -2282,7 +2195,9 @@ class ROSRobot(rtb.Robot):
                 and col_dict_cp[link] != [] 
                 and link not in self.overlapped_link_dict[sliced_link_name]
                 and link != sliced_link_name
-                and np.linalg.norm(self.ets(start=sliced_link_name, end=link).eval(self.q)[:3, 3]) < magnitude_tresh
+                and np.linalg.norm(
+                    self.ets(start=sliced_link_name, end=link).eval(self.q)[:3, 3]
+                ) < magnitude_thresh
         ]
 
         external_list =[
@@ -2292,7 +2207,12 @@ class ROSRobot(rtb.Robot):
                 and col_dict_cp[link] != []
                 and link not in self.overlapped_link_dict[sliced_link_name]
                 and link != sliced_link_name
-                and np.linalg.norm(distance.cdist([self.ets(start=self.base_link.name, end=sliced_link_name).eval(self.q)[:3, 3]],[col_dict_cp[link][0].T[:3,3]])) < magnitude_tresh
+                and np.linalg.norm(
+                    math.dist(
+                        self.ets(start=self.base_link.name, end=sliced_link_name).eval(self.q)[:3, 3],
+                        col_dict_cp[link][0].T[:3,3]
+                    )
+                ) < magnitude_thresh
         ]
 
         return target_list + external_list
@@ -2435,29 +2355,21 @@ class ROSRobot(rtb.Robot):
 
         with Timer(f"Get collision per state:", enabled=False):
             # NOTE: use current (non-ghost) robot's link names to extract ghost robot's link from dictionary
-            for link in reversed(self.sorted_links):
+            for link in self.collision_dict.keys():
                 # Get the link to check against from the ghost robot's link dictionary
-                # NOTE: utilise the main (non-ghost) robot's collision slice (for speed)
-                # NOTE: this does mean that both the robot and ghost have the same collision check window
-                new_link = self.robot_ghost.link_dict[link.name] \
-                    if link.name in self.robot_ghost.link_dict.keys() \
-                        and link in self.collision_sliced_links \
-                    else None
-                
-                if new_link == None:
-                    continue
-                    
                 # Output as a list of names
                 links_in_collision = self.get_links_in_collision(
-                    target_link=new_link.name, 
-                    check_list=new_link.collision.data if new_link.collision.data else [], 
-                    ignore_list=self.overlapped_link_dict[new_link.name],
+                    target_link=link, 
+                    check_list=self.robot_ghost.link_dict[link].collision.data if link in self.robot_ghost.link_dict.keys() else self.collision_dict[link], 
+                    ignore_list=self.overlapped_link_dict[link] if link in self.overlapped_link_dict.keys() else [],
                     link_list=self.robot_ghost.links,
                     output_name_list=True,
                     skip=True)
+            
+                # print(f"Checking [{link}] -> links in collision: {links_in_collision}")
                 
                 if len(links_in_collision) > 0:
-                    rospy.logerr(f"Collision at state {self.robot_ghost.q} in trajectory between -> [{link.name}] and {[link for link in links_in_collision]}")
+                    rospy.logerr(f"Collision at state {self.robot_ghost.q} in trajectory between -> [{link}] and {[link_n for link_n in links_in_collision]}")
                     go_signal = False
                     break
 
@@ -2529,13 +2441,14 @@ class ROSRobot(rtb.Robot):
             # Alternative Method (METHOD 2) that is getting the list in a faster iterative method
             # NOTE: this has to course through ALL links in space (self.links encapsulates all links that are not the gripper)
             self.overlapped_link_dict = dict([
-                (link.name, self.get_links_in_collision(
-                    target_link=link.name, 
-                    check_list=self.collision_dict[link.name], 
+                (link, self.get_links_in_collision(
+                    target_link=link, 
+                    check_list=self.collision_dict[link], 
                     ignore_list=[],
+                    link_list=self.links,
                     output_name_list=True)
                 )
-                for link in reversed(self.links)])
+                for link in self.collision_dict.keys()])
             
             # NOTE: secondary run to get gripper links as well
             gripper_dict = dict([
@@ -2791,9 +2704,150 @@ class ROSRobot(rtb.Robot):
             self.collision_approached = False
             return False
         
+    def set_safe_state(self):
+        # Account for pointer location
+        if self.q_safe_window_p < len(self.q_safe_window):
+            # Add current target bar x value
+            self.q_safe_window[self.q_safe_window_p] = self.q
+            # increment pointer(s)
+            self.q_safe_window_p += 1
+        else:
+            # shift all values to left by 1 (defaults to 0 at end)
+            self.q_safe_window = np.roll(self.q_safe_window, shift=-1, axis=0)
+            # add value to end
+            self.q_safe_window[-1] = self.q  
     # --------------------------------------------------------------------- #
     # --------- Standard Methods ------------------------------------------ #
     # --------------------------------------------------------------------- #
+    def general_exectutor(self, q, collision_ignore: bool =False):
+        result = False
+        if self.check_singularity(q):
+            rospy.logwarn(f"Singularity Detected in Goal State: {q}")
+            return result
+
+        # Generate trajectory from successful solution
+        traj = self.traj_generator(self, qf=q)
+
+        if traj.name == 'invalid':
+            rospy.logwarn(f"Invalid trajectory detected, existing safely")
+            return result
+
+        # Take max time from trajectory and convert to array based on traj length
+        # NOTE: this is needed to then construct a JointTrajectory type
+        max_time = np.max(traj.t)
+        time_array = np.linspace(0, max_time, len(traj.s))
+        #print(f"time array: {time_array}")
+        # Iterates through calculated trajectory and converts to a JointTrajectory type
+        # NOTE: a standard delay of 1 second needed so controller can execute correctly
+        #       otherwise, issues with physical panda motion
+        self.jt_traj.header.stamp = rospy.Time.now()
+        self.jt_traj.joint_names = list(self.joint_names)
+        #print(f"traj joint names: {jt_traj.joint_names}")
+        for idx in range(0,len(traj.s)):
+        #    print(f"current time array: {time_array[idx]} | rospy duration: {rospy.Duration(time_array[idx])}")
+            jt_traj_point = JointTrajectoryPoint()
+            jt_traj_point.time_from_start = rospy.Duration(time_array[idx] + 1)
+            jt_traj_point.positions = list(traj.s[idx])
+            jt_traj_point.velocities = list(traj.sd[idx])
+            self.jt_traj.points.append(jt_traj_point)
+
+        # Conduct 'Ghost' Robot Check for Collision throughout trajectory
+        # NOTE: also publishes marker representation of trajectory for visual confirmation (Rviz)
+        if collision_ignore:
+            go_signal = True
+        else:
+            go_signal = self.trajectory_collision_checker(traj=traj)
+        
+        # If valid (no collisions detected) then continue with action
+        if go_signal:
+            self.controller_type_request = ControllerType.JOINT_TRAJECTORY
+
+            self.executor = TrajectoryExecutor(
+                self,
+                traj=traj,
+                cutoff=self.trajectory_end_cutoff
+            )
+
+            while not self.executor.is_finished():
+                rospy.sleep(0.01)
+
+            result = self.executor.is_succeeded()
+
+            # Send empty data at end to clear visual trajectory
+            marker_traj = Marker()
+            marker_traj.points = []
+            self.display_traj_publisher.publish(marker_traj)
+
+        return result
+    
+    # Implementation from: https://github.com/ros-controls/ros_control/issues/511 
+    def controller_switch_service(self, ns, cls, **kwargs):
+        rospy.wait_for_service(ns)
+        service = rospy.ServiceProxy(ns, cls)
+        response = service(**kwargs)
+        if not response.ok:
+            rospy.logwarn(f"Attempting controller switch failed...")
+        else:
+            rospy.loginfo(f"Controller switched successfully")
+
+    def controller_select(self, controller_type: int = 0) -> bool:
+        if controller_type == None or controller_type > (len(ControllerType) - 1):
+            print(f"len of controller type: {len(ControllerType)}")
+            return False
+        
+        if controller_type == ControllerType.JOINT_GROUP_VEL and controller_type != self.controller_type:
+            try:
+               self.controller_switch_service("/controller_manager/switch_controller",
+                       SwitchController,
+                       start_controllers=["joint_group_velocity_controller"],
+                       stop_controllers=["position_joint_trajectory_controller"],
+                       strictness=1, start_asap=False, timeout=0.0)
+               
+               self.controller_type = ControllerType.JOINT_GROUP_VEL
+            except rospy.ServiceException as e:
+               rospy.logerr(f"-- Could not switch controllers: {e}")
+               return False
+        elif controller_type == ControllerType.JOINT_TRAJECTORY and controller_type != self.controller_type:
+            try:
+               self.controller_switch_service("/controller_manager/switch_controller",
+                       SwitchController,
+                       start_controllers=["position_joint_trajectory_controller"],
+                       stop_controllers=["joint_group_velocity_controller"],
+                       strictness=1, start_asap=False, timeout=0.0)
+               self.controller_type = ControllerType.JOINT_TRAJECTORY
+            except rospy.ServiceException as e:
+               rospy.logerr(f"-- Could not switch controllers: {e}")
+               return False
+        else:
+            rospy.logerr(f"Unknown controller type, failed.")
+            return False
+
+    def execute_trajectory(self):
+        # ---- TESTING NEW IMPLEMENTATION
+        # Create a client to loaded controller
+        client = actionlib.SimpleActionClient(
+            '/position_joint_trajectory_controller/follow_joint_trajectory', 
+            FollowJointTrajectoryAction
+        )
+
+        # Wait for client server connection
+        client.wait_for_server()
+
+        # Create goal
+        goal = FollowJointTrajectoryGoal()
+        goal.trajectory = self.jt_traj
+
+        # Send Joint Trajectory to position controller for execution
+        client.send_goal(goal)
+
+        # TODO: currently the collision preempt (or any armer preempt)
+        #       does not stop the motion as it is being externally controlled
+        #       through the joint trajectory controller. Best to add a supervisor
+        #       to stop action (trajectory controller) on any events here
+        # Wait for controller to finish
+        client.wait_for_result()
+        result = client.get_result()
+
     def close(self):
         """
         Closes the action servers associated with this robot
@@ -2812,11 +2866,11 @@ class ROSRobot(rtb.Robot):
 
         # Warn and Reset
         if self.singularity_approached:
-            rospy.logwarn(f"PREEMPTED: Approaching singularity (index: {self.manip_scalar}) --> please home to fix")
+            rospy.logwarn(f"PREEMPTED: Approaching singularity (index: {self.manip_scalar}) --> please signal /arm/recover service to fix")
             self.singularity_approached = False
 
         if self.collision_approached:
-            rospy.logwarn(f"PREEMPTED: Collision Found --> please home to fix")
+            rospy.logwarn(f"PREEMPTED: Collision Found --> please signal /arm/collision_recover service to fix")
             self.collision_approached = False
 
         # NOTE: put robot object into ERROR state as we have been preempted
@@ -3064,6 +3118,13 @@ class ROSRobot(rtb.Robot):
                     marker.scale.x = obj.shape.radius * 2
                     marker.scale.y = obj.shape.radius * 2
                     marker.scale.z = obj.shape.length
+                elif obj.shape.stype == 'cuboid':
+                    marker.type = 1
+
+                    # Expects diameter (m)
+                    marker.scale.x = obj.shape.scale[0]
+                    marker.scale.y = obj.shape.scale[1]
+                    marker.scale.z = obj.shape.scale[2]
                 else:
                     break
             
@@ -3183,6 +3244,7 @@ class ROSRobot(rtb.Robot):
 
         self.state_publisher.publish(self.state)
         # Publishes any dynamically added shapes/collision objects to RVIZ for debugging
+        # TODO: add a way to enable/disable this
         self.marker_publisher()
 
         self.event.set()
