@@ -24,9 +24,10 @@ import spatialgeometry as sg
 from typing import List, Any
 from threading import Lock, Event
 from armer.models.URDFRobot import URDFRobot
-from armer.utils import mjtg, ikine
+from armer.utils import mjtg, trapezoidal, ikine
 from armer.errors import ArmerError
 from armer.trajectory import TrajectoryExecutor
+from armer.timer import Timer
 from rclpy.callback_groups import ReentrantCallbackGroup
 
 # pylint: disable=too-many-instance-attributes
@@ -38,6 +39,14 @@ from armer_msgs.srv import GetNamedPoses, AddNamedPose, RemoveNamedPose, AddName
 from geometry_msgs.msg import TwistStamped, Twist, PoseStamped
 from std_msgs.msg import Header, Float64MultiArray, Bool
 from sensor_msgs.msg import JointState
+
+# TESTING NEW IMPORTS FOR DYNAMIC OBJECT MARKER DISPLAY (RVIZ)
+from visualization_msgs.msg import Marker, MarkerArray
+
+# TESTING NEW IMPORTS FOR KD TREE COLLISION SEARCH METHOD
+from sklearn.neighbors import KDTree
+# from armer.cython import collision_handler
+import math
 
 class ControlMode:
    JOINTS=1
@@ -58,6 +67,9 @@ class ROSRobot(URDFRobot):
                  modified_qr=None,
                  singularity_thresh=0.02,
                  action_cb_group=None,
+                 qlim_min=None,
+                 qlim_max=None,
+                 qdlim=None,
                  * args,
                  **kwargs):  # pylint: disable=unused-argument
         
@@ -70,6 +82,17 @@ class ROSRobot(URDFRobot):
         # TESTING for NEO
         self.collision_obj_list: List[sg.Shape] = list()
         
+        # Update with ustom qlim (joint limits) if specified in robot config
+        if qlim_min and qlim_max:
+            self.qlim = np.array([qlim_min, qlim_max])
+            self.logger(f"Updating Custom qlim: {self.qlim}")
+
+        if qdlim:
+            self.qdlim = np.array(qdlim)
+            self.logger(f"Updating Custom qdlim: {self.qdlim}")
+        else:
+            self.qdlim = None
+
         # Handle the setup of joint stat and velocity topics for a ROS backend
         # NOTE: this should match the ros_control real robot state and control (group velocity) interface topics
         #       the defaults are generally typical, but could be different
@@ -86,24 +109,90 @@ class ROSRobot(URDFRobot):
         #       the default is in the root path (for shared usage)
         #       can be configured for project specific loading (see service)
         self.config_path = config_path if config_path else os.path.join(
-            os.getenv('HOME', '/root'),
-            '.ros/configs/armer.yaml'
+            os.getenv('HOME', '/home'),
+            '.ros/configs/system_named_poses.yaml'
         )
 
         # Configure the gripper name
         if not hasattr(self, 'gripper'):
-            self.gripper = self.grippers[0].name
+            self.gripper = self.grippers[0].name if len(self.grippers) > 0 else 'tool0'
           
         # Sort links by parents starting from gripper
-        sorted_links=[]
+        self.sorted_links=[]
+
+        # Check if the existing gripper name exists (Error handling) otherwise default to top of dict stack
+        if self.gripper not in self.link_dict.keys():
+            default_top_link_name = sorted(self.link_dict.keys())[-1]
+            self.logger(f"Configured gripper name {self.gripper} not in link tree -> defaulting to top of stack: {default_top_link_name}")
+            self.gripper = default_top_link_name
+
         link=self.link_dict[self.gripper]   
         while link is not None:
-            sorted_links.append(link)
+            self.sorted_links.append(link)
             link=link.parent
-        sorted_links.reverse()
+        self.sorted_links.reverse()
 
+        # --- Collision Checking Setup Section --- #
+        # Loops through links (as read in through URDF parser)
+        # Extracts each link's list of collision shapes (of type sg.Shape). TODO: add a validity check on type here
+        # Updates a dictionary (key as link name) of collision shape lists per link
+        # Create a new dictionary of link lookup to ignore overlapping joint/collision objects
+        # NOTE: the theory here is to keep a record of all expected collisions (overlaps) per link so that
+        #       the main self collision check can ignore these cases. 
+        self.overlapped_link_dict = dict()
+        self.collision_dict = dict()
+        # This is a list of collision objects that is used by NEO
+        # NOTE: this may not be explictly needed, as a list form (flattened) of the self.collision_dict.values() 
+        #       contains the same information
+        self.collision_obj_list = list()
+        # Define a list of dynamic objects (to be added in at runtime)
+        # NOTE: this is useful to include collision shapes (i.e., cylinders, spheres, cuboids) in your scene for collision checking
+        self.dynamic_collision_dict = dict()
+        self.dynamic_collision_removal_dict = dict()
+        self.collision_approached = False
+        # Check for external links (from robot tree)
+        # This is required to add any other links (not specifically part of the robot tree) 
+        # to our collision dictionary for checking
+        for link in self.links:
+            # print(f"links: {link.name}")
+            if link.name in self.collision_dict.keys():
+                continue
+
+            # print(f"adding link: {link.name} which is type: {type(link)} with collision data: {link.collision.data}")
+            self.collision_dict[link.name] = link.collision.data if link.collision.data else []
+            [self.collision_obj_list.append(data) for data in link.collision.data]
+        
+        # Handle collision link window slicing
+        # Window slicing is a way to define which links need to be tracked for collisions (for efficiency)
+        # Checks error of input from configuration file (note that default is current sorted links)
+        self.collision_sliced_links = self.sorted_links
+        self.update_link_collision_window()
+        # Initialise a 'ghost' robot instance for trajectory collision checking prior to execution
+        # NOTE: Used to visualise the trajectory as a simple marker list in RVIZ for debugging
+        # NOTE: there was an issue identified around using the latest franka-emika panda description
+        # self.logger(f"urdf filepath: {self.urdf_filepath}")
+        self.robot_ghost = URDFRobot(
+            nh=nh,
+            wait_for_description=False, 
+            gripper=self.gripper,
+            urdf_file=self.urdf_filepath,
+            collision_check_start_link=self.collision_sliced_links[-1].name, 
+            collision_check_stop_link=self.collision_sliced_links[0].name
+        )
+        if self.robot_ghost.is_valid():
+            self.logger(f"Robot Ghost Configured and Ready")
+        else:
+            self.logger(f"Robot Ghost Invalid", 'warn')
+        
+        # Collision Safe State Window
+        # NOTE: the size of the window (default of 200) dictates how far back we move to get out
+        # of a collision situation, based on previously executed joint states that were safe
+        self.q_safe_window = np.zeros([200,len(self.q)])
+        self.q_safe_window_p = 0
+        # --- Collision Checking Setup Section END --- #
+        
         self.joint_indexes = []
-        self.joint_names = list(map(lambda link: link._joint_name, filter(lambda link: link.isjoint, sorted_links)))
+        self.joint_names = list(map(lambda link: link._joint_name, filter(lambda link: link.isjoint, self.sorted_links)))
         
         # Configure a new origin if specified
         if origin:
@@ -159,7 +248,7 @@ class ROSRobot(URDFRobot):
         #       this can be replaced by any generator as needed
         # TODO: introduce mechanism to update generator and solver as needed
         self.executor = None        
-        self.traj_generator = mjtg
+        self.traj_generator = trapezoidal
         self.ik_solver = ikine
 
         # Configure ROS transform buffer and listener
@@ -800,23 +889,564 @@ class ROSRobot(URDFRobot):
         return response
     
     # --------------------------------------------------------------------- #
-    # --------- Standard Methods ------------------------------------------ #
+    # --------- Collision and Singularity Checking Methods ---------------- #
     # --------------------------------------------------------------------- #
-    def close(self):
+    def add_collision_obj(self, obj):
         """
-        Closes any resources associated with this robot
+        Simple mechanism for adding a shape object to the collision list
+        NOTE: only for debugging purposes
         """
-        self.pose_server.need_to_terminate = True
-        self.joint_pose_server.need_to_terminate = True
-        self.named_pose_server.need_to_terminate = True
-
-    def add_collision_obj(self, obj: sg.Shape):
         self.collision_obj_list.append(obj)
+
+    def closest_dist_query_shape_based(self, sliced_link_name, target_links):
+        """
+        This method uses the closest point method of a Shape object to extract translation to a link.
+        NOTE: only a single shape is used per link (defaulting to the first one). This is needed to
+        keep the speed of this process as fast as possible. This may not be the best method if the 
+        shape being used is not 'representative' of the entire link.
+        """
+        translation_dict = {
+            link: self.collision_dict[sliced_link_name][0].closest_point(self.collision_dict[link][0])[2]
+            for link in target_links 
+            if self.collision_dict[link] != [] and link not in self.overlapped_link_dict[sliced_link_name]
+        }
+        return translation_dict
+    
+    def closest_dist_query_pose_based(self, sliced_link_name, magnitude_thresh: float = 0.4, refine: bool = False):
+        """
+        This method uses the built-in recursive search (ets) for links within the robot tree
+        to quickly get the translation from a specified sliced link. Note that this method
+        gets the translation to the link's origin, which may not be as representative as possibe with
+        respect to the surface of the link.
+        NOTE: an additional external dictionary is needed for dynamically added shapes, or shapes/links not
+        within the robot tree (fails at the ets method)
+        NOTE: currently the fastest method as of 2023-12-1
+        """
+        col_dict_cp = self.collision_dict.copy()
+        # If asked to refine, then base the link dictionary creation on the magnitude threshold value (m)
+        # NOTE: refining can lead to slow down on large number of multiple shapes
+        if refine:
+            translation_dict = {
+                link: self.ets(start=sliced_link_name, end=link).eval(self.q)[:3, 3]
+                for link in col_dict_cp.keys()
+                if link in self.link_dict.keys() 
+                    and col_dict_cp[link] != [] 
+                    and link not in self.overlapped_link_dict[sliced_link_name]
+                    and link != sliced_link_name
+                    and np.linalg.norm(
+                        self.ets(start=sliced_link_name, end=link).eval(self.q)[:3, 3]
+                    ) < magnitude_thresh
+            }
+
+            # This is the external objects translation from the base_link
+            external_dict = {
+                link: col_dict_cp[link][0].T[:3,3]
+                for link in col_dict_cp.keys()
+                if link not in self.link_dict.keys()
+                    and col_dict_cp[link] != []
+                    and link not in self.overlapped_link_dict[sliced_link_name]
+                    and link != sliced_link_name
+                    and np.linalg.norm(
+                        math.dist(
+                            self.ets(start=self.base_link.name, end=sliced_link_name).eval(self.q)[:3, 3],
+                            col_dict_cp[link][0].T[:3,3]
+                        )
+                    ) < magnitude_thresh
+            }
+        else:
+            translation_dict = {
+                link: self.ets(start=sliced_link_name, end=link).eval(self.q)[:3, 3]
+                for link in col_dict_cp.keys()
+                if link in self.link_dict.keys() 
+                    and col_dict_cp[link] != [] 
+                    and link not in self.overlapped_link_dict[sliced_link_name]
+                    and link != sliced_link_name
+            }
+
+            # This is the external objects translation from the base_link
+            external_dict = {
+                link: col_dict_cp[link][0].T[:3,3]
+                for link in col_dict_cp.keys()
+                if link not in self.link_dict.keys()
+                    and col_dict_cp[link] != []
+                    and link not in self.overlapped_link_dict[sliced_link_name]
+                    and link != sliced_link_name
+            }
+
+        translation_dict.update(external_dict)
+        return translation_dict
+    
+    def collision_marker_debugger(self, sliced_link_names: list = [], check_link_names: list = []):
+        """
+        A simple debugging method to output to RVIZ the current link shapes being checked
+        """
+        marker_array = []
+        captured = []
+        counter = 0
+        for links in check_link_names:
+            # These are the links associated with the respective idx sliced link
+            for link in links:
+                # Check if we have already created a marker
+                if link in captured:
+                    continue
+
+                # Get all the shape objects and create a marker for each
+                for shape in self.collision_dict[link]:
+                    # Default setup of marker header
+                    marker = Marker()
+
+                    # NOTE: this is currently an assumption as dynamic objects as easily added with respect to base link
+                    # TODO: add with respect to any frame would be good
+                    # NOTE: mesh objects not working (need relative pathing, not absolute)
+                    if link not in self.link_dict.keys():
+                        marker.header.frame_id = self.base_link.name
+                    else:
+                        marker.header.frame_id = link
+
+                    marker.header.stamp = rospy.Time.now()
+                    if shape.stype == 'sphere':
+                        marker.type = 2
+                        # Expects diameter (m)
+                        marker.scale.x = shape.radius * 2
+                        marker.scale.y = shape.radius * 2
+                        marker.scale.z = shape.radius * 2
+                    elif shape.stype == 'cylinder':
+                        marker.type = 3
+
+                        # Expects diameter (m)
+                        marker.scale.x = shape.radius * 2
+                        marker.scale.y = shape.radius * 2
+                        marker.scale.z = shape.length
+                    elif shape.stype == 'cuboid':
+                        marker.type = 1
+
+                        # Expects diameter (m)
+                        marker.scale.x = shape.scale[0]
+                        marker.scale.y = shape.scale[1]
+                        marker.scale.z = shape.scale[2]
+                    else:
+                        break
+                
+                    marker.id = counter
+                    pose_se3 = sm.SE3(shape.T[:3, 3])
+                    marker.pose.position = Point(*pose_se3.t)
+
+                    if link in sliced_link_names:
+                        marker.color.r = 0.5
+                        marker.color.g = 0.5
+                    else:
+                        marker.color.r = 0
+                        marker.color.g = 1
+                    
+                    marker.color.b = 0
+                    marker.color.a = 0.25
+                    counter+=1
+
+                    marker_array.append(marker)
+            
+                captured.append(link)
+
+        # Publish array of markers
+        self.collision_debug_publisher.publish(marker_array)
+    
+    def query_target_link_check(self, sliced_link_name: str = "", magnitude_thresh: float = 0.2):
+        """
+        This method is intended to run per cycle of operation and is expected to find changes to distances
+        based on the original main dictionary (as created by creation_of_pose_link_distances)
+        """
+        col_dict_cp = self.collision_dict.copy()
+        target_list = [
+            link
+            for link in col_dict_cp.keys()
+            if link in self.link_dict.keys() 
+                and col_dict_cp[link] != [] 
+                and link not in self.overlapped_link_dict[sliced_link_name]
+                and link != sliced_link_name
+                and np.linalg.norm(
+                    self.ets(start=sliced_link_name, end=link).eval(self.q)[:3, 3]
+                ) < magnitude_thresh
+        ]
+
+        external_list =[
+            link
+            for link in col_dict_cp.keys()
+            if link not in self.link_dict.keys()
+                and col_dict_cp[link] != []
+                and link not in self.overlapped_link_dict[sliced_link_name]
+                and link != sliced_link_name
+                and np.linalg.norm(
+                    math.dist(
+                        self.ets(start=self.base_link.name, end=sliced_link_name).eval(self.q)[:3, 3],
+                        col_dict_cp[link][0].T[:3,3]
+                    )
+                ) < magnitude_thresh
+        ]
+
+        return target_list + external_list
+
+    def query_kd_nn_collision_tree(self, sliced_links: list = [], dim: int = 5, debug: bool = False) -> list:
+        """
+        Given a list of links (sliced), this method returns nearest neighbor links for collision checking
+        Aims to improve efficiency by identifying dim closest objects for collision checking per link
+        """
+        # Early termination
+        if sliced_links == None or sliced_links == []:
+            self.logger(f"target links: {sliced_links} is not valid. Exiting...", 'error')
+            return []
+
+        # print(f"cylinder link check: {self.link_dict['cylinder_link']}")
+        # Iterate through each sliced link (target link) 
+        # For the current sliced link; find the closest point between one of the link's shapes
+        # NOTE: each link can have multiple shapes, but in the first instance, we take only one shape per link to 
+        #       understand the distance to then calculate the target links via the KDTree
+        check_links = []
+        for sliced_link in sliced_links:
+            # Early termination on error
+            if sliced_link.name not in self.link_dict.keys():
+                self.logger(f"Given sliced link: {sliced_link.name} is not valid. Skipping...", 'error')
+                continue
+
+            # Testing refinement using link poses (Individual method needed for shape-based version)
+            # start = timeit.default_timer()
+            # target_link_list = self.query_target_link_check(sliced_link_name=sliced_link.name, magnitude_tresh=0.4)
+            # end = timeit.default_timer()
+            # print(f"[Link Pose Based] Extraction of Target Links for Surface Check: {1/(end-start)} hz")
+
+            # Initial approach to get closest link (based on link origin, not surface)
+            # NOTE: as it is based on origin, the size/shape of collision object matters
+            # NOTE: fastest method as of 2023-12-1
+            start = timeit.default_timer()
+            translation_dict = self.closest_dist_query_pose_based(sliced_link_name=sliced_link.name)
+            end = timeit.default_timer()
+            # print(f"[OLD] Get distances to links from target: {1/(end-start)} hz")
+         
+            tree = KDTree(data=list(translation_dict.copy().values()))
+            target_position = self.ets(start=self.base_link, end=sliced_link).eval(self.q)[:3, 3]
+            # Test query of nearest neighbors for a specific shape (3D) as origin (given tree is from source)
+            dist, ind = tree.query(X=[target_position], k=len(translation_dict.keys()) if len(translation_dict.keys()) < dim else dim, dualtree=True)
+            # print(f"dist: {dist} | links: {[list(translation_dict.keys())[i] for i in ind[0]]} | ind[0]: {ind[0]}")
+
+            check_links.append([list(translation_dict.keys())[i] for i in ind[0]])
+       
+        if debug:
+            self.collision_marker_debugger(
+                sliced_link_names=[link.name for link in sliced_links],
+                check_link_names=check_links
+            )
+
+        return check_links
+
+    def trajectory_collision_checker(self, traj) -> bool:
+        """
+        - Checks against a given trajectory (per state) if a collision is found
+        - Outputs a debugging marker trail of path for visualisation
+        
+        Returns True valid (no collisions), otherwise False if found
+        """
+        # Attempt to slice the trajectory into bit-size chuncks to speed up collision check
+        # NOTE: doesn't need to check every state in trajectory, as spatially stepping will find links in collision
+        # NOTE: the smaller the step thresh is, the less points used for checking (resulting in faster execution)
+        # TODO: check this assumption holds true
+        step_thresh = 10
+        step_value = int(len(traj.s) / step_thresh) if int(len(traj.s) / step_thresh) > 0 else 1
+        
+        # Create marker array for representing trajectory
+        marker_traj = Marker()
+        marker_traj.header.frame_id = self.base_link.name
+        marker_traj.header.stamp = rospy.Time.now()
+        marker_traj.action = Marker.ADD
+        marker_traj.pose.orientation.w = 1
+        marker_traj.id = 0
+        marker_traj.type = Marker.LINE_STRIP
+        marker_traj.scale.x = 0.01
+        # Default to Green Markers
+        marker_traj.color.g = 1.0
+        marker_traj.color.a = 1.0
+
+        # Initial empty publish
+        marker_traj.points = []
+        self.display_traj_publisher.publish(marker_traj)
+
+        self.logger(f"Traj len: {len(traj.s)} | with step value: {step_value}")
+        go = True
+        with Timer("Full Trajectory Collision Check", enabled=True):
+            for idx in range(0,len(traj.s),step_value):
+                
+                # Calculate end-effector pose and extract translation component
+                pose = self.ets(start=self.base_link, end=self.gripper).eval(traj.s[idx])
+                extracted_t = pose[:3, 3]
+
+                # Update marker trajectory for visual representation
+                p = Point()
+                p.x = extracted_t[0]
+                p.y = extracted_t[1]
+                p.z = extracted_t[2]
+                marker_traj.points.append(p)
+
+                print(f"extracted translation: {extracted_t}")
+                if self.check_collision_per_state(q=traj.s[idx]) == False:
+                    # Terminate on collision check failure
+                    # TODO: add red component to trail to signify collision
+                    # NOTE: currently terminates on collision for speed and efficiency
+                    #       could continue (regardless) to show 'full' trajectory with collision
+                    #       component highlighted? Note, that speed is a function of 
+                    #       step_thresh (currently yields approx. 30Hz on calculation 
+                    #       for a 500 sample size traj at a step_tresh of 10)
+                    go=False
+                    break
+
+        # Publish marker (regardless of failure case for visual identification)
+        self.display_traj_publisher.publish(marker_traj)
+        # Output go based on passing collision check
+        return go
+    
+    def get_link_collision_dict(self) -> dict():
+        """
+        Returns a dictionary of all associated links (names) which lists their respective collision data
+        To be used by high-level armer class for collision handling
+        """
+        return self.collision_dict
+    
+    def check_collision_per_state(self, q: list() = []) -> bool():
+        """
+        Given a robot state (q) this method checks if the links (of a ghost robot) will result in a collision
+        If a collision is found, then the output is True, else False
+        """
+        with Timer(name="setup backend and state", enabled=False):    
+            env = self.robot_ghost._get_graphical_backend()
+            self.robot_ghost.q = q
+            env.launch(headless=True)
+            env.add(self.robot_ghost, readonly=True)
+                
+            go_signal = True
+
+        with Timer(f"Get collision per state:", enabled=False):
+            # NOTE: use current (non-ghost) robot's link names to extract ghost robot's link from dictionary
+            for link in self.collision_dict.keys():
+                # Get the link to check against from the ghost robot's link dictionary
+                # Output as a list of names
+                links_in_collision = self.get_links_in_collision(
+                    target_link=link, 
+                    check_list=self.robot_ghost.link_dict[link].collision.data if link in self.robot_ghost.link_dict.keys() else self.collision_dict[link], 
+                    ignore_list=self.overlapped_link_dict[link] if link in self.overlapped_link_dict.keys() else [],
+                    link_list=self.robot_ghost.links,
+                    output_name_list=True,
+                    skip=True)
+            
+                # print(f"Checking [{link}] -> links in collision: {links_in_collision}")
+                
+                if len(links_in_collision) > 0:
+                    self.logger(f"Collision at state {self.robot_ghost.q} in trajectory between -> [{link}] and {[link_n for link_n in links_in_collision]}", 'error')
+                    go_signal = False
+                    break
+
+            return go_signal 
+    
+    def update_link_collision_window(self):
+        """
+        This method updates a sliced list of links (member variable)
+        as determined by the class method variables:
+            collision_check_start_link
+            collision_check_stop_link
+        """
+        with Timer("Link Slicing Check", enabled=False):
+            # Prepare sliced link based on a defined stop link 
+            # TODO: this could be update-able for interesting collision checks based on runtime requirements
+            # NOTE: the assumption here is that each link is unique (which is handled low level by rtb) so we take the first element if found
+            # NOTE: sorted links is from base link upwards to end-effector. We want to slice from stop link to start in rising index order
+            col_start_link_idx = [i for i, link in enumerate(self.sorted_links) if link.name == self.collision_check_start_link]
+            col_stop_link_idx = [i for i, link in enumerate(self.sorted_links) if link.name == self.collision_check_stop_link]
+            # print(f"start_idx: {col_start_link_idx} | stop_idx: {col_stop_link_idx}")
+
+            # NOTE: slice indexes are lists, so confirm data inside
+            if len(col_start_link_idx) > 0 and len(col_stop_link_idx) > 0:
+                start_idx = col_start_link_idx[0]
+                end_idx = col_stop_link_idx[0]
+
+                # Terminate early on invalid indexes
+                if start_idx < end_idx or start_idx > len(self.sorted_links):
+                    self.logger(f"Start and End idx are incompatible, defaulting to full link list", 'warn')
+                    return 
+
+                # Handle end point
+                if start_idx == len(self.sorted_links):
+                    self.collision_sliced_links = self.sorted_links[end_idx:None]
+                else:
+                    self.collision_sliced_links = self.sorted_links[end_idx:start_idx + 1]
+
+                # Reverse order for sorting from start to end
+                self.collision_sliced_links.reverse()    
+
+                self.logger(f"Collision Link Window Set: {[link.name for link in self.collision_sliced_links]}")
+            else:
+                # Defaul to the current list of sorted links (full)
+                self.collision_sliced_links = self.sorted_links
+                self.collision_sliced_links.reverse()
+
+    def characterise_collision_overlaps(self) -> bool:
+        """
+        Characterises the existing robot tree and tracks overlapped links in collision handling
+        NOTE: needed to do collision checking, when joints are typically (neighboring) overlapped
+        NOTE: this is quite an intensive run at the moment, 
+            however, it is only expected to be run in single intervals (not continuous)
+            [2023-10-27] approx. time frequency is 1hz (Panda simulated)
+            [2023-10-31] approx. time frequency is 40Hz and 21Hz (UR10 and Panda simulated with better method, respectively)
+        """
+        # Running timer to get frequency of run. Set enabled to True for debugging output to stdout
+        with Timer(name="Characterise Collision Overlaps", enabled=True):
+            # Error handling on gripper name
+            if self.gripper == None or self.gripper == "":
+                self.logger(f"Characterise Collision Overlaps -> gripper name is invalid: {self.gripper}", 'error')
+                return False 
+            
+            # Error handling on empty lick dictionary (should never happen but just in case)
+            if self.link_dict == dict() or self.link_dict == None:
+                self.logger(f"Characterise Collision Overlaps -> link dictionary is invalid: {self.link_dict}", 'error')
+                return False
+            
+            # Error handling on collision object dict
+            if self.collision_dict == dict() or self.collision_dict == None:
+                self.logger(f"Characterise Collision Overlaps -> collision dictionary is invalid: [{self.collision_dict}]", 'error')
+                return False
+            
+            # Alternative Method (METHOD 2) that is getting the list in a faster iterative method
+            # NOTE: this has to course through ALL links in space (self.links encapsulates all links that are not the gripper)
+            self.overlapped_link_dict = dict([
+                (link, self.get_links_in_collision(
+                    target_link=link, 
+                    check_list=self.collision_dict[link], 
+                    ignore_list=[],
+                    link_list=self.links,
+                    output_name_list=True)
+                )
+                for link in self.collision_dict.keys()])
+            
+            # NOTE: secondary run to get gripper links as well
+            gripper_dict = dict([
+                (link.name, self.get_links_in_collision(
+                    target_link=link.name, 
+                    check_list=self.collision_dict[link.name], 
+                    ignore_list=[],
+                    output_name_list=True)
+                )
+                for link in reversed(self.grippers)])
+            
+            self.overlapped_link_dict.update(gripper_dict)
+
+            # using json.dumps() to Pretty Print O(n) time complexity
+            self.logger(f"Characterise Collision Overlaps per link: {json.dumps(self.overlapped_link_dict, indent=4)}")
+
+        # Reached end in success
+        return True
+    
+    def get_links_in_collision(self, target_link: str, 
+                               ignore_list: list = [], 
+                               check_list: list = [], 
+                               link_list: list = [], 
+                               output_name_list: bool = False,
+                               skip: bool = True):
+        """
+        An alternative method that returns a list of links in collision with target link.
+        NOTE: ignore list used to ignore known overlapped collisions (i.e., neighboring link collisions)
+        NOTE: check_list is a list of Shape objects to check against.
+        """
+        with Timer("NEW Get Link Collision", enabled=False):
+            # rospy.loginfo(f"Target link requested is: {target_link}")
+            if link_list == []:
+                link_list = self.sorted_links
+            
+            # Handle invalid link name input
+            if target_link == '' or target_link == None or not isinstance(target_link, str):
+                self.logger(f"Self Collision Check -> Link name [{target_link}] is invalid.", 'warn')
+                return []
+            
+            # Handle check list empty scenario
+            if check_list == []:
+                # print(f"Check list is empty so terminate.")
+                return []
+
+            # DEBUGGING
+            # rospy.loginfo(f"{target_link} has the following collision objects: {check_list}")
+            
+            # NOTE iterates over all configured links and compares against provided list of check shapes 
+            # NOTE: the less objects in a check list, the better
+            #       this is to handle cases (like with the panda) that has multiple shapes per link defining its collision geometry
+            #       any custom descriptions should aim to limit the geometry per link as robot geometry is controlled by the vendor
+            # NOTE: ignore list is initiased at start up and is meant to handle cases where a mounted table (in collision with the base) is ignored
+            #       i.e., does not throw a collision for base_link in collision with table (as it is to be ignored) but will trigger for end-effector link
+            check_dict = dict([(link.name, link) \
+                for obj in check_list \
+                for link in reversed(link_list) \
+                if (link.name not in ignore_list) and (link.name != target_link) and (link.iscollided(obj, skip=skip))
+            ])
+            
+            # print(f"links: {[link.name for link in self.links]}")
+            # print(f"Collision Keys: {list(check_dict.keys())}") if len(check_dict.keys()) > 0 else None   
+            # print(f"Collision Values: {list(check_dict.values())}")    
+
+            # Output list of collisions or name of links based on input bool
+            if output_name_list:
+                return list(check_dict.keys())
+            else:
+                return list(check_dict.values())
+    
+    def check_link_collision(self, target_link: str, sliced_links: list = [], ignore_list: list = [], check_list: list = []):
+        """
+        This method is similar to roboticstoolbox.robot.Robot.iscollided
+        NOTE: ignore list used to ignore known overlapped collisions (i.e., neighboring link collisions)
+        NOTE: archived for main usage, but available for one shot checks if needed
+        """
+        with Timer(name="OLD Check Link Collision", enabled=False):
+            self.logger(f"Target link requested is: {target_link}")
+            # Handle invalid link name input
+            if target_link == '' or target_link == None or not isinstance(target_link, str):
+                self.logger(f"Self Collision Check -> Link name [{target_link}] is invalid.", 'warn')
+                return None, False
+            
+            # Handle check list empty scenario
+            if check_list == []:
+                # print(f"Check list is empty so terminate.")
+                return None, False
+
+            # DEBUGGING
+            # rospy.loginfo(f"{target_link} has the following collision objects: {check_list}")
+            
+            # NOTE iterates over all configured links and compares against provided list of check shapes 
+            # NOTE: the less objects in a check list, the better
+            #       this is to handle cases (like with the panda) that has multiple shapes per link defining its collision geometry
+            #       any custom descriptions should aim to limit the geometry per link as robot geometry is controlled by the vendor
+            # NOTE: ignore list is initiased at start up and is meant to handle cases where a mounted table (in collision with the base) is ignored
+            #       i.e., does not throw a collision for base_link in collision with table (as it is to be ignored) but will trigger for end-effector link
+            for link in reversed(sliced_links):
+                # print(f"Link being checked: {link.name}")
+                # Check against ignore list and continue if inside
+                # NOTE: this assumes that the provided target link (dictating the ignore list) is unique
+                #       in some cases the robot's links (if multiple are being checked) may have the same named links
+                #       TODO: uncertain if this is scalable (currently working on two pandas with the same link names), but check this
+                # NOTE: ignore any links that are expected to be overlapped with current link (inside current robot object)
+                if link.name in ignore_list: 
+                    # print(f"{link.name} is in list: {ignore_list}, so skipping")
+                    continue
+
+                # Ignore check if the target link is the same
+                if link.name == target_link:
+                    # rospy.logwarn(f"Self Collision Check -> Skipping the current target: {link.name}")
+                    continue
+
+                # NOTE: as per note above, ideally this loop should be a oneshot (in most instances)
+                # TODO: does it make sense to only check the largest shape in this list? 
+                for obj in check_list:
+                    # rospy.logwarn(f"LOCAL CHECK for [{self.name}] -> Checking: {link.name}")
+                    if link.iscollided(obj, skip=True):
+                        self.logger(f"Self Collision Check -> Link that is collided: {link.name}", 'error')
+                        return link, True
+                
+            return None, False
 
     def neo(self, Tep, velocities):
         """
         Runs a version of Jesse H.'s NEO controller
-        <IN DEVELOPMENT
+        <IN DEVELOPMENT>
         """
         ##### Determine Slack #####
         # Transform from the end-effector to desired pose
@@ -868,15 +1498,15 @@ class ROSRobot(URDFRobot):
                 0.3,
                 0.05,
                 1.0,
-                start=self.link_dict["link1"],
-                end=self.link_dict["link_eef"],
+                start=self.link_dict["panda_link1"],
+                end=self.link_dict["panda_hand"],
             )
 
             # print(f"c_Ain: {np.shape(c_Ain)} | Ain: {np.shape(Ain)}")
             # If there are any parts of the robot within the influence distance
             # to the collision in the scene
             if c_Ain is not None and c_bin is not None:
-                c_Ain = np.c_[c_Ain, np.zeros((c_Ain.shape[0], 5))]
+                c_Ain = np.c_[c_Ain, np.zeros((c_Ain.shape[0], 4))]
 
                 # print(f"c_Ain (in prob area): {np.shape(c_Ain)} | Ain: {np.shape(Ain)}")
                 # Stack the inequality constraints
@@ -897,6 +1527,78 @@ class ROSRobot(URDFRobot):
             qd = None
 
         return qd
+
+    def check_singularity(self, q=None) -> bool:
+        """
+        Checks the manipulability as a scalar manipulability index
+        for the robot at the joint configuration to indicate singularity approach. 
+        - It indicates dexterity (how well conditioned the robot is for motion)
+        - Value approaches 0 if robot is at singularity
+        - Returns True if close to singularity (based on threshold) or False otherwise
+        - See rtb.robots.Robot.py for details
+
+        :param q: The robot state to check for manipulability.
+        :type q: numpy array of joints (float)
+        :return: True (if within singularity) or False (otherwise)
+        :rtype: bool
+        """
+        # Get the robot state manipulability
+        self.manip_scalar = self.manipulability(q)
+
+        # Debugging
+        # rospy.loginfo(f"Manipulability: {manip_scalar} | --> 0 is singularity")
+
+        if (np.fabs(self.manip_scalar) <= self.singularity_thresh and self.preempted == False):
+            self.singularity_approached = True
+            self.logger(f"Preempted due to singularity {self.manip_scalar}", 'warn')
+            return True
+        else:
+            self.singularity_approached = False
+            return False
+
+    def check_collision(self) -> bool:
+        """
+        High-level check of collision
+        NOTE: this is called by loop to verify preempt of robot
+        NOTE: This may not be needed as main armer class (high-level) will check collisions per robot
+        """
+        # Check for collisions
+        # NOTE: optimise this as much as possible
+        # NOTE: enabled in below Timer line to True for debugging print of frequency of operation
+        with Timer(name="Collision Check",enabled=False):
+            collision = self.full_collision_check()
+
+        # Handle checking
+        if collision and self.preempted == False:
+            self.collision_approached = True
+            return True
+        else:
+            self.collision_approached = False
+            return False
+        
+    def set_safe_state(self):
+        # Account for pointer location
+        if self.q_safe_window_p < len(self.q_safe_window):
+            # Add current target bar x value
+            self.q_safe_window[self.q_safe_window_p] = self.q
+            # increment pointer(s)
+            self.q_safe_window_p += 1
+        else:
+            # shift all values to left by 1 (defaults to 0 at end)
+            self.q_safe_window = np.roll(self.q_safe_window, shift=-1, axis=0)
+            # add value to end
+            self.q_safe_window[-1] = self.q  
+
+    # --------------------------------------------------------------------- #
+    # --------- Standard Methods ------------------------------------------ #
+    # --------------------------------------------------------------------- #
+    def close(self):
+        """
+        Closes any resources associated with this robot
+        """
+        self.pose_server.need_to_terminate = True
+        self.joint_pose_server.need_to_terminate = True
+        self.named_pose_server.need_to_terminate = True
 
     def preempt(self, *args: list) -> None:
         """
@@ -1030,34 +1732,6 @@ class ROSRobot(URDFRobot):
 
     def publish(self):
         self.joint_publisher.publish(Float64MultiArray(data=self.qd))
-
-    def check_singularity(self, q=None) -> bool:
-        """
-        Checks the manipulability as a scalar manipulability index
-        for the robot at the joint configuration to indicate singularity approach. 
-        - It indicates dexterity (how well conditioned the robot is for motion)
-        - Value approaches 0 if robot is at singularity
-        - Returns True if close to singularity (based on threshold) or False otherwise
-        - See rtb.robots.Robot.py for details
-
-        :param q: The robot state to check for manipulability.
-        :type q: numpy array of joints (float)
-        :return: True (if within singularity) or False (otherwise)
-        :rtype: bool
-        """
-        # Get the robot state manipulability
-        self.manip_scalar = self.manipulability(q)
-
-        # Debugging
-        # rospy.loginfo(f"Manipulability: {manip_scalar} | --> 0 is singularity")
-
-        if (np.fabs(self.manip_scalar) <= self.singularity_thresh and self.preempted == False):
-            self.singularity_approached = True
-            self.logger(f"Preempted due to singularity {self.manip_scalar}", 'warn')
-            return True
-        else:
-            self.singularity_approached = False
-            return False
         
     def transform(self, stamped_message, target_frame_id):
         T = self.tf_buffer.lookup_transform(
