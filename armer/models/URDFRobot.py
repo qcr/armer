@@ -33,7 +33,7 @@ class URDFRobot(Robot):
       links, name, urdf_string, urdf_filepath = self.URDF_read(urdf_file)
     else:
       links, name, urdf_string, urdf_filepath = URDFRobot.URDF_read_description(wait=wait_for_description)
-    
+
     self.gripper = gripper if gripper else URDFRobot.resolve_gripper(links)
     gripper_link = list(filter(lambda link: link.name == self.gripper, links))
     
@@ -100,14 +100,14 @@ class URDFRobot(Robot):
   @staticmethod
   def URDF_read_description(wait=True, param='robot_description'):
     if wait:
-      rospy.loginfo('[INIT] Waiting for robot description')
+      rospy.loginfo('Initialistion -> Waiting for robot description...')
       while not rospy.has_param('/' + param):
         rospy.sleep(0.5)
-      rospy.loginfo('[INIT] Found robot description')
+      rospy.loginfo('Initialisation -> Found robot description!')
     else:
       # Check if robot param exists and handle as error if need be
       if not rospy.has_param('/' + param): return None, None, None, None
-      rospy.loginfo(f"[INIT] Found robot description NEW")
+      rospy.loginfo(f"Initialisation -> Found robot description [no wait]")
 
     urdf_string = URDFRobot.URDF_resolve(rospy.get_param('/' + param))
 

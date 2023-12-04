@@ -149,19 +149,24 @@ class ROSRobot(rtb.Robot):
 
         # Sort links by parents starting from gripper
         link=self.link_dict[self.gripper]   
-        # print(f"link dict: {sorted(self.link_dict.keys())[-1]}")
         
-        # COLLISION HANDLING TESTING
-        # NOTE: needs optimisation in future
+        # --- COLLISION HANDLING SETUP SECTION --- #
         # Loops through links (as read in through URDF parser)
         # Extracts each link's list of collision shapes (of type sg.Shape). TODO: add a validity check on type here
-        # Updates a class dictionary (key as link name) -> ideally first entry is our gripper (this can change)
+        # Updates a dictionary (key as link name) of collision shape lists per link
         # Create a new dictionary of link lookup to ignore overlapping joint/collision objects
         # NOTE: the theory here is to keep a record of all expected collisions (overlaps) per link so that
         #       the main self collision check can ignore these cases. 
         self.overlapped_link_dict = dict()
         self.collision_dict = dict()
+        # This is a list of collision objects that is used by NEO
+        # NOTE: this may not be explictly needed, as a list form (flattened) of the self.collision_dict.values() 
+        #       contains the same information
         self.collision_obj_list = list()
+        # Define a list of dynamic objects (to be added in at runtime)
+        # NOTE: this is useful to include collision shapes (i.e., cylinders, spheres, cuboids) in your scene for collision checking
+        self.dynamic_collision_dict = dict()
+        self.dynamic_collision_removal_dict = dict()
         self.collision_approached = False
         # Iterate through robot links and sort - add to tracked collision list
         while link is not None:
@@ -169,32 +174,10 @@ class ROSRobot(rtb.Robot):
             # print(f"link name in sort: {link.name}")
             # Add current link to overall dictionary
             self.collision_dict[link.name] = link.collision.data if link.collision.data else []
-            # [self.collision_obj_list.append(data) for data in link.collision.data]
-
             self.sorted_links.append(link)
             link=link.parent
         self.sorted_links.reverse()
-        # Handle collision link window slicing
-        # Checks error of input from configuration file (note that default is current sorted links)
-        self.collision_sliced_links = self.sorted_links
-        self.update_link_collision_window()
-        # TESTING 
-        # Initialise a 'ghost' robot instance for trajectory collision checking
-        # NOTE: could also use this for visualising the trajectory (TBD)
-        # NOTE: there was an issue identified around using the latest franka-emika panda description
-        # print(f"the urdf filepath is: {self.urdf_filepath}")
-        self.robot_ghost = URDFRobot(
-            wait_for_description=False, 
-            urdf_file=self.urdf_filepath,
-            collision_check_start_link=self.collision_sliced_links[-1].name, 
-            collision_check_stop_link=self.collision_sliced_links[0].name
-        )
-        
-        # Define a list of dynamic objects (to be added in at runtime)
-        self.dynamic_collision_dict = dict()
-        self.dynamic_collision_removal_dict = dict()
-        # Create link-pose distance vector map
-        self.sliced_link_pose_map = dict()
+
         # Check for external links (from robot tree)
         # This is required to add any other links (not specifically part of the robot tree) 
         # to our collision dictionary for checking
@@ -206,11 +189,34 @@ class ROSRobot(rtb.Robot):
             # print(f"adding link: {link.name} which is type: {type(link)} with collision data: {link.collision.data}")
             self.collision_dict[link.name] = link.collision.data if link.collision.data else []
             [self.collision_obj_list.append(data) for data in link.collision.data]
-
+        
+        # Handle collision link window slicing
+        # Window slicing is a way to define which links need to be tracked for collisions (for efficiency)
+        # Checks error of input from configuration file (note that default is current sorted links)
+        self.collision_sliced_links = self.sorted_links
+        self.update_link_collision_window()
+        # Initialise a 'ghost' robot instance for trajectory collision checking prior to execution
+        # NOTE: Used to visualise the trajectory as a simple marker list in RVIZ for debugging
+        # NOTE: there was an issue identified around using the latest franka-emika panda description
+        self.robot_ghost = URDFRobot(
+            wait_for_description=False, 
+            gripper=self.gripper,
+            urdf_file=self.urdf_filepath,
+            collision_check_start_link=self.collision_sliced_links[-1].name, 
+            collision_check_stop_link=self.collision_sliced_links[0].name
+        )
         # Debugging
         # print(f"All collision objects in main list: {self.collision_obj_list}")
         # print(f"Collision dict for links: {self.collision_dict}\n")
         # print(f"Dictionary of expected link collisions: {self.overlapped_link_dict}\n")    
+        # print(f"Sliced Links: {[link.name for link in self.collision_sliced_links]}")
+
+        # Collision Safe State Window
+        # NOTE: the size of the window (default of 200) dictates how far back we move to get out
+        # of a collision situation, based on previously executed joint states that were safe
+        self.q_safe_window = np.zeros([200,len(self.q)])
+        self.q_safe_window_p = 0
+        # --- COLLISION HANDLING SETUP SECTION END--- #
 
         self.joint_indexes = []
         self.joint_names = list(map(lambda link: link._joint_name, filter(lambda link: link.isjoint, self.sorted_links)))
@@ -277,11 +283,6 @@ class ROSRobot(rtb.Robot):
         self.controller_type = ControllerType.JOINT_GROUP_VEL
         self.controller_type_request = ControllerType.JOINT_GROUP_VEL
         self.jt_traj = JointTrajectory()
-        # Collision Safe State Window
-        # NOTE: the size of the window (default of 200) dictates how far back we move to get out
-        # of a collision situation, based on previously executed joint states that were safe
-        self.q_safe_window = np.zeros([200,len(self.q)])
-        self.q_safe_window_p = 0
 
         if not self.readonly:
             # Create Transform Listener
@@ -664,6 +665,10 @@ class ROSRobot(rtb.Robot):
         This callback makes use of the roboticstoolbox p_servo function
         to generate velocities at each timestep.
         """
+        if self._controller_mode == ControlMode.ERROR:
+            rospy.logerr(f"SERVO CB: [{self.name}] in Error Control Mode...")
+            return None
+        
         # Safely stop any current motion of the arm
         if self.moving:
             self.preempt()
@@ -674,8 +679,8 @@ class ROSRobot(rtb.Robot):
             goal_gain = msg.gain if msg.gain else 0.2
             goal_thresh = msg.threshold if msg.threshold else 0.005
             arrived = False
-            self.moving = True
-            self.preempted = False
+            # self.moving = True
+            # self.preempted = False
 
             # Current end-effector pose
             Te = self.ets(start=self.base_link, end=self.gripper).eval(self.q)
@@ -1968,8 +1973,10 @@ class ROSRobot(rtb.Robot):
         # NOTE: Also, existing description shapes (not part of the robot tree) need to be peeled out and added here as well
         self.collision_obj_list.append(shape)
 
+        # Re-update the collision overlaps on insertion
+        # Needed so links expected to be in collision with shape are correctly captured
         self.characterise_collision_overlaps()
-
+        
         # print(f"Current collision objects: {self.collision_obj_list}")
 
         return AddCollisionObjectResponse(success=True)
@@ -2407,10 +2414,14 @@ class ROSRobot(rtb.Robot):
                 else:
                     self.collision_sliced_links = self.sorted_links[end_idx:start_idx + 1]
 
-                rospy.loginfo(f"Collision Link Window Set: {self.sorted_links[start_idx].name} to {self.sorted_links[end_idx].name}")
+                # Reverse order for sorting from start to end
+                self.collision_sliced_links.reverse()    
+
+                rospy.loginfo(f"Collision Link Window Set: {[link.name for link in self.collision_sliced_links]}")
             else:
                 # Defaul to the current list of sorted links (full)
                 self.collision_sliced_links = self.sorted_links
+                self.collision_sliced_links.reverse()
 
     def characterise_collision_overlaps(self) -> bool:
         """
@@ -3089,11 +3100,21 @@ class ROSRobot(rtb.Robot):
     def publish(self):
         self.joint_publisher.publish(Float64MultiArray(data=self.qd))
 
+    def workspace_display(self):
+        """
+        TODO: a method to display (debugging) the currently configured workspace of the arm
+        NOTE: should only run this once every time a new workspace/change to workspace has been done
+        """
+        pass
+
     def marker_publisher(self):
         """
         Gets any existing dynamic objects (if added) and publishes them for debugging/display in RVIZ
+        Currently handles only: 
+            - Sphere 
+            - Cylinder
+            - Cuboid
         """
-    
         # Iterate through and add to marker publish if ready
         marker_array = []
         for obj in list(self.dynamic_collision_dict.values()):
