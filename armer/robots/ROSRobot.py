@@ -17,9 +17,6 @@ import spatialmath as sm
 import numpy as np
 import yaml
 import time
-# Required for NEO
-import qpsolvers as qp
-import spatialgeometry as sg
 
 from typing import List, Any
 from threading import Lock, Event
@@ -36,24 +33,41 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 from armer_msgs.msg import ManipulatorState, JointVelocity, ServoStamped, Guards
 from armer_msgs.action import GuardedVelocity, Home, MoveToJointPose, MoveToNamedPose, MoveToPose
 from armer_msgs.srv import GetNamedPoses, AddNamedPose, RemoveNamedPose, AddNamedPoseConfig, RemoveNamedPoseConfig, GetNamedPoseConfigs 
-from geometry_msgs.msg import TwistStamped, Twist, PoseStamped
+from geometry_msgs.msg import TwistStamped, Twist, PoseStamped, Pose
 from std_msgs.msg import Header, Float64MultiArray, Bool
 from sensor_msgs.msg import JointState
 
 # TESTING NEW IMPORTS FOR DYNAMIC OBJECT MARKER DISPLAY (RVIZ)
 from visualization_msgs.msg import Marker, MarkerArray
 
-# TESTING NEW IMPORTS FOR KD TREE COLLISION SEARCH METHOD
+# Collision Checking Imports
 from sklearn.neighbors import KDTree
-# from armer.cython import collision_handler
+from armer.cython import collision_handler
+from dataclasses import dataclass
+import qpsolvers as qp
+import spatialgeometry as sg
 import math
 
 class ControlMode:
    JOINTS=1
    CARTESIAN=2
 
+class ControllerType:
+    JOINT_GROUP_VEL=0
+    JOINT_TRAJECTORY=1
+
+# Class of dynamic objects (input at runtime)
+@dataclass
+class DynamicCollisionObj:
+    shape: sg.Shape
+    key: str = ''
+    id: int = 0
+    pose: Pose = Pose()
+    is_added: bool = False
+
 class ROSRobot(URDFRobot):
-    """The ROSRobot class wraps the URDFRobot implementing basic ROS functionality
+    """
+    The ROSRobot class wraps the URDFRobot implementing basic ROS functionality
     """
     def __init__(self,
                  nh=None,
@@ -79,9 +93,7 @@ class ROSRobot(URDFRobot):
         self.name = name if name else self.name
         # Configure action servers with their required callback group
         self.action_cb_group = action_cb_group if action_cb_group else ReentrantCallbackGroup()
-        # TESTING for NEO
-        self.collision_obj_list: List[sg.Shape] = list()
-        
+                
         # Update with ustom qlim (joint limits) if specified in robot config
         if qlim_min and qlim_max:
             self.qlim = np.array([qlim_min, qlim_max])
@@ -182,7 +194,7 @@ class ROSRobot(URDFRobot):
         if self.robot_ghost.is_valid():
             self.logger(f"Robot Ghost Configured and Ready")
         else:
-            self.logger(f"Robot Ghost Invalid", 'warn')
+            self.logger(f"Robot Ghost Invalid -> Cannot Conduct Trajectory Collision Checking", 'warn')
         
         # Collision Safe State Window
         # NOTE: the size of the window (default of 200) dictates how far back we move to get out

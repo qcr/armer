@@ -6,7 +6,9 @@
 import os
 from glob import glob
 from typing import List
-from setuptools import setup, find_packages
+from setuptools import setup, find_packages, Extension
+from Cython.Build import cythonize
+from Cython.Distutils import build_ext
 
 package_name = 'armer'
 
@@ -71,7 +73,7 @@ setup(
     author='Gavin Suddrey',
     maintainer='Dasun Gunasinghe, Timothy Morris',
     maintainer_email='dasun.gunasinghe@qut.edu.au, timothy.morris@qut.edu.au',
-    license='MIT',
+    license='BSD3',
     classifiers=[
         #   3 - Alpha
         #   4 - Beta
@@ -104,6 +106,7 @@ setup(
     # packages=find_packages(exclude=['tests']),
     packages=[package_name],
     package_data={'armer': extra_files},
+    ext_modules=cythonize("armer/cython/*.pyx", annotate=True),
     include_package_data=True,
     install_requires=req,
     extras_require={
