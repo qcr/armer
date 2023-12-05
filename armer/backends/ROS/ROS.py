@@ -1,5 +1,6 @@
 """
 @author Gavin Suddrey
+@author Dasun Gunasinghe
 """
 
 import time
@@ -108,21 +109,6 @@ class ROS(Connector):  # pragma nocover
             self.robots[robot_name]._update_link_tf()
             self.robots[robot_name]._propogate_scene_tree()
 
-            
-            #if self.robots[robot_name].controller_type_request == 1:
-            #    rospy.loginfo(f"Swtiching to trajectory controller")
-            #    # Joint Trajectory control
-            #    self.robots[robot_name].controller_select(1)
-            #    rospy.loginfo(f"Executing Trajectory...")
-            #    self.robots[robot_name].execute_trajectory()
-            #    rospy.loginfo(f"Trajectory Completed! Switching Back to Joint Velocity Controller")
-
-            #    # Reset back to standard joint group velocity controller
-            #    self.robots[robot_name].controller_select(0)
-
-            #    # Setting request to 0
-            #    self.robots[robot_name].controller_type_request = 0
-            #else:
             # Publishes out to ROS via configured control topic (joint_group_vel_controller)
             self.robots[robot_name].publish()
 
@@ -158,6 +144,14 @@ class ROS(Connector):  # pragma nocover
 
         pass
 
+    def hw_initialise(self):
+        """
+        A method to set each robot object's hardware controlled flag
+        """
+        rospy.loginfo(f"Initialising each robot's hw controlled flag under ros_control")
+        for robot_name in self.robots:
+            self.robots[robot_name].hw_controlled = True
+
     #
     #  Methods to interface with the robots created in other environemnts
     #
@@ -184,11 +178,6 @@ class ROS(Connector):  # pragma nocover
             raise ValueError(
                 "the id argument does not correspond with a known shape in backend"
             )
-
-    def hw_initialise(self):
-        print(f"Initialising each robot's hw controlled flag under ros_control")
-        for robot_name in self.robots:
-            self.robots[robot_name].hw_controlled = True
     
     def hold(self):    # pragma nocover
         '''
