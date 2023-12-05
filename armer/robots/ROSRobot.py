@@ -1061,18 +1061,7 @@ class ROSRobot(rtb.Robot):
                 self.base_link.name,
                 goal_pose,
             )
-            
             pose = goal_pose.pose
-                
-            # IS THE GOAL POSE WITHIN THE BOUNDRY?...
-            if self.pose_within_workspace(pose) == False:
-                rospy.logwarn("-- Pose goal outside defined workspace; refusing to move...")
-                self.pose_server.set_succeeded(
-                  MoveToPoseResult(success=False), 'Named pose outside defined workspace'
-                )
-                self.executor = None
-                self.moving = False
-                return
             
             # Attempt to get valid solution
             # NOTE: on failure, returns existing state as solution for 0 movement
@@ -1080,30 +1069,15 @@ class ROSRobot(rtb.Robot):
             ik_invalid = all(x == y for x,y in zip(self.q, solution.q))
             if ik_invalid:
                 rospy.logwarn(f"-- Could not find valid IK solution, refusing to move...")
-                self.pose_server.set_succeeded(
-                  MoveToPoseResult(success=False), 'IK Solution Invalid'
-                )
-                self.executor = None
-                self.moving = False
-                return
-
-            # Check for singularity on end solution:
-            # TODO: prevent motion on this bool? Needs to be thought about
-            if self.check_singularity(solution.q):
-                rospy.logwarn(f"IK solution within singularity threshold [{self.singularity_thresh}] -> ill-advised motion")
-
-            
-            result = self.general_executor(q=solution.q)
-                
-            if hasattr(result, 'error_code') and result.error_code == 0:
-                #print(f"result has error code and is safe")
-                self.pose_server.set_succeeded(MoveToPoseResult(success=True))
-            elif isinstance(result, bool) and result:
-                #print(f"result is of type bool and is safe")
-                self.pose_server.set_succeeded(MoveToPoseResult(success=True))
+                self.pose_server.set_succeeded(MoveToPoseResult(success=False), 'IK Solution Invalid')
             else:
-                self.pose_server.set_aborted(MoveToPoseResult(success=False))
+                if self.general_executor(q=solution.q, pose=pose):
+                    #print(f"result has error code and is safe")
+                    self.pose_server.set_succeeded(MoveToPoseResult(success=True))
+                else:
+                    self.pose_server.set_aborted(MoveToPoseResult(success=False), 'Executor Failed in Action')
                 
+            # Reset Flags at End
             self.executor = None
             self.moving = False
 
@@ -1505,7 +1479,7 @@ class ROSRobot(rtb.Robot):
             q = np.array(self.qr) if hasattr(self, 'qr') else self.q
             
             # Run the general executor (checks for collisions)
-            result = self.general_executor(q=q)
+            result = self.general_executor(q=q, workspace_ignore=True)
 
             if result:
                 self.home_server.set_succeeded(
@@ -2002,15 +1976,12 @@ class ROSRobot(rtb.Robot):
         """
         This will attempt to move the arm to a previous 'non-collision' state
         """
-        # Get the last 'non' collision state and send this to a joint pose move
-        print(f"Last safe state: {self.q_safe_window[0]} | current in collision state: {self.q}")
-
         # Attempt recovery
-        self.general_executor(q=self.q_safe_window[0], collision_ignore=True)
+        self.general_executor(q=self.q_safe_window[0], collision_ignore=True, workspace_ignore=True)
         
         # Recover from Error if set
         if self._controller_mode == ControlMode.ERROR:
-            rospy.loginfo(f"Resetting from ERROR state to JOINTS [Default]")
+            rospy.loginfo(f"[ARM RECOVER CB] -> Resetting from ERROR state to JOINTS [Default]")
             self._controller_mode = ControlMode.JOINTS
             self.preempted = False
 
@@ -2221,7 +2192,7 @@ class ROSRobot(rtb.Robot):
         """
         # Early termination
         if sliced_links == None or sliced_links == []:
-            rospy.logerr(f"target links: {sliced_links} is not valid. Exiting...")
+            rospy.logerr(f"[COLLISION KD TREE QUERY] -> target links: {sliced_links} is not valid. Exiting...")
             return []
 
         # print(f"cylinder link check: {self.link_dict['cylinder_link']}")
@@ -2233,7 +2204,7 @@ class ROSRobot(rtb.Robot):
         for sliced_link in sliced_links:
             # Early termination on error
             if sliced_link.name not in self.link_dict.keys():
-                rospy.logerr(f"Given sliced link: {sliced_link.name} is not valid. Skipping...")
+                rospy.logerr(f"[COLLISION KD TREE QUERY] -> Given sliced link: {sliced_link.name} is not valid. Skipping...")
                 continue
 
             # Testing refinement using link poses (Individual method needed for shape-based version)
@@ -2297,7 +2268,7 @@ class ROSRobot(rtb.Robot):
         marker_traj.points = []
         self.display_traj_publisher.publish(marker_traj)
 
-        rospy.loginfo(f"Traj len: {len(traj.s)} | with step value: {step_value}")
+        rospy.loginfo(f"[TRAJECTORY COLLISION CHECK] -> Traj len: {len(traj.s)} | with step value: {step_value}")
         go = True
         with Timer("Full Trajectory Collision Check", enabled=True):
             for idx in range(0,len(traj.s),step_value):
@@ -2313,7 +2284,6 @@ class ROSRobot(rtb.Robot):
                 p.z = extracted_t[2]
                 marker_traj.points.append(p)
 
-                print(f"extracted translation: {extracted_t}")
                 if self.check_collision_per_state(q=traj.s[idx]) == False:
                     # Terminate on collision check failure
                     # TODO: add red component to trail to signify collision
@@ -2366,7 +2336,7 @@ class ROSRobot(rtb.Robot):
                 # print(f"Checking [{link}] -> links in collision: {links_in_collision}")
                 
                 if len(links_in_collision) > 0:
-                    rospy.logerr(f"Collision at state {self.robot_ghost.q} in trajectory between -> [{link}] and {[link_n for link_n in links_in_collision]}")
+                    rospy.logerr(f"[COLLISION PER STATE CHECK] -> Collision at state {self.robot_ghost.q} in trajectory between -> [{link}] and {[link_n for link_n in links_in_collision]}")
                     go_signal = False
                     break
 
@@ -2395,7 +2365,7 @@ class ROSRobot(rtb.Robot):
 
                 # Terminate early on invalid indexes
                 if start_idx < end_idx or start_idx > len(self.sorted_links):
-                    rospy.logwarn(f"Start and End idx are incompatible, defaulting to full link list")
+                    rospy.logwarn(f"[COLLISION SLICE WINDOW SETUP] -> Start and End idx are incompatible, defaulting to full link list")
                     return 
 
                 # Handle end point
@@ -2407,7 +2377,7 @@ class ROSRobot(rtb.Robot):
                 # Reverse order for sorting from start to end
                 self.collision_sliced_links.reverse()    
 
-                rospy.loginfo(f"Collision Link Window Set: {[link.name for link in self.collision_sliced_links]}")
+                rospy.loginfo(f"[COLLISION SLICE WINDOW SETUP] -> Window Set: {[link.name for link in self.collision_sliced_links]}")
             else:
                 # Defaul to the current list of sorted links (full)
                 self.collision_sliced_links = self.sorted_links
@@ -2426,17 +2396,17 @@ class ROSRobot(rtb.Robot):
         with Timer(name="Characterise Collision Overlaps", enabled=True):
             # Error handling on gripper name
             if self.gripper == None or self.gripper == "":
-                rospy.logerr(f"Characterise Collision Overlaps -> gripper name is invalid: {self.gripper}")
+                rospy.logerr(f"[OVERLAP COLLISION CHARACTERISE] -> gripper name is invalid: {self.gripper}")
                 return False 
             
             # Error handling on empty lick dictionary (should never happen but just in case)
             if self.link_dict == dict() or self.link_dict == None:
-                rospy.logerr(f"Characterise Collision Overlaps -> link dictionary is invalid: {self.link_dict}")
+                rospy.logerr(f"[OVERLAP COLLISION CHARACTERISE] -> link dictionary is invalid: {self.link_dict}")
                 return False
             
             # Error handling on collision object dict
             if self.collision_dict == dict() or self.collision_dict == None:
-                rospy.logerr(f"Characterise Collision Overlaps -> collision dictionary is invalid: [{self.collision_dict}]")
+                rospy.logerr(f"[OVERLAP COLLISION CHARACTERISE] -> collision dictionary is invalid: [{self.collision_dict}]")
                 return False
             
             # Alternative Method (METHOD 2) that is getting the list in a faster iterative method
@@ -2464,7 +2434,7 @@ class ROSRobot(rtb.Robot):
             self.overlapped_link_dict.update(gripper_dict)
 
             # using json.dumps() to Pretty Print O(n) time complexity
-            rospy.loginfo(f"Characterise Collision Overlaps per link: {json.dumps(self.overlapped_link_dict, indent=4)}")
+            rospy.loginfo(f"[OVERLAP COLLISION CHARACTERISE] -> Collision Overlaps per link: {json.dumps(self.overlapped_link_dict, indent=4)}")
 
         # Reached end in success
         return True
@@ -2487,7 +2457,7 @@ class ROSRobot(rtb.Robot):
             
             # Handle invalid link name input
             if target_link == '' or target_link == None or not isinstance(target_link, str):
-                rospy.logwarn(f"Self Collision Check -> Link name [{target_link}] is invalid.")
+                rospy.logwarn(f"[GET LINKS IN COLLISION] -> Link name [{target_link}] is invalid.")
                 return []
             
             # Handle check list empty scenario
@@ -2720,24 +2690,29 @@ class ROSRobot(rtb.Robot):
     # --------------------------------------------------------------------- #
     # --------- Standard Methods ------------------------------------------ #
     # --------------------------------------------------------------------- #
-    def general_executor(self, q, collision_ignore: bool =False):
+    def general_executor(self, q, pose: Pose = None, collision_ignore: bool =False, workspace_ignore: bool = False):
         """
         A general executor that performs the following on a given joint state goal
+        - Workspace check prior to move. Setting workspace_ignore to True skips this (for cases where a pose is not defined or needed)
         - Singularity checking and termination on failure
-        - Collision checking and termination on failure
+        - Collision checking and termination on failure. Setting collision_ignore to True skips this check
         - Execution of a ros_control or standard execution (real/sim) depending on what
             is available
         """
         result = False
+        if self.pose_within_workspace(pose) == False and not workspace_ignore:
+            rospy.logwarn("[GENERAL EXECUTOR] -> Pose goal outside defined workspace; refusing to move...")
+            return result
+
         if self.check_singularity(q):
-            rospy.logwarn(f"Singularity Detected in Goal State: {q}")
+            rospy.logwarn(f"[GENERAL EXECUTOR] -> Singularity Detected in Goal State: {q}")
             return result
 
         # Generate trajectory from successful solution
         traj = self.traj_generator(self, qf=q)
 
         if traj.name == 'invalid':
-            rospy.logwarn(f"Invalid trajectory detected, existing safely")
+            rospy.logwarn(f"[GENERAL EXECUTOR] -> Invalid trajectory detected, existing safely")
             return result
 
         # Take max time from trajectory and convert to array based on traj length
@@ -2756,11 +2731,12 @@ class ROSRobot(rtb.Robot):
             # Check if the robot has been initialised to connect to real hardware
             # In these cases, the joint_trajectory_controller is to be used
             if self.hw_controlled:
-                rospy.loginfo(f"Running ros_control trajectory controller...")
+                rospy.loginfo(f"[GENERAL EXECUTOR] -> Running ros_control trajectory method...")
                 self.controller_select(ControllerType.JOINT_TRAJECTORY)
                 result = self.execute_ros_control_trajectory(traj=traj, max_time=max_time)
                 self.controller_select(ControllerType.JOINT_GROUP_VEL)
             else:
+                rospy.loginfo(f"[GENERAL EXECUTOR] -> Running ros_control joint group velocity method...")
                 # Not in ROS Backend (i.e., using real hardware) so default to
                 # standard implementation - largely for simulation
                 self.executor = TrajectoryExecutor(
@@ -2787,13 +2763,13 @@ class ROSRobot(rtb.Robot):
         service = rospy.ServiceProxy(ns, cls)
         response = service(**kwargs)
         if not response.ok:
-            rospy.logwarn(f"Attempting controller switch failed...")
+            rospy.logwarn(f"[CONTROLLER SWITCHER] -> Attempting controller switch failed...")
         else:
-            rospy.loginfo(f"Controller switched successfully")
+            rospy.loginfo(f"[CONTROLLER SWITCHER] -> Controller switched successfully")
 
     def controller_select(self, controller_type: int = 0) -> bool:
         if controller_type == None or controller_type > 1 or controller_type < 0:
-            print(f"invalid controller type: {controller_type}")
+            rospy.logerr(f"[CONTROLLER SELECT] -> invalid controller type: {controller_type}")
             return False
         
         if controller_type == ControllerType.JOINT_GROUP_VEL and controller_type != self.controller_type:
@@ -2806,7 +2782,7 @@ class ROSRobot(rtb.Robot):
                
                self.controller_type = ControllerType.JOINT_GROUP_VEL
             except rospy.ServiceException as e:
-               rospy.logerr(f"-- Could not switch controllers: {e}")
+               rospy.logerr(f"[CONTROLLER SELECT] -> Could not switch controllers: {e}")
                return False
         elif controller_type == ControllerType.JOINT_TRAJECTORY and controller_type != self.controller_type:
             try:
@@ -2817,10 +2793,10 @@ class ROSRobot(rtb.Robot):
                        strictness=1, start_asap=False, timeout=0.0)
                self.controller_type = ControllerType.JOINT_TRAJECTORY
             except rospy.ServiceException as e:
-               rospy.logerr(f"-- Could not switch controllers: {e}")
+               rospy.logerr(f"[CONTROLLER SELECT] -> Could not switch controllers: {e}")
                return False
         else:
-            rospy.logerr(f"Unknown controller type, failed.")
+            rospy.logerr(f"[CONTROLLER SELECT] -> Unknown controller type, failed.")
             return False
 
     def execute_ros_control_trajectory(self, traj, max_time: int = 0):
@@ -2835,14 +2811,17 @@ class ROSRobot(rtb.Robot):
         )
 
         # Wait for client server connection
-        client.wait_for_server()
+        # NOTE: timeout on 5 seconds
+        if not client.wait_for_server(timeout=rospy.Duration(secs=5)):
+            rospy.logerr(f"[EXECUTE ROS CONTROL TRAJ] -> Could not setup client for ros_control trajectory controller")
+            return False
 
         # Iterates through calculated trajectory and converts to a JointTrajectory type
         # NOTE: a standard delay of 1 second needed so controller can execute correctly
         #       otherwise, issues with physical panda motion
-        jt_traj = JointTrajectory()
-        jt_traj.header.stamp = rospy.Time.now()
-        jt_traj.joint_names = list(self.joint_names)
+        jt = JointTrajectory()
+        jt.header.stamp = rospy.Time.now()
+        jt.joint_names = list(self.joint_names)
         time_array = np.linspace(0, max_time, len(traj.s))
         #print(f"time array: {time_array}")
         #print(f"traj joint names: {jt_traj.joint_names}")
@@ -2851,11 +2830,11 @@ class ROSRobot(rtb.Robot):
             jt_traj_point.time_from_start = rospy.Duration(time_array[idx] + 1)
             jt_traj_point.positions = list(traj.s[idx])
             jt_traj_point.velocities = list(traj.sd[idx])
-            jt_traj.points.append(jt_traj_point)
+            jt.points.append(jt_traj_point)
         
         # Create goal
         goal = FollowJointTrajectoryGoal()
-        goal.trajectory = jt_traj
+        goal.trajectory = jt
 
         # Send Joint Trajectory to position controller for execution
         client.send_goal(goal)
@@ -2869,10 +2848,10 @@ class ROSRobot(rtb.Robot):
         result = client.get_result()
 
         if hasattr(result, 'error_code') and result.error_code == 0:
-            rospy.loginfo(f"Successful execution of ros_control trajectory -> [{result}]")
+            rospy.loginfo(f"[EXECUTE ROS CONTROL TRAJ] -> Successful execution of ros_control trajectory -> [{result}]")
             return True
         else:
-            rospy.logerr(f"Error found in executing ros_control trajectory -> [{result}]")
+            rospy.logerr(f"[EXECUTE ROS CONTROL TRAJ] -> Error found in executing ros_control trajectory -> [{result}]")
             return False
 
     def close(self):
@@ -2967,17 +2946,21 @@ class ROSRobot(rtb.Robot):
         self.last_update = rospy.get_time()
 
     def pose_within_workspace(self, pose=Pose):
+        if pose == None or pose == Pose():
+            rospy.logerr(f"[WORKSPACE CHECK] -> Invalid Pose Input [{pose}]")
+            return False
+        
         # TODO: The workspace should be stored in param server!!!
         path = rospy.get_param('/robot_workspace', '')
         if path == '':
             # No workspace defined - assume infinite workspace
             # TODO: remove debug message
-            rospy.logwarn("No WORKSPACE DEFINED")
+            rospy.logwarn("[WORKSPACE CHECK] -> No WORKSPACE DEFINED")
             return True
         
         if os.path.isfile(path) == False:
             # In this case fail safe as a workspace definition had been attempted by user
-            rospy.logerr(f"[{self.name}] WORKSPACE COULD NOT BE DEFINED! (Invalid Path) Please check the workspace.yaml file located at {path}")
+            rospy.logerr(f"[WORKSPACE CHECK] -> [{self.name}] WORKSPACE COULD NOT BE DEFINED! (Invalid Path) Please check the workspace.yaml file located at {path}")
             return False
         
         # TODO: The workspace should be stored in param server
@@ -2986,10 +2969,10 @@ class ROSRobot(rtb.Robot):
             config = yaml.load(handle, Loader=yaml.SafeLoader)
 
         workspace = config['workspace'] if 'workspace' in config else None
-        rospy.logdebug(f"Boundary--: {workspace}")
+        rospy.logdebug(f"[WORKSPACE CHECK] -> Boundary--: {workspace}")
 
         if workspace == None:
-            rospy.logerr(f"[{self.name}] WORKSPACE COULD NOT BE DEFINED! (Invalid Yaml) Please check the workspace.yaml file located at {path}")
+            rospy.logerr(f"[WORKSPACE CHECK] -> [{self.name}] WORKSPACE COULD NOT BE DEFINED! (Invalid Yaml) Please check the workspace.yaml file located at {path}")
             # In this case fail safe as a workspace definition had been attempted by user
             return False
 
@@ -3009,8 +2992,8 @@ class ROSRobot(rtb.Robot):
             pose.position.y <= min_y or pose.position.y >= max_y or \
                 pose.position.z <= min_z or pose.position.z >= max_z):
 
-            rospy.logerr(f"[{self.name}] ROBOT **would** EXCEEDED DEFINED BOUNDARY!!!")
-            rospy.logerr(f"[{self.name}] - Goal pose.position: {pose.position}")
+            rospy.logerr(f"[WORKSPACE CHECK] -> [{self.name}] ROBOT **would** EXCEEDED DEFINED BOUNDARY!!!")
+            rospy.logerr(f"[WORKSPACE CHECK] -> [{self.name}] - Goal pose.position: {pose.position}")
             return False
         else:
             return True

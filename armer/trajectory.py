@@ -32,7 +32,7 @@ class TrajectoryExecutor:
     self.cutoff = cutoff
 
     #DEBUGGING
-    print(f"max traj time: {self.traj_max_time}")
+    # print(f"max traj time: {self.traj_max_time}")
 
     if self.traj.istime and len(self.traj.s) >= 2:
       s = np.linspace(0, 1, len(self.traj.s))
