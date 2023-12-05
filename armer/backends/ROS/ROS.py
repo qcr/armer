@@ -109,16 +109,22 @@ class ROS(Connector):  # pragma nocover
             self.robots[robot_name]._propogate_scene_tree()
 
             
-            if self.robots[robot_name].controller_type_request == 1:
-                # Joint Trajectory control
-                self.robots[robot_name].controller_select(1)
-                self.robots[robot_name].execute_trajectory()
+            #if self.robots[robot_name].controller_type_request == 1:
+            #    rospy.loginfo(f"Swtiching to trajectory controller")
+            #    # Joint Trajectory control
+            #    self.robots[robot_name].controller_select(1)
+            #    rospy.loginfo(f"Executing Trajectory...")
+            #    self.robots[robot_name].execute_trajectory()
+            #    rospy.loginfo(f"Trajectory Completed! Switching Back to Joint Velocity Controller")
 
-                # Reset back to standard joint group velocity controller
-                self.robots[robot_name].controller_select(0)
-            else:
-                # Publishes out to ROS via configured control topic (joint_group_vel_controller)
-                self.robots[robot_name].publish()
+            #    # Reset back to standard joint group velocity controller
+            #    self.robots[robot_name].controller_select(0)
+
+            #    # Setting request to 0
+            #    self.robots[robot_name].controller_type_request = 0
+            #else:
+            # Publishes out to ROS via configured control topic (joint_group_vel_controller)
+            self.robots[robot_name].publish()
 
         # Update world transforms of dynamic objects
         # TODO: test with real robot
@@ -179,6 +185,11 @@ class ROS(Connector):  # pragma nocover
                 "the id argument does not correspond with a known shape in backend"
             )
 
+    def hw_initialise(self):
+        print(f"Initialising each robot's hw controlled flag under ros_control")
+        for robot_name in self.robots:
+            self.robots[robot_name].hw_controlled = True
+    
     def hold(self):    # pragma nocover
         '''
         hold() keeps the backend open i.e. stops the program from closing once

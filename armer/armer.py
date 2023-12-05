@@ -81,6 +81,7 @@ class Armer:
         self.global_collision_dict = dict()
 
         # Launch backend
+
         self.backend.launch(**(backend_args if backend_args else dict()))
 
         # print(f"init links:")
@@ -109,6 +110,10 @@ class Armer:
             # robot.add_collision_obj(s1)
             # self.backend.add(s0)
             # self.backend.add(s1)
+        
+        # Handle any hardware required initialisation if available
+        if hasattr(self.backend, 'hw_initialise'):
+            self.backend.hw_initialise()
 
         for readonly, args in self.readonly_backends:
             readonly.launch(**args)

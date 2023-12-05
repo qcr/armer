@@ -283,6 +283,7 @@ class ROSRobot(rtb.Robot):
         self.controller_type = ControllerType.JOINT_GROUP_VEL
         self.controller_type_request = ControllerType.JOINT_GROUP_VEL
         self.jt_traj = JointTrajectory()
+        self.hw_controlled = False
 
         if not self.readonly:
             # Create Transform Listener
@@ -1092,7 +1093,7 @@ class ROSRobot(rtb.Robot):
                 rospy.logwarn(f"IK solution within singularity threshold [{self.singularity_thresh}] -> ill-advised motion")
 
             
-            result = self.general_exectutor(q=solution.q)
+            result = self.general_executor(q=solution.q)
                 
             if hasattr(result, 'error_code') and result.error_code == 0:
                 #print(f"result has error code and is safe")
@@ -1268,7 +1269,7 @@ class ROSRobot(rtb.Robot):
             if self.check_singularity(goal.joints):
                 rospy.logwarn(f"IK solution within singularity threshold [{self.singularity_thresh}] -> ill-advised motion")
             
-            result = self.general_exectutor(q=goal.joints)
+            result = self.general_executor(q=goal.joints)
             if result:
                 self.joint_pose_server.set_succeeded(
                     MoveToJointPoseResult(success=True)
@@ -1501,23 +1502,12 @@ class ROSRobot(rtb.Robot):
             self.preempt()
             
         with self.lock:
-            qd = np.array(self.qr) if hasattr(self, 'qr') else self.q
-
-            rospy.logerr("HOME - pre TrajectoryExecuter loop...")
+            q = np.array(self.qr) if hasattr(self, 'qr') else self.q
             
-            self.executor = TrajectoryExecutor(
-                self,
-                self.traj_generator(self, qd, goal.speed if goal.speed else 0.2),
-                cutoff=0.01,
-            )
-            rospy.logerr("HOME - post TrajectoryExecuter loop...")
+            # Run the general executor (checks for collisions)
+            result = self.general_executor(q=q)
 
-            rospy.logerr("HOME - pre is_finished loop...")
-            while not self.executor.is_finished():
-              rospy.sleep(0.01)
-            rospy.logerr("HOME - post is_finished loop...")
-
-            if self.executor.is_succeeded():
+            if result:
                 self.home_server.set_succeeded(
                     HomeResult(success=True)
                 )
@@ -2016,7 +2006,7 @@ class ROSRobot(rtb.Robot):
         print(f"Last safe state: {self.q_safe_window[0]} | current in collision state: {self.q}")
 
         # Attempt recovery
-        self.general_exectutor(q=self.q_safe_window[0], collision_ignore=True)
+        self.general_executor(q=self.q_safe_window[0], collision_ignore=True)
         
         # Recover from Error if set
         if self._controller_mode == ControlMode.ERROR:
@@ -2730,7 +2720,14 @@ class ROSRobot(rtb.Robot):
     # --------------------------------------------------------------------- #
     # --------- Standard Methods ------------------------------------------ #
     # --------------------------------------------------------------------- #
-    def general_exectutor(self, q, collision_ignore: bool =False):
+    def general_executor(self, q, collision_ignore: bool =False):
+        """
+        A general executor that performs the following on a given joint state goal
+        - Singularity checking and termination on failure
+        - Collision checking and termination on failure
+        - Execution of a ros_control or standard execution (real/sim) depending on what
+            is available
+        """
         result = False
         if self.check_singularity(q):
             rospy.logwarn(f"Singularity Detected in Goal State: {q}")
@@ -2746,21 +2743,6 @@ class ROSRobot(rtb.Robot):
         # Take max time from trajectory and convert to array based on traj length
         # NOTE: this is needed to then construct a JointTrajectory type
         max_time = np.max(traj.t)
-        time_array = np.linspace(0, max_time, len(traj.s))
-        #print(f"time array: {time_array}")
-        # Iterates through calculated trajectory and converts to a JointTrajectory type
-        # NOTE: a standard delay of 1 second needed so controller can execute correctly
-        #       otherwise, issues with physical panda motion
-        self.jt_traj.header.stamp = rospy.Time.now()
-        self.jt_traj.joint_names = list(self.joint_names)
-        #print(f"traj joint names: {jt_traj.joint_names}")
-        for idx in range(0,len(traj.s)):
-        #    print(f"current time array: {time_array[idx]} | rospy duration: {rospy.Duration(time_array[idx])}")
-            jt_traj_point = JointTrajectoryPoint()
-            jt_traj_point.time_from_start = rospy.Duration(time_array[idx] + 1)
-            jt_traj_point.positions = list(traj.s[idx])
-            jt_traj_point.velocities = list(traj.sd[idx])
-            self.jt_traj.points.append(jt_traj_point)
 
         # Conduct 'Ghost' Robot Check for Collision throughout trajectory
         # NOTE: also publishes marker representation of trajectory for visual confirmation (Rviz)
@@ -2771,18 +2753,26 @@ class ROSRobot(rtb.Robot):
         
         # If valid (no collisions detected) then continue with action
         if go_signal:
-            self.controller_type_request = ControllerType.JOINT_TRAJECTORY
+            # Check if the robot has been initialised to connect to real hardware
+            # In these cases, the joint_trajectory_controller is to be used
+            if self.hw_controlled:
+                rospy.loginfo(f"Running ros_control trajectory controller...")
+                self.controller_select(ControllerType.JOINT_TRAJECTORY)
+                result = self.execute_ros_control_trajectory(traj=traj, max_time=max_time)
+                self.controller_select(ControllerType.JOINT_GROUP_VEL)
+            else:
+                # Not in ROS Backend (i.e., using real hardware) so default to
+                # standard implementation - largely for simulation
+                self.executor = TrajectoryExecutor(
+                    self,
+                    traj=traj,
+                    cutoff=self.trajectory_end_cutoff
+                )
 
-            self.executor = TrajectoryExecutor(
-                self,
-                traj=traj,
-                cutoff=self.trajectory_end_cutoff
-            )
+                while not self.executor.is_finished():
+                    rospy.sleep(0.01)
 
-            while not self.executor.is_finished():
-                rospy.sleep(0.01)
-
-            result = self.executor.is_succeeded()
+                result = self.executor.is_succeeded()
 
             # Send empty data at end to clear visual trajectory
             marker_traj = Marker()
@@ -2802,8 +2792,8 @@ class ROSRobot(rtb.Robot):
             rospy.loginfo(f"Controller switched successfully")
 
     def controller_select(self, controller_type: int = 0) -> bool:
-        if controller_type == None or controller_type > (len(ControllerType) - 1):
-            print(f"len of controller type: {len(ControllerType)}")
+        if controller_type == None or controller_type > 1 or controller_type < 0:
+            print(f"invalid controller type: {controller_type}")
             return False
         
         if controller_type == ControllerType.JOINT_GROUP_VEL and controller_type != self.controller_type:
@@ -2833,8 +2823,11 @@ class ROSRobot(rtb.Robot):
             rospy.logerr(f"Unknown controller type, failed.")
             return False
 
-    def execute_trajectory(self):
-        # ---- TESTING NEW IMPLEMENTATION
+    def execute_ros_control_trajectory(self, traj, max_time: int = 0):
+        """
+        Executes a ros_control trajectory implementation
+        NOTE: only works when ros_control backend is available
+        """
         # Create a client to loaded controller
         client = actionlib.SimpleActionClient(
             '/position_joint_trajectory_controller/follow_joint_trajectory', 
@@ -2844,9 +2837,25 @@ class ROSRobot(rtb.Robot):
         # Wait for client server connection
         client.wait_for_server()
 
+        # Iterates through calculated trajectory and converts to a JointTrajectory type
+        # NOTE: a standard delay of 1 second needed so controller can execute correctly
+        #       otherwise, issues with physical panda motion
+        jt_traj = JointTrajectory()
+        jt_traj.header.stamp = rospy.Time.now()
+        jt_traj.joint_names = list(self.joint_names)
+        time_array = np.linspace(0, max_time, len(traj.s))
+        #print(f"time array: {time_array}")
+        #print(f"traj joint names: {jt_traj.joint_names}")
+        for idx in range(0,len(traj.s)):
+            jt_traj_point = JointTrajectoryPoint()
+            jt_traj_point.time_from_start = rospy.Duration(time_array[idx] + 1)
+            jt_traj_point.positions = list(traj.s[idx])
+            jt_traj_point.velocities = list(traj.sd[idx])
+            jt_traj.points.append(jt_traj_point)
+        
         # Create goal
         goal = FollowJointTrajectoryGoal()
-        goal.trajectory = self.jt_traj
+        goal.trajectory = jt_traj
 
         # Send Joint Trajectory to position controller for execution
         client.send_goal(goal)
@@ -2858,6 +2867,13 @@ class ROSRobot(rtb.Robot):
         # Wait for controller to finish
         client.wait_for_result()
         result = client.get_result()
+
+        if hasattr(result, 'error_code') and result.error_code == 0:
+            rospy.loginfo(f"Successful execution of ros_control trajectory -> [{result}]")
+            return True
+        else:
+            rospy.logerr(f"Error found in executing ros_control trajectory -> [{result}]")
+            return False
 
     def close(self):
         """
@@ -3228,7 +3244,7 @@ class ROSRobot(rtb.Robot):
 
         # apply desired joint velocity to robot
         # NOTE: this should be allowed to run even in ControlMode.ERROR to recover (i.e., Home action)
-        if self.executor:
+        if self.executor and not self.hw_controlled:
             self.j_v = self.executor.step(dt)
 
             # TODO: Remove?
