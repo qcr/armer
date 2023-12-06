@@ -19,7 +19,7 @@ import actionlib
 import tf
 import roboticstoolbox as rtb
 import spatialmath as sm
-from spatialmath import SE3, SO3, UnitQuaternion, base, Quaternion
+from spatialmath import SE3, SO3, UnitQuaternion
 import pointcloud_utils as pclu
 import numpy as np
 import yaml
@@ -32,7 +32,7 @@ from armer.utils import ikine, mjtg, trapezoidal
 # Import Standard Messages
 from std_msgs.msg import Header, Bool
 from sensor_msgs.msg import JointState
-from geometry_msgs.msg import Pose, PoseStamped, Point
+from geometry_msgs.msg import Pose, PoseStamped, Point, Quaternion
 from geometry_msgs.msg import TwistStamped, Twist, Transform
 from std_srvs.srv import Empty, EmptyRequest, EmptyResponse
 from std_msgs.msg import Float64MultiArray
@@ -122,17 +122,17 @@ class ROSRobot(rtb.Robot):
         # Update with ustom qlim (joint limits) if specified in robot config
         if qlim_min and qlim_max:
             self.qlim = np.array([qlim_min, qlim_max])
-            rospy.loginfo(f"Updating Custom qlim: {self.qlim}")
+            rospy.loginfo(f"[INITIALISATION] -> Updating Custom qlim: {self.qlim}")
 
         if qdlim:
             self.qdlim = np.array(qdlim)
-            rospy.loginfo(f"Updating Custom qdlim: {self.qdlim}")
+            rospy.loginfo(f"[INITIALISATION] -> Updating Custom qdlim: {self.qdlim}")
         else:
             self.qdlim = None
 
         # Singularity index threshold (0 is a sigularity)
         # NOTE: this is a tested value and may require configuration (i.e., speed of robot)
-        rospy.loginfo(f"[INIT] Singularity Scalar Threshold set to: {singularity_thresh}")
+        rospy.loginfo(f"[INITIALISATION] -> Singularity Scalar Threshold set to: {singularity_thresh}")
         self.singularity_thresh = singularity_thresh 
         self.manip_scalar = None
         self.singularity_approached = False
@@ -146,7 +146,7 @@ class ROSRobot(rtb.Robot):
         # Check if the existing gripper name exists (Error handling) otherwise default to top of dict stack
         if self.gripper not in self.link_dict.keys():
             default_top_link_name = sorted(self.link_dict.keys())[-1]
-            rospy.logwarn(f"Configured gripper name {self.gripper} not in link tree -> defaulting to top of stack: {default_top_link_name}")
+            rospy.logwarn(f"[INITIALISATION] -> Configured gripper name {self.gripper} not in link tree -> defaulting to top of stack: {default_top_link_name}")
             self.gripper = default_top_link_name
 
         # Sort links by parents starting from gripper
@@ -308,12 +308,6 @@ class ROSRobot(rtb.Robot):
             self.display_traj_publisher: rospy.Publisher = rospy.Publisher(
                 '{}/trajectory_marker_display'.format(self.name.lower()),
                 Marker,
-                queue_size=1
-            )
-
-            self.display_moveit_traj_publisher: rospy.Publisher = rospy.Publisher(
-                '{}/armer_moveit_display'.format(self.name.lower()),
-                DisplayTrajectory,
                 queue_size=1
             )
 
@@ -565,10 +559,11 @@ class ROSRobot(rtb.Robot):
             )
 
             rospy.Service(
-                '{}/collision_recover'.format(self.name.lower()),
+                '{}/recover_move'.format(self.name.lower()),
                 Empty,
-                self.collision_recover_cb
+                self.recover_move_cb
             )
+
     # --------------------------------------------------------------------- #
     # --------- ROS Topic Callback Methods -------------------------------- #
     # --------------------------------------------------------------------- #
@@ -590,11 +585,10 @@ class ROSRobot(rtb.Robot):
         :type msg: TwistStamped
         """
         if self._controller_mode == ControlMode.ERROR:
-            rospy.logerr(f"CART VEL CB: [{self.name}] in Error Control Mode...")
+            rospy.logerr(f"[CART VELOCITY CB] -> [{self.name}] in Error Control Mode...")
             return None
 
         if self.moving:
-            print(f"HERE because moving (CART)")
             self.preempt()
 
         with self.lock:
@@ -610,16 +604,15 @@ class ROSRobot(rtb.Robot):
         :type msg: JointVelocity
         """
         if self._controller_mode == ControlMode.ERROR:
-            rospy.logerr(f"JOINT VEL CB: [{self.name}] in Error Control Mode...")
+            rospy.logerr(f"[JOINT VELOCITY CB] -> [{self.name}] in Error Control Mode...")
             return None
 
         # Check for vector length and terminate if invalid
         if len(msg.joints) != len(self.j_v):
-            rospy.logerr(f"JOINT VEL CB: [{self.name}] provided input vector length invalid [{len(msg.joints)}]. Expecting len [{len(self.j_v)}]")
+            rospy.logerr(f"[JOINT VELOCITY CB] -> [{self.name}] provided input vector length invalid [{len(msg.joints)}]. Expecting len [{len(self.j_v)}]")
             return None
          
         if self.moving:            
-            print(f"HERE because moving (JOINT)")
             self.preempt()
 
         with self.lock:
@@ -627,7 +620,7 @@ class ROSRobot(rtb.Robot):
             self.last_update = rospy.get_time()
 
     # --------------------------------------------------------------------- #
-    # --------- ROS Action Callback Methods ------------------------------- #
+    # --------- Traditional ROS Action Callback Methods ------------------- #
     # --------------------------------------------------------------------- #
     def guarded_velocity_cb(self, msg: GuardedVelocityGoal) -> None:
         """
@@ -732,6 +725,154 @@ class ROSRobot(rtb.Robot):
 
         self.cartesian_servo_publisher.publish(arrived)
 
+    def pose_cb(self, goal: MoveToPoseGoal) -> None:
+        """
+        ROS Action Server callback:
+        Moves the end-effector to the
+        cartesian pose indicated by goal
+
+        :param goal: [description]
+        :type goal: MoveToPoseGoal
+        """
+        if self.moving:
+            self.preempt()
+
+        with self.lock:
+            goal_pose = goal.pose_stamped
+
+            if goal_pose.header.frame_id == '':
+                goal_pose.header.frame_id = self.base_link.name
+
+            goal_pose = self.tf_listener.transformPose(
+                self.base_link.name,
+                goal_pose,
+            )
+            pose = goal_pose.pose
+            
+            # Attempt to get valid solution
+            # NOTE: on failure, returns existing state as solution for 0 movement
+            solution = ikine(self, pose, q0=self.q, end=self.gripper)
+            ik_invalid = all(x == y for x,y in zip(self.q, solution.q))
+            if ik_invalid:
+                rospy.logwarn(f"[CARTESIAN POSE MOVE CB] -> Could not find valid IK solution, refusing to move...")
+                self.pose_server.set_succeeded(MoveToPoseResult(success=False), 'IK Solution Invalid')
+            else:
+                # NOTE: checks and preempts if collision or workspace violation
+                # NOTE: can proceed if workspace not defined
+                if self.general_executor(q=solution.q, pose=pose, collision_ignore=False, workspace_ignore=False):
+                    self.pose_server.set_succeeded(MoveToPoseResult(success=True))
+                else:
+                    self.pose_server.set_aborted(MoveToPoseResult(success=False), 'Executor Failed in Action')
+                
+            # Reset Flags at End
+            self.executor = None
+            self.moving = False
+    
+    def joint_pose_cb(self, goal: MoveToJointPoseGoal) -> None:
+        """
+        ROS Action Server callback:
+        Moves the arm the named pose indicated by goal
+
+        :param goal: Goal message containing the name of
+        the joint configuration to which the arm should move
+        :type goal: MoveToNamedPoseGoal
+        """
+        if self.moving:
+            self.preempt()
+
+        with self.lock:     
+
+            # Check for singularity on end solution:
+            # TODO: prevent motion on this bool? Needs to be thought about
+            if self.check_singularity(goal.joints):
+                rospy.logwarn(f"IK solution within singularity threshold [{self.singularity_thresh}] -> ill-advised motion")
+            
+            # NOTE: checks for collisions and workspace violations
+            # NOTE: can continue if workspace is not defined
+            if self.general_executor(q=goal.joints):
+                self.joint_pose_server.set_succeeded(MoveToJointPoseResult(success=True))
+            else:
+                self.joint_pose_server.set_aborted(MoveToJointPoseResult(success=False))
+
+            self.executor = None
+            self.moving = False
+
+    def named_pose_cb(self, goal: MoveToNamedPoseGoal) -> None:
+        """
+        ROS Action Server callback:
+        Moves the arm the named pose indicated by goal
+
+        :param goal: Goal message containing the name of
+        the joint configuration to which the arm should move
+        :type goal: MoveToNamedPoseGoal
+        """
+        if self.moving:
+            self.preempt()
+
+        with self.lock:
+            if not goal.pose_name in self.named_poses:
+                self.named_pose_server.set_aborted(
+                    MoveToNamedPoseResult(success=False),
+                    'Unknown named pose'
+                )
+                rospy.logwarn(f"-- Named pose goal ({goal.pose_name}) is unknown; refusing to move...")
+                return
+
+            # Extract end state (q) of joints
+            q = np.array(self.named_poses[goal.pose_name])
+
+            # Calculate end pose for checking boundary (if defined)
+            goal_pose_se3 = SE3(self.ets(start=self.base_link, end=self.gripper).eval(q))
+            goal_pose = Pose()
+            goal_pose.position.x = goal_pose_se3.t[0]
+            goal_pose.position.y = goal_pose_se3.t[1]
+            goal_pose.position.z = goal_pose_se3.t[2]
+
+            # NOTE: Checks collisions prior to executing
+            # NOTE: Checks workspace (if defined), continues if not
+            if self.general_executor(q=q, pose=goal_pose):
+                self.named_pose_server.set_succeeded(MoveToNamedPoseResult(success=True))
+            else:
+                self.named_pose_server.set_aborted(MoveToNamedPoseResult(success=False))
+
+            # Reset of flags at end
+            self.executor = None
+            self.moving = False
+
+    def home_cb(self, goal: HomeGoal) -> HomeResult:
+        """[summary]
+
+        :param req: Empty request
+        :type req: EmptyRequest
+        :return: Empty response
+        :rtype: EmptyResponse
+        """
+        if self.moving:
+            self.preempt()
+            
+        with self.lock:
+            # Prep end goal state (q) for home joint positions
+            q = np.array(self.qr) if hasattr(self, 'qr') else self.q
+            
+            # Run the general executor (checks for collisions)
+            # NOTE: ignores workspace on homing
+            if self.general_executor(q=q, workspace_ignore=True):
+                self.home_server.set_succeeded(HomeResult(success=True))
+            else:
+                self.home_server.set_aborted(HomeResult(success=False))
+
+            # Recover from Error if set
+            if self._controller_mode == ControlMode.ERROR:
+                rospy.loginfo(f"Resetting from ERROR state to JOINTS [Default]")
+                self._controller_mode = ControlMode.JOINTS
+                self.preempted = False
+
+            self.executor = None
+            self.moving = False
+
+    # --------------------------------------------------------------------- #
+    # --------- Added Custom ROS Action Callback Methods ------------------ #
+    # --------------------------------------------------------------------- #
     def tf_to_pose_transporter_cb(self, goal: TfToPoseGoal) -> None:
         pub_rate = rospy.Rate(goal.rate)
         pub = rospy.Publisher(goal.pose_topic, PoseStamped, queue_size=1)
@@ -771,7 +912,6 @@ class ROSRobot(rtb.Robot):
                 pub_rate.sleep()
                 continue
                     
-
             if target_pose_offset == Pose():
                 rospy.logerr(f"target vector is empty, cannot be calculated. exiting...")
                 if previous_pose != Pose():
@@ -1044,48 +1184,6 @@ class ROSRobot(rtb.Robot):
         self.executor = None
         self.moving = False
 
-    def pose_cb(self, goal: MoveToPoseGoal) -> None:
-        """
-        ROS Action Server callback:
-        Moves the end-effector to the
-        cartesian pose indicated by goal
-
-        :param goal: [description]
-        :type goal: MoveToPoseGoal
-        """
-        if self.moving:
-            self.preempt()
-
-        with self.lock:
-            goal_pose = goal.pose_stamped
-
-            if goal_pose.header.frame_id == '':
-                goal_pose.header.frame_id = self.base_link.name
-
-            goal_pose = self.tf_listener.transformPose(
-                self.base_link.name,
-                goal_pose,
-            )
-            pose = goal_pose.pose
-            
-            # Attempt to get valid solution
-            # NOTE: on failure, returns existing state as solution for 0 movement
-            solution = ikine(self, pose, q0=self.q, end=self.gripper)
-            ik_invalid = all(x == y for x,y in zip(self.q, solution.q))
-            if ik_invalid:
-                rospy.logwarn(f"-- Could not find valid IK solution, refusing to move...")
-                self.pose_server.set_succeeded(MoveToPoseResult(success=False), 'IK Solution Invalid')
-            else:
-                if self.general_executor(q=solution.q, pose=pose):
-                    #print(f"result has error code and is safe")
-                    self.pose_server.set_succeeded(MoveToPoseResult(success=True))
-                else:
-                    self.pose_server.set_aborted(MoveToPoseResult(success=False), 'Executor Failed in Action')
-                
-            # Reset Flags at End
-            self.executor = None
-            self.moving = False
-
     def step_cb(self, goal: MoveToPoseGoal) -> None:
         """
         """
@@ -1229,38 +1327,6 @@ class ROSRobot(rtb.Robot):
             self.executor = None
             self.moving = False
 
-    def joint_pose_cb(self, goal: MoveToJointPoseGoal) -> None:
-        """
-        ROS Action Server callback:
-        Moves the arm the named pose indicated by goal
-
-        :param goal: Goal message containing the name of
-        the joint configuration to which the arm should move
-        :type goal: MoveToNamedPoseGoal
-        """
-        if self.moving:
-            self.preempt()
-
-        with self.lock:     
-
-            # Check for singularity on end solution:
-            # TODO: prevent motion on this bool? Needs to be thought about
-            if self.check_singularity(goal.joints):
-                rospy.logwarn(f"IK solution within singularity threshold [{self.singularity_thresh}] -> ill-advised motion")
-            
-            result = self.general_executor(q=goal.joints)
-            if result:
-                self.joint_pose_server.set_succeeded(
-                    MoveToJointPoseResult(success=True)
-                )
-            else:
-                self.joint_pose_server.set_aborted(
-                    MoveToJointPoseResult(success=False)
-                )
-
-            self.executor = None
-            self.moving = False
-
     def named_pose_in_frame_cb(self, goal: MoveToNamedPoseGoal) -> None:
         """
         
@@ -1377,66 +1443,6 @@ class ROSRobot(rtb.Robot):
 
             self.executor = None
             self.moving = False
-    
-    def named_pose_cb(self, goal: MoveToNamedPoseGoal) -> None:
-        """
-        ROS Action Server callback:
-        Moves the arm the named pose indicated by goal
-
-        :param goal: Goal message containing the name of
-        the joint configuration to which the arm should move
-        :type goal: MoveToNamedPoseGoal
-        """
-        if self.moving:
-            self.preempt()
-
-        with self.lock:
-            if not goal.pose_name in self.named_poses:
-                self.named_pose_server.set_aborted(
-                    MoveToNamedPoseResult(success=False),
-                    'Unknown named pose'
-                )
-                rospy.logwarn(f"-- Named pose goal ({goal.pose_name}) is unknown; refusing to move...")
-                return
-
-            qd = np.array(self.named_poses[goal.pose_name])
-
-            # IS THE GOAL POSE WITHIN THE BOUNDRY?...
-            goal_pose_se3 = SE3(self.ets(start=self.base_link, end=self.gripper).eval(qd))
-            goal_pose = Pose()
-            goal_pose.position.x = goal_pose_se3.t[0]
-            goal_pose.position.y = goal_pose_se3.t[1]
-            goal_pose.position.z = goal_pose_se3.t[2]
-
-            if self.pose_within_workspace(goal_pose) == False:
-                rospy.logwarn("-- Named pose goal outside defined workspace; refusing to move...")
-                self.named_pose_server.set_succeeded(
-                  MoveToNamedPoseResult(success=False), 'Named pose outside defined workspace'
-                )
-                self.executor = None
-                self.moving = False
-                return
-            
-            self.executor = TrajectoryExecutor(
-                self,
-                self.traj_generator(self, qd, goal.speed if goal.speed else 0.2),
-                cutoff=self.trajectory_end_cutoff
-            )
-
-            while not self.executor.is_finished():
-                rospy.sleep(0.01)
-
-            if self.executor.is_succeeded():
-                self.named_pose_server.set_succeeded(
-                        MoveToNamedPoseResult(success=True)
-                )
-            else:
-                self.named_pose_server.set_aborted(
-                  MoveToNamedPoseResult(success=False)
-                )
-
-            self.executor = None
-            self.moving = False
 
     def named_pose_distance_cb(self, goal: MoveToNamedPoseGoal) -> None:
         """        
@@ -1469,43 +1475,8 @@ class ROSRobot(rtb.Robot):
             self.named_pose_distance_server.set_succeeded(
                     MoveToNamedPoseResult(success=False))
 
-    def home_cb(self, goal: HomeGoal) -> HomeResult:
-        """[summary]
-
-        :param req: Empty request
-        :type req: EmptyRequest
-        :return: Empty response
-        :rtype: EmptyResponse
-        """
-        if self.moving:
-            self.preempt()
-            
-        with self.lock:
-            q = np.array(self.qr) if hasattr(self, 'qr') else self.q
-            
-            # Run the general executor (checks for collisions)
-            result = self.general_executor(q=q, workspace_ignore=True)
-
-            if result:
-                self.home_server.set_succeeded(
-                    HomeResult(success=True)
-                )
-            else:
-                self.home_server.set_aborted(
-                  HomeResult(success=False)
-                )
-
-            # Recover from Error if set
-            if self._controller_mode == ControlMode.ERROR:
-                rospy.loginfo(f"Resetting from ERROR state to JOINTS [Default]")
-                self._controller_mode = ControlMode.JOINTS
-                self.preempted = False
-
-            self.executor = None
-            self.moving = False
-
     # --------------------------------------------------------------------- #
-    # --------- ROS Service Callback Methods ------------------------------- #
+    # --------- ROS Service Callback Methods ------------------------------ #
     # --------------------------------------------------------------------- #
     def recover_cb(self, req: EmptyRequest) -> EmptyResponse: # pylint: disable=no-self-use
         """[summary]
@@ -1519,11 +1490,33 @@ class ROSRobot(rtb.Robot):
         """
         # Recover from Error if set (basic functionality)
         if self._controller_mode == ControlMode.ERROR:
-            rospy.loginfo(f"Resetting from ERROR state to JOINTS [Default]")
+            rospy.loginfo(f"[RECOVER CB] -> Resetting from ERROR state to JOINTS [Default]")
             self._controller_mode = ControlMode.JOINTS
             self.preempted = False
         else:
-            rospy.logwarn(f'Robot [{self.name}] not in ERROR state. Do Nothing.')
+            rospy.logwarn(f'RECOVER CB] -> Robot [{self.name}] not in ERROR state. Do Nothing.')
+
+        return EmptyResponse()
+    
+    def recover_move_cb(self, req: EmptyRequest) -> EmptyResponse:
+        """
+        This will attempt to move the arm to a previous 'non-collision' state
+        NOTE: uses a set moving window of 'safe states' added every step of ARMer
+        """
+        # Attempt recovery
+        # NOTE: movement requested with collisions and workspace ingore (to recover back)
+        self.general_executor(q=self.q_safe_window[0], collision_ignore=True, workspace_ignore=True)
+        
+        # Recover from Error State
+        if self._controller_mode == ControlMode.ERROR:
+            rospy.loginfo(f"[RECOVER MOVE CB] -> Resetting from ERROR state to JOINTS [Default]")
+            self._controller_mode = ControlMode.JOINTS
+            self.preempted = False
+        else:
+            rospy.logwarn(f'RECOVER MOVE CB] -> Robot [{self.name}] not in ERROR state. Do Nothing.')
+
+        self.executor = None
+        self.moving = False
 
         return EmptyResponse()
     
@@ -1844,6 +1837,7 @@ class ROSRobot(rtb.Robot):
         self.Kp = None
         self.Ki = None
         self.Kd = None
+
     # --------------------------------------------------------------------- #
     # --------- Collision and Singularity Checking Services --------------- #
     # --------------------------------------------------------------------- #
@@ -1950,6 +1944,7 @@ class ROSRobot(rtb.Robot):
         
         # print(f"Current collision objects: {self.collision_obj_list}")
         # Add the shape as an interactive marker for easy re-updating
+        # NOTE: handle to not add if overwrite requested
         # NOTE: wait for shape to be added to backend
         if interactive_marker_handle:
             rospy.sleep(rospy.Duration(secs=1))
@@ -1983,24 +1978,6 @@ class ROSRobot(rtb.Robot):
         # Dump list out
         # return GetCollisionObjectsResponse(list(self.dynamic_collision_dict.keys()))
         return GetCollisionObjectsResponse(out_list)
-    
-    def collision_recover_cb(self, req: EmptyRequest) -> EmptyResponse:
-        """
-        This will attempt to move the arm to a previous 'non-collision' state
-        """
-        # Attempt recovery
-        self.general_executor(q=self.q_safe_window[0], collision_ignore=True, workspace_ignore=True)
-        
-        # Recover from Error if set
-        if self._controller_mode == ControlMode.ERROR:
-            rospy.loginfo(f"[ARM RECOVER CB] -> Resetting from ERROR state to JOINTS [Default]")
-            self._controller_mode = ControlMode.JOINTS
-            self.preempted = False
-
-        self.executor = None
-        self.moving = False
-
-        return EmptyResponse()
     
     # --------------------------------------------------------------------- #
     # --------- Collision and Singularity Checking Methods ---------------- #
@@ -2142,7 +2119,9 @@ class ROSRobot(rtb.Robot):
                         break
                 
                     marker.id = counter
-                    pose_se3 = sm.SE3(shape.T[:3, 3])
+                    pose_se3 = sm.SE3(shape.T)
+                    uq = UnitQuaternion(pose_se3)
+                    marker.pose.orientation = Quaternion(*np.concatenate([uq.vec3, [uq.s]]))
                     marker.pose.position = Point(*pose_se3.t)
 
                     if link in sliced_link_names:
@@ -2700,6 +2679,7 @@ class ROSRobot(rtb.Robot):
             self.q_safe_window = np.roll(self.q_safe_window, shift=-1, axis=0)
             # add value to end
             self.q_safe_window[-1] = self.q  
+
     # --------------------------------------------------------------------- #
     # --------- Standard Methods ------------------------------------------ #
     # --------------------------------------------------------------------- #
@@ -3144,6 +3124,9 @@ class ROSRobot(rtb.Robot):
             self.interactive_marker_server.applyChanges()
     
     def normalizeQuaternion( self, quaternion_msg ):
+        """
+        This is from: https://github.com/ros-visualization/visualization_tutorials/tree/noetic-devel
+        """
         norm = quaternion_msg.x**2 + quaternion_msg.y**2 + quaternion_msg.z**2 + quaternion_msg.w**2
         s = norm**(-0.5)
         quaternion_msg.x *= s
@@ -3153,6 +3136,8 @@ class ROSRobot(rtb.Robot):
 
     def interactive_marker_creation(self):
         """
+        NOTE: updated and implemented from the tutorials here: 
+            https://github.com/ros-visualization/visualization_tutorials/tree/noetic-devel
         Publishes interactive marker versions of added shape objects
         Currently handles only: 
             - Sphere 
@@ -3240,6 +3225,30 @@ class ROSRobot(rtb.Robot):
                 control.orientation.z = 1
                 self.normalizeQuaternion(control.orientation)
                 control.interaction_mode = InteractiveMarkerControl.MOVE_AXIS
+                control.orientation_mode = InteractiveMarkerControl.FIXED
+                int_marker.controls.append(control)  
+
+                # Axis Rotation in X
+                control = InteractiveMarkerControl()
+                control.name = "rotate_x"
+                control.orientation.w = 1
+                control.orientation.x = 1
+                control.orientation.y = 0
+                control.orientation.z = 0
+                self.normalizeQuaternion(control.orientation)
+                control.interaction_mode = InteractiveMarkerControl.ROTATE_AXIS
+                control.orientation_mode = InteractiveMarkerControl.FIXED
+                int_marker.controls.append(control)  
+
+                # Axis Rotation in Y
+                control = InteractiveMarkerControl()
+                control.name = "rotate_y"
+                control.orientation.w = 1
+                control.orientation.x = 0
+                control.orientation.y = 1
+                control.orientation.z = 0
+                self.normalizeQuaternion(control.orientation)
+                control.interaction_mode = InteractiveMarkerControl.ROTATE_AXIS
                 control.orientation_mode = InteractiveMarkerControl.FIXED
                 int_marker.controls.append(control)  
 
