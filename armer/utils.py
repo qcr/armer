@@ -32,6 +32,13 @@ def ikine(robot, target, q0, end):
     return type('obj', (object,), {'q' : np.array(result[0])})
 
 def trapezoidal(robot: rtb.Robot, qf: np.ndarray, max_speed=None, frequency=500, move_time_sec: float=5):
+    """
+    Main Trajectory Creation Method
+    - Uses the in-built roboticstoolbox mtraj method
+    - Creates a trapezoidal trajectory (closely resembles minimum jerk)
+    - Uses provided frequency to construct trajectory time steps
+    - Uses move time to scale joint velocities.
+    """
     rospy.loginfo(f"[TRAJECTORY CONFIG] -> Trapezoidal Method | movement time: {move_time_sec} (sec)")
 
     # ------------ NOTE: determine a joint trajectory (curved) based on time request
@@ -54,7 +61,7 @@ def mjtg(robot: rtb.robot, qf: np.ndarray, max_speed: float=0.2, max_rot: float=
     # This is the average cartesian speed we want the robot to move at
     # NOTE: divided by approx. 2 to make the max speed the approx. peak of the speed achieved
     # TODO: investigate a better approximation strategy here
-    rospy.loginfo("Attempting to produce a mjtg tragectory")
+    rospy.logwarn(f"DEPRECATED. Please use trapezoidal method")
     ave_cart_speed = max_speed / 1.92
 
     #---------------- Calculate Linear move time estimate (3 point sampling)

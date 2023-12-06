@@ -43,10 +43,11 @@ from armer_msgs.srv import *
 
 # TESTING NEW IMPORTS FOR TRAJ DISPLAY (MOVEIT)
 from trajectory_msgs.msg import JointTrajectoryPoint, JointTrajectory
-from moveit_msgs.msg import RobotState, AttachedCollisionObject, CollisionObject, RobotTrajectory, DisplayTrajectory
+from moveit_msgs.msg import DisplayTrajectory
 
 # TESTING NEW IMPORTS FOR DYNAMIC OBJECT MARKER DISPLAY (RVIZ)
-from visualization_msgs.msg import Marker, MarkerArray
+from visualization_msgs.msg import Marker, MarkerArray, InteractiveMarker, InteractiveMarkerControl
+from interactive_markers.interactive_marker_server import InteractiveMarkerServer, InteractiveMarkerFeedback
 
 # TESTING CONTROLLER SWITCHING FOR NEW TRAJECTORY CONTROL
 from controller_manager_msgs.srv import SwitchController
@@ -77,6 +78,7 @@ class DynamicCollisionObj:
     id: int = 0
     pose: Pose = Pose()
     is_added: bool = False
+    marker_created: bool = False
 
 class ROSRobot(rtb.Robot):
     """
@@ -216,6 +218,9 @@ class ROSRobot(rtb.Robot):
         # of a collision situation, based on previously executed joint states that were safe
         self.q_safe_window = np.zeros([200,len(self.q)])
         self.q_safe_window_p = 0
+
+        # Setup interactive marker (for use with RVIZ)
+        self.interactive_marker_server = InteractiveMarkerServer("armer_interactive_objects")
         # --- COLLISION HANDLING SETUP SECTION END--- #
 
         self.joint_indexes = []
@@ -1858,10 +1863,10 @@ class ROSRobot(rtb.Robot):
         NOTE: check failure modes (i.e., not in link dict, etc.)
         """
         pass
-    
+
     def add_collision_obj_cb(self, req: AddCollisionObjectRequest) -> AddCollisionObjectResponse:
         """
-        TODO: Implement a way to add to existing collision dictionary at runtime
+        Adds a collision primative (sphere, cylinder, cuboid) to existing collision dictionary at runtime
         Expected input:
             -> name (string): to define the key within the collision dictionary
             -> type (string): to define basic primatives (as part of the sg.Shape class)
@@ -1915,6 +1920,7 @@ class ROSRobot(rtb.Robot):
         
         # Test adding to collision dictionary for checking
         # NOTE: perform error checking on name key (unless a replace flag was set)
+        interactive_marker_handle = True
         if req.name in self.collision_dict.keys() and not req.overwrite:
             rospy.logerr(f"Requested name [{req.name}] already exists in collision list and not asked to overwrite [{req.overwrite}]")
             return AddCollisionObjectResponse(success=False)
@@ -1924,6 +1930,7 @@ class ROSRobot(rtb.Robot):
             rospy.logwarn(f"[NOT YET FULLY IMPLEMENTED] Here attempting to remove existing shape")
             removed_obj = self.dynamic_collision_dict.pop(req.name)
             self.dynamic_collision_removal_dict[req.name] = removed_obj
+            interactive_marker_handle = False
     
         # Create a Dynamic Collision Object and add the configured shape to the scene
         dynamic_obj = DynamicCollisionObj(shape=shape, key=req.name, pose=req.pose, is_added=False)
@@ -1942,6 +1949,11 @@ class ROSRobot(rtb.Robot):
         self.characterise_collision_overlaps()
         
         # print(f"Current collision objects: {self.collision_obj_list}")
+        # Add the shape as an interactive marker for easy re-updating
+        # NOTE: wait for shape to be added to backend
+        if interactive_marker_handle:
+            rospy.sleep(rospy.Duration(secs=1))
+            self.interactive_marker_creation()
 
         return AddCollisionObjectResponse(success=True)
     
@@ -1989,6 +2001,7 @@ class ROSRobot(rtb.Robot):
         self.moving = False
 
         return EmptyResponse()
+    
     # --------------------------------------------------------------------- #
     # --------- Collision and Singularity Checking Methods ---------------- #
     # --------------------------------------------------------------------- #
@@ -2752,6 +2765,7 @@ class ROSRobot(rtb.Robot):
 
             # Send empty data at end to clear visual trajectory
             marker_traj = Marker()
+            marker_traj.header.frame_id = self.base_link.name
             marker_traj.points = []
             self.display_traj_publisher.publish(marker_traj)
 
@@ -3105,9 +3119,150 @@ class ROSRobot(rtb.Robot):
         NOTE: should only run this once every time a new workspace/change to workspace has been done
         """
         pass
+    
+    def int_marker_cb(self, feedback):
+        """
+        On mouse release (valid click event) this method updates the corresponding
+        object pose in the collision dictionary
+        """
+        # Update pose of shape on a mouse release event
+        if feedback.event_type == InteractiveMarkerFeedback.MOUSE_UP:            
+            # Update collision dict shape information
+            shape = self.collision_dict[feedback.marker_name] if feedback.marker_name in self.collision_dict else None
+            if shape == None or len(shape) > 1 or len(shape) <= 0:
+                rospy.logerr(f"[INTERACTIVE MARKER UPDATE] -> Could not access [{feedback.marker_name}]")
+            else:
+                pose_se3 = SE3(feedback.pose.position.x, 
+                        feedback.pose.position.y,
+                        feedback.pose.position.z) * UnitQuaternion(feedback.pose.orientation.w, [
+                                                                feedback.pose.orientation.x, 
+                                                                feedback.pose.orientation.y,
+                                                                feedback.pose.orientation.z]).SE3()
+                shape[0].T = pose_se3.A
+            
+            rospy.loginfo(f"[INTERACTIVE MARKER UPDATE] -> Obj {feedback.marker_name} updated to pose: {feedback.pose}")
+            self.interactive_marker_server.applyChanges()
+    
+    def normalizeQuaternion( self, quaternion_msg ):
+        norm = quaternion_msg.x**2 + quaternion_msg.y**2 + quaternion_msg.z**2 + quaternion_msg.w**2
+        s = norm**(-0.5)
+        quaternion_msg.x *= s
+        quaternion_msg.y *= s
+        quaternion_msg.z *= s
+        quaternion_msg.w *= s
+
+    def interactive_marker_creation(self):
+        """
+        Publishes interactive marker versions of added shape objects
+        Currently handles only: 
+            - Sphere 
+            - Cylinder
+            - Cuboid
+        """
+        dyn_col_dict_cp = self.dynamic_collision_dict.copy()
+        for obj in list(dyn_col_dict_cp.values()):
+            # Ensure object has been successfully added to backend first
+            if obj.is_added and not obj.marker_created:
+                print(f"Here")
+                # Default interactive marker setup
+                marker = Marker()
+                if obj.shape.stype == 'sphere':
+                    marker.type = Marker.SPHERE
+
+                    # Expects diameter (m)
+                    marker.scale.x = obj.shape.radius * 2
+                    marker.scale.y = obj.shape.radius * 2
+                    marker.scale.z = obj.shape.radius * 2
+                elif obj.shape.stype == 'cylinder':
+                    marker.type = Marker.CYLINDER
+
+                    # Expects diameter (m)
+                    marker.scale.x = obj.shape.radius * 2
+                    marker.scale.y = obj.shape.radius * 2
+                    marker.scale.z = obj.shape.length
+                elif obj.shape.stype == 'cuboid':
+                    marker.type = Marker.CUBE
+
+                    # Expects diameter (m)
+                    marker.scale.x = obj.shape.scale[0]
+                    marker.scale.y = obj.shape.scale[1]
+                    marker.scale.z = obj.shape.scale[2]
+                else:
+                    break
+
+                int_marker = InteractiveMarker()
+                int_marker.header.frame_id = self.base_link.name
+                int_marker.scale = np.max([marker.scale.x, marker.scale.y, marker.scale.z])
+                int_marker.pose = obj.pose
+                int_marker.name = obj.key
+                marker.color.r = obj.shape.color[0]
+                marker.color.g = obj.shape.color[1]
+                marker.color.b = obj.shape.color[2]
+                marker.color.a = obj.shape.color[3]
+                
+                # Main Motion
+                control = InteractiveMarkerControl()
+                control.always_visible = True
+                control.interaction_mode = InteractiveMarkerControl.MOVE_ROTATE_3D
+                control.markers.append(marker)
+                int_marker.controls.append(control)  
+
+                # Axis Movement in X
+                control = InteractiveMarkerControl()
+                control.name = "move_x"
+                control.orientation.w = 1
+                control.orientation.x = 1
+                control.orientation.y = 0
+                control.orientation.z = 0
+                self.normalizeQuaternion(control.orientation)
+                control.interaction_mode = InteractiveMarkerControl.MOVE_AXIS
+                control.orientation_mode = InteractiveMarkerControl.FIXED
+                int_marker.controls.append(control)        
+
+                # Axis Movement in Y
+                control = InteractiveMarkerControl()
+                control.name = "move_y"
+                control.orientation.w = 1
+                control.orientation.x = 0
+                control.orientation.y = 1
+                control.orientation.z = 0
+                self.normalizeQuaternion(control.orientation)
+                control.interaction_mode = InteractiveMarkerControl.MOVE_AXIS
+                control.orientation_mode = InteractiveMarkerControl.FIXED
+                int_marker.controls.append(control)  
+
+                # Axis Movement in Z
+                control = InteractiveMarkerControl()
+                control.name = "move_z"
+                control.orientation.w = 1
+                control.orientation.x = 0
+                control.orientation.y = 0
+                control.orientation.z = 1
+                self.normalizeQuaternion(control.orientation)
+                control.interaction_mode = InteractiveMarkerControl.MOVE_AXIS
+                control.orientation_mode = InteractiveMarkerControl.FIXED
+                int_marker.controls.append(control)  
+
+                # Axis Rotation in Z
+                control = InteractiveMarkerControl()
+                control.name = "rotate_z"
+                control.orientation.w = 1
+                control.orientation.x = 0
+                control.orientation.y = 0
+                control.orientation.z = 1
+                self.normalizeQuaternion(control.orientation)
+                control.interaction_mode = InteractiveMarkerControl.ROTATE_AXIS
+                control.orientation_mode = InteractiveMarkerControl.FIXED
+                int_marker.controls.append(control)  
+                
+                obj.marker_created = True
+                self.interactive_marker_server.insert(marker=int_marker, feedback_cb=self.int_marker_cb)
+                self.interactive_marker_server.applyChanges()
+
 
     def marker_publisher(self):
         """
+        DEPRECATED -> see interactive_marker_creation method
         Gets any existing dynamic objects (if added) and publishes them for debugging/display in RVIZ
         Currently handles only: 
             - Sphere 
@@ -3125,21 +3280,21 @@ class ROSRobot(rtb.Robot):
                 marker.header.stamp = rospy.Time.now()
 
                 if obj.shape.stype == 'sphere':
-                    marker.type = 2
+                    marker.type = Marker.SPHERE
 
                     # Expects diameter (m)
                     marker.scale.x = obj.shape.radius * 2
                     marker.scale.y = obj.shape.radius * 2
                     marker.scale.z = obj.shape.radius * 2
                 elif obj.shape.stype == 'cylinder':
-                    marker.type = 3
+                    marker.type = Marker.CYLINDER
 
                     # Expects diameter (m)
                     marker.scale.x = obj.shape.radius * 2
                     marker.scale.y = obj.shape.radius * 2
                     marker.scale.z = obj.shape.length
                 elif obj.shape.stype == 'cuboid':
-                    marker.type = 1
+                    marker.type = Marker.CUBE
 
                     # Expects diameter (m)
                     marker.scale.x = obj.shape.scale[0]
@@ -3263,11 +3418,14 @@ class ROSRobot(rtb.Robot):
         self.last_tick = current_time
 
         self.state_publisher.publish(self.state)
-        # Publishes any dynamically added shapes/collision objects to RVIZ for debugging
-        # TODO: add a way to enable/disable this
-        self.marker_publisher()
 
         self.event.set()
+
+    def _load_shape_config(self):
+        """
+        TODO: Attempts to load in any configured collision shapes
+        """
+        pass
 
     def __load_config(self):
         """[summary]
