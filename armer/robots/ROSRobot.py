@@ -17,6 +17,8 @@ import spatialmath as sm
 import numpy as np
 import yaml
 import time
+import timeit
+import json
 
 from typing import List, Any
 from threading import Lock, Event
@@ -33,7 +35,7 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 from armer_msgs.msg import ManipulatorState, JointVelocity, ServoStamped, Guards
 from armer_msgs.action import GuardedVelocity, Home, MoveToJointPose, MoveToNamedPose, MoveToPose
 from armer_msgs.srv import GetNamedPoses, AddNamedPose, RemoveNamedPose, AddNamedPoseConfig, RemoveNamedPoseConfig, GetNamedPoseConfigs 
-from geometry_msgs.msg import TwistStamped, Twist, PoseStamped, Pose
+from geometry_msgs.msg import TwistStamped, Twist, PoseStamped, Pose, Point
 from std_msgs.msg import Header, Float64MultiArray, Bool
 from sensor_msgs.msg import JointState
 
@@ -138,12 +140,6 @@ class ROSRobot(URDFRobot):
             self.logger(f"Configured gripper name {self.gripper} not in link tree -> defaulting to top of stack: {default_top_link_name}")
             self.gripper = default_top_link_name
 
-        link=self.link_dict[self.gripper]   
-        while link is not None:
-            self.sorted_links.append(link)
-            link=link.parent
-        self.sorted_links.reverse()
-
         # --- Collision Checking Setup Section --- #
         # Loops through links (as read in through URDF parser)
         # Extracts each link's list of collision shapes (of type sg.Shape). TODO: add a validity check on type here
@@ -162,6 +158,13 @@ class ROSRobot(URDFRobot):
         self.dynamic_collision_dict = dict()
         self.dynamic_collision_removal_dict = dict()
         self.collision_approached = False
+
+        link=self.link_dict[self.gripper]   
+        while link is not None:
+            self.collision_dict[link.name] = link.collision.data if link.collision.data else []
+            self.sorted_links.append(link)
+            link=link.parent
+        self.sorted_links.reverse()
         # Check for external links (from robot tree)
         # This is required to add any other links (not specifically part of the robot tree) 
         # to our collision dictionary for checking
@@ -1015,7 +1018,7 @@ class ROSRobot(URDFRobot):
                     else:
                         marker.header.frame_id = link
 
-                    marker.header.stamp = rospy.Time.now()
+                    # marker.header.stamp = self.get_time(as_float=False)
                     if shape.stype == 'sphere':
                         marker.type = 2
                         # Expects diameter (m)

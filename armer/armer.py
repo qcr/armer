@@ -14,10 +14,13 @@ import tf2_ros
 import yaml
 import roboticstoolbox as rtb
 import spatialmath as sm
+import timeit
 
 from typing import List, Dict, Any, Tuple
 from armer.utils import populate_transform_stamped
 from armer.robots import ROSRobot
+# Add cython global checker
+from armer.cython import collision_handler
 
 class Armer:
     """
@@ -66,10 +69,26 @@ class Armer:
 
         # Launch backend
         self.backend.launch(**(backend_args if backend_args else dict()))
-
+        
+        # This is a global dictionary of dictionaries (per robot) for multi robot scenarios
+        self.global_collision_dict = dict()
         for robot in self.robots:
-            self.backend.add(robot)
+            # Add robot to backend (with low alpha for collision shapes)
+            self.backend.add(robot, collision_alpha=0.2)
 
+            # Resolve robot collision overlaps
+            robot.characterise_collision_overlaps()
+
+            # This method extracts all captured collision objects (dict) from each robot
+            # Needed to conduct global collision checking (if more than one robot instance is in play)
+            # NOTE: all robot instances read the same robot description param, so all robots will get the same description
+            #       this may not be the preferred implementation for future use cases.
+            self.global_collision_dict[robot.name] = robot.get_link_collision_dict()
+        
+        # Handle any hardware required initialisation if available
+        if hasattr(self.backend, 'hw_initialise'):
+            self.backend.hw_initialise()
+        
         for readonly, args in self.readonly_backends:
             readonly.launch(**args)
 
@@ -191,10 +210,128 @@ class Armer:
             publish_transforms=publish_transforms,
             logging=logging
         )
+    
+    def global_collision_check(self, robot: ROSRobot):
+        """
+        Conducts a full check for collisions
+        NOTE: takes a given robot object and runs its collision check (of its own dictionary) against the global dictionary
+                the global dictionary may have collision data from multiple robots (with different link data)
+        TODO: currently each robot is checked against its own link data. This is needed for self collision checking
+            but could be possibly optimised in some way as to not be overloaded with multiple instances
+        NOTE: [2023-10-31] Identified that this component is very inefficient for the panda (real test). Implemented 
+                a start and stop link (e.g., terminating search from end-effector to panda_link8, rather than full tree)
+        """
+        # Error handling on gripper name
+        if robot.gripper == None or robot.gripper == "":
+            robot.logger(f"Global Collision Check -> gripper name is invalid: {robot.gripper}", 'error')
+            return False
+        
+        # Error handling on empty lick dictionary (should never happen but just in case)
+        if robot.link_dict == dict() or robot.link_dict == None:
+            robot.logger(f"Global Collision Check -> link dictionary is invalid: {robot.link_dict}", 'error')
+            return False
+
+        # Error handling on collision object dict and overlap dict
+        if robot.overlapped_link_dict == dict() or robot.overlapped_link_dict == None or \
+            robot.collision_dict == dict() or robot.collision_dict == None:
+            robot.logger(f"Global Collision Check -> collision or overlap dictionaries invalid: [{robot.collision_dict}] | [{robot.overlapped_link_dict}]", 'error')
+            return False
+        
+        if robot.collision_sliced_links == None:
+            robot.logger(f"Global Collision Check -> could not get collision sliced links: [{robot.collision_sliced_links}]", 'error')
+            return False
+
+        # Debugging
+        # print(f"sliced links: {[link.name for link in robot.collision_sliced_links]}")
+        # print(f"col dict -> robots to check: {[robot for robot in self.global_collision_dict.keys()]}")
+        # print(f"col dict -> links to check as a dict: {[link for link in self.global_collision_dict.values()]}")
+        # print(f"panda_link5 check: {self.global_collision_dict['arm']['panda_link5']}")
+
+        start = timeit.default_timer()
+        # Creates a KD tree based on link locations (cartesian translation) to target link (sliced) and extracts 
+        # closest links to evaluate (based on dim; e.g., if dim=3, then the 3 closest links will be checked for that link)
+        # NOTE: this has yielded a notable improvement in execution without this method (approx. 120%). However, 
+        #       it is important to note that the link distances used in the tree are based on that link's origin point.
+        #       therefore, there may be cases where the size of the link (physically) is larger than its origin, meaning we miss it in eval
+        #       This is something to investigate to robustify this method.
+        check_links = robot.query_kd_nn_collision_tree(
+            sliced_links=robot.collision_sliced_links, 
+            dim=4,
+            debug=False
+        )
+        end = timeit.default_timer()
+        # print(f"[KD Setup] full collision check: {1/(end-start)} hz")
+        # print(f"[Check Links] -> {check_links}")
+
+        # Alternative Method
+        # NOTE: this has between 1-6% increase in speed of execution
+        start = timeit.default_timer()
+        col_link_id = collision_handler.global_check(
+            robot_name = robot.name,
+            robot_names = list(self.global_collision_dict.keys()),
+            len_robots = len(self.global_collision_dict.keys()),
+            robot_links = robot.collision_sliced_links,
+            len_links = len(robot.collision_sliced_links),
+            global_dict = self.global_collision_dict,
+            overlap_dict = robot.overlapped_link_dict,
+            check_links = check_links
+        )
+        end = timeit.default_timer()
+        # print(f"[Actual Link Check] full collision check: {1/(end-start)} hz")
+    
+        if col_link_id >= 0:
+            # rospy.logwarn(f"Global Collision Check -> Robot [{robot.name}] in collision with link {robot.collision_sliced_links[col_link_id].name}")
+            return True
+        else:
+            # No collisions found with no errors identified.
+            return False
+        
+    def update_dynamic_objects(self, robot: ROSRobot) -> None:
+        """
+        method to handle the addition and removal of dynamic objects per robot instance
+        """
+        # Check if the current robot has any objects that need removal
+        if robot.dynamic_collision_removal_dict:
+            for d_obj_name in list(robot.dynamic_collision_removal_dict.copy().keys()):
+                robot.logger(f"Removal of Dynamic Objects in Progress", 'warn')
+                # remove from backend
+                # NOTE: there is a noted bug in the swift backend that sets the object 
+                #       (in a separate dictionary called swift_objects) to None. In the self.backend.step()
+                #       method below, this attempts to run some methods that belong to the shape but cannot do so
+                #       as it is a NoneType.
+                shape_to_remove = robot.dynamic_collision_removal_dict[d_obj_name].shape
+                robot.logger(f"Remove object is: {shape_to_remove}")
+                # TODO: add this feature in once swift side is fixed 
+                #       should still work for ROS backend
+                # self.backend.remove(shape_to_remove)
+                # remove from robot dict
+                robot.dynamic_collision_removal_dict.pop(d_obj_name)
+                robot.logger(f"Removed successfully")
+        else:
+            # Check if the current robot has any newly added objects to add to the backend
+            # NOTE: this loop is run everytime at the moment (not an issue with limited shapes but needs better optimisation for scale)
+            for dynamic_obj in robot.dynamic_collision_dict.copy().values():
+                if dynamic_obj.is_added == False:
+                    robot.logger(f"Adding Dynamic Object: {dynamic_obj}")
+                    dynamic_obj.id = self.backend.add(dynamic_obj.shape)
+                    dynamic_obj.is_added = True
+                    robot.logger(f"Added Successfully")
 
     def step(self, dt: float, current_time: float) -> None:
         """Main step method - controlled by ROS2 node"""
         for robot in self.robots:
+            if self.global_collision_check(robot=robot) and robot.preempted == False:
+                # Current robot found to be in collision so preempt
+                robot.collision_approached = True
+                robot.preempt()
+
+            if robot.preempted == False:
+                # Set the safe state of robot for recovery on collisions if needed
+                robot.set_safe_state()
+
+            # Check if the current robot has any  dynamic objects that need backend update
+            self.update_dynamic_objects(robot=robot)
+                
             robot.step(dt=dt)
 
         # with Timer('step'):

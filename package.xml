@@ -10,7 +10,7 @@
 
   <!-- Commonly used license strings: -->
   <!--   BSD, MIT, Boost Software License, GPLv2, GPLv3, LGPLv2.1, LGPLv3 -->
-  <license>MIT</license>
+  <license>BSD3</license>
 
   <!-- ROS version handling -->
   <exec_depend>rclpy</exec_depend>

@@ -3,6 +3,15 @@ robots:
     model: 
       urdf_file: franka_description/robots/panda_arm_hand.urdf.xacro
       qr: [0, -0.3, 0, -2.2, 0, 2.0, 0.78539816339]
+      # This is the definition of the default control end-effector link (change as needed)
+      gripper: panda_hand 
+      # NOTE: this defines the start and stop links for definig link collision checking window
+      # NOTE: this assumes the sorted links are in order (start is top of tree to stop at base)
+      # NOTE: start defaults to the robot's gripper if not defined
+      # NOTE: stop defaults to the robot's base link if not defined
+      # The closer this is to the end-effector (set in gripper) the faster the checking will perform
+      collision_check_start_link: panda_hand
+      collision_check_stop_link: panda_link7
     singularity_thresh: 0.02
 backend: 
   type: roboticstoolbox.backends.swift.Swift

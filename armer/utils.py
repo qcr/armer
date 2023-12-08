@@ -89,10 +89,10 @@ def mjtg(robot: rtb.robot, qf: np.ndarray, max_speed: float=0.2, max_rot: float=
     #---------------- End
 
     move_time = max(linear_move_time, angular_move_time)
-    rospy.loginfo(f'Estimated move time of {move_time} (max of) | lin {linear_move_time} | ang {angular_move_time}')
+    robot.logger(f'Estimated move time of {move_time} (max of) | lin {linear_move_time} | ang {angular_move_time}')
     # Edited as part of branch hotfix/96fd293: termination on invalid trajectory
     if move_time == 0:
-        rospy.logerr(f"Trajectory is invalid --> Cannot Solve.")
+        robot.logger(f"Trajectory is invalid --> Cannot Solve.", 'error')
         return Trajectory(name='invalid', t=1, s=robot.q, sd=None, sdd=None, istime=False)
 
     # Obtain minimum jerk velocity profile of joints based on estimated end effector move time

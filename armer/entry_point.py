@@ -21,9 +21,8 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 __path__ = ament_index_python.packages.get_package_share_directory('armer')
 
 class ArmerNode(Node):
-  """Main ARMer Node
-  
-  The main Node running in ROS2
+  """
+  Main ARMer Node running in ROS2
   """
   def __init__(self):
     super().__init__('armer')
@@ -49,10 +48,10 @@ class ArmerNode(Node):
     )
 
   def timer_callback(self):
-    """ROS2 Callback Mechanism
+    """
+    ROS2 Callback Mechanism
     
-    Set to configured frequency (init)
-    NOTE: 
+    Set to configured frequency (init) 
     """
     current_time = self.get_clock().now()
     # Get dt in seconds (REQUIRED)
@@ -67,6 +66,9 @@ class ArmerNode(Node):
     self.last_time = current_time
 
 def main(args=None):
+    """
+    Initialises and executes the node
+    """
     rclpy.init(args=args)
 
     try:
