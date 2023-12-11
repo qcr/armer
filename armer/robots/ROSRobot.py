@@ -558,7 +558,7 @@ class ROSRobot(rtb.Robot):
 
             rospy.Service(
                 '{}/remove_collision_object'.format(self.name.lower()),
-                AddCollisionObject,
+                RemoveCollisionObject,
                 self.remove_collision_obj_cb
             )
 
@@ -1973,7 +1973,7 @@ class ROSRobot(rtb.Robot):
 
         return AddCollisionObjectResponse(success=True)
     
-    def remove_collision_obj_cb(self, req: AddCollisionObjectRequest) -> AddCollisionObjectResponse:
+    def remove_collision_obj_cb(self, req: RemoveCollisionObjectRequest) -> RemoveCollisionObjectResponse:
         """
         This will take a given key and (if it exists) and removes said key object as a collision shape
         NOTE: currently expects the following
@@ -1982,7 +1982,7 @@ class ROSRobot(rtb.Robot):
         # Handle early termination on input error for name and type
         if req.name == None or req.name == '':
             rospy.logerr(f"[REMOVE COLLISION OBJ CB] -> Remove collision object service input error: name [{req.name}] | type [{req.type}]")
-            return AddCollisionObjectResponse(success=False)
+            return RemoveCollisionObjectResponse(success=False)
         
         if req.name in self.collision_dict.keys(): 
             # Stage Backend to Remove Object
@@ -2000,7 +2000,7 @@ class ROSRobot(rtb.Robot):
             self.interactive_marker_server.erase(name=req.name)
             self.interactive_marker_server.applyChanges()
 
-            return AddCollisionObjectResponse(success=True)
+            return RemoveCollisionObjectResponse(success=True)
         else:
             rospy.logerr(f"[REMOVE COLLISION OBJ CB] -> Unknown name [{req.name}] requested; not in collision dictionary")
     
