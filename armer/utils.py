@@ -14,6 +14,17 @@ from roboticstoolbox.tools.trajectory import Trajectory
 from scipy.interpolate import interp1d
 
 def ikine(robot, target, q0, end):
+    """Inverse Kinematic Solver Method
+
+    Args:
+        robot (rtb.Robot): A Robot object that inherits from rtb.Robot
+        target (ndarry): Target joint state (q) as an array of len robot joints
+        q0 (ndarry): Current joint state (q) as an array of len robot joints
+        end (transform): The end transform link to solve to 
+
+    Returns:
+        _type_: solved joint state (if found) or current state (in error)
+    """
     Tep = SE3(target.position.x, target.position.y, target.position.z) * \
             UnitQuaternion(target.orientation.w, [target.orientation.x, target.orientation.y, target.orientation.z]).SE3()
             
@@ -32,12 +43,14 @@ def ikine(robot, target, q0, end):
     return type('obj', (object,), {'q' : np.array(result[0])})
 
 def trapezoidal(robot: rtb.Robot, qf: np.ndarray, max_speed=None, frequency=500, move_time_sec: float=5):
-    """
-    Main Trajectory Creation Method
-    - Uses the in-built roboticstoolbox mtraj method
-    - Creates a trapezoidal trajectory (closely resembles minimum jerk)
-    - Uses provided frequency to construct trajectory time steps
-    - Uses move time to scale joint velocities.
+    """Generates a Trapezoidal Trajectory
+        - Uses the in-built roboticstoolbox mtraj method
+        - Creates a trapezoidal trajectory (closely resembles minimum jerk)
+        - Uses provided frequency to construct trajectory time steps
+        - Uses move time to scale joint velocities.
+
+    Returns:
+        roboticstoolbox.tools.trajectory: Constructed Trajectory object if valid (or invalid if in error for 0 motion)
     """
     rospy.loginfo(f"[TRAJECTORY CONFIG] -> Trapezoidal Method | movement time: {move_time_sec} (sec)")
 
@@ -58,6 +71,18 @@ def trapezoidal(robot: rtb.Robot, qf: np.ndarray, max_speed=None, frequency=500,
         return Trajectory(name='invalid', t=1, s=robot.q, sd=None, sdd=None, istime=False)
 
 def mjtg(robot: rtb.robot, qf: np.ndarray, max_speed: float=0.2, max_rot: float=0.5, frequency=500):
+    """Minimum Jerk Trajectory Generator (DEPRECATED)
+
+    Args:
+        robot (rtb.robot): A Robot object (of type rtb.Robot)
+        qf (np.ndarray): Target joint states of joint len
+        max_speed (float, optional): Max speed of trajectory (m/s). Defaults to 0.2.
+        max_rot (float, optional): Max rotational speed of trajectory (rad/s). Defaults to 0.5.
+        frequency (int, optional): Frequency of trajectory (steps). Defaults to 500.
+
+    Returns:
+        _type_: Trajectory object containing solved trajectory or invalid in error
+    """
     # This is the average cartesian speed we want the robot to move at
     # NOTE: divided by approx. 2 to make the max speed the approx. peak of the speed achieved
     # TODO: investigate a better approximation strategy here
@@ -137,9 +162,11 @@ def mjtg(robot: rtb.robot, qf: np.ndarray, max_speed: float=0.2, max_rot: float=
     return Trajectory(name='minimum-jerk', t=move_time, s=q, sd=qd, sdd=None, istime=True)
 
 def populate_transform_stamped(parent_name: str, link_name: str, transform: np.array):
-    """
-    Generates a geometry_msgs/TransformStamped message between
-    a link and its parent based on the provided SE3 transform
+    """Generates a geometry_msgs/TransformStamped message between a link
+    and its parent based on the provided SE3 transform
+
+    Returns:
+        TransformStamped: updated transform
     """
     transform_stamped = TransformStamped()
     transform_stamped.header.stamp = rospy.Time.now()
