@@ -2420,7 +2420,7 @@ class ROSRobot(rtb.Robot):
                 self.collision_sliced_links = self.sorted_links
                 self.collision_sliced_links.reverse()
 
-    def characterise_collision_overlaps(self) -> bool:
+    def characterise_collision_overlaps(self, debug: bool = False) -> bool:
         """
         Characterises the existing robot tree and tracks overlapped links in collision handling
         NOTE: needed to do collision checking, when joints are typically (neighboring) overlapped
@@ -2471,7 +2471,8 @@ class ROSRobot(rtb.Robot):
             self.overlapped_link_dict.update(gripper_dict)
 
             # using json.dumps() to Pretty Print O(n) time complexity
-            rospy.loginfo(f"[OVERLAP COLLISION CHARACTERISE] -> Collision Overlaps per link: {json.dumps(self.overlapped_link_dict, indent=4)}")
+            if debug:
+                rospy.loginfo(f"[OVERLAP COLLISION CHARACTERISE] -> Collision Overlaps per link: {json.dumps(self.overlapped_link_dict, indent=4)}")
 
         # Reached end in success
         return True
@@ -3165,7 +3166,13 @@ class ROSRobot(rtb.Robot):
                                                                 feedback.pose.orientation.z]).SE3()
                 shape[0].T = pose_se3.A
             
-            rospy.loginfo(f"[INTERACTIVE MARKER UPDATE] -> Obj {feedback.marker_name} updated to pose: {feedback.pose}")
+
+            # Characterise collision overlaps when change is found
+            # NOTE: enable to see what links are overlapped for debugging purposes
+            self.characterise_collision_overlaps(debug=False)
+
+            # Debugging
+            # rospy.loginfo(f"[INTERACTIVE MARKER UPDATE] -> Obj {feedback.marker_name} updated to pose: {feedback.pose}")
             self.interactive_marker_server.applyChanges()
     
     def normalizeQuaternion( self, quaternion_msg ):
@@ -3193,7 +3200,6 @@ class ROSRobot(rtb.Robot):
         for obj in list(dyn_col_dict_cp.values()):
             # Ensure object has been successfully added to backend first
             if obj.is_added and not obj.marker_created:
-                print(f"Here")
                 # Default interactive marker setup
                 marker = Marker()
                 if obj.shape.stype == 'sphere':

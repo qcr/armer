@@ -93,7 +93,7 @@ class Armer:
             # Resolve robot links for collision checking
             # NOTE: must be done after adding to backend
             # NOTE: this gets an understanding of the current robot's overlapped self collisions
-            robot.characterise_collision_overlaps()
+            robot.characterise_collision_overlaps(debug=True)
 
             # This method extracts all captured collision objects (dict) from each robot
             # Needed to conduct global collision checking (if more than one robot instance is in play)
