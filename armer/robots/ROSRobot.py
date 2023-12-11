@@ -34,7 +34,7 @@ from std_msgs.msg import Header, Bool
 from sensor_msgs.msg import JointState
 from geometry_msgs.msg import Pose, PoseStamped, Point, Quaternion
 from geometry_msgs.msg import TwistStamped, Twist, Transform
-from std_srvs.srv import Empty, EmptyRequest, EmptyResponse
+from std_srvs.srv import Empty, EmptyRequest, EmptyResponse, SetBool, SetBoolRequest, SetBoolResponse
 from std_msgs.msg import Float64MultiArray
 
 # Import ARMER Messages
@@ -170,6 +170,9 @@ class ROSRobot(rtb.Robot):
         self.dynamic_collision_dict = dict()
         self.dynamic_collision_removal_dict = dict()
         self.collision_approached = False
+        # Flag toggled by service. Enables visualisation of target shapes in RVIZ 
+        # NOTE: slower execution if enabled, so use only when necessary
+        self.collision_debug_enabled = False
         # Iterate through robot links and sort - add to tracked collision list
         while link is not None:
             # Debugging
@@ -306,17 +309,17 @@ class ROSRobot(rtb.Robot):
 
             # --- TEST GHOST PUBLISHER --- #
             self.display_traj_publisher: rospy.Publisher = rospy.Publisher(
-                '{}/trajectory_marker_display'.format(self.name.lower()),
+                '{}/trajectory_display'.format(self.name.lower()),
                 Marker,
                 queue_size=1
             )
 
             # --- TEST RVIZ MARKER PUBLISHER --- #
-            self.display_rviz_marker_publisher: rospy.Publisher = rospy.Publisher(
-                '{}/dynamic_marker_display'.format(self.name.lower()),
-                MarkerArray,
-                queue_size=1
-            )
+            # self.display_rviz_marker_publisher: rospy.Publisher = rospy.Publisher(
+            #     '{}/dynamic_marker_display'.format(self.name.lower()),
+            #     MarkerArray,
+            #     queue_size=1
+            # )
 
             self.collision_debug_publisher: rospy.Publisher = rospy.Publisher(
                 '{}/collision_debug_display'.format(self.name.lower()),
@@ -461,7 +464,13 @@ class ROSRobot(rtb.Robot):
                 Empty, 
                 self.recover_cb
             )
-            
+
+            rospy.Service(
+                '{}/recover_move'.format(self.name.lower()),
+                Empty,
+                self.recover_move_cb
+            )
+
             rospy.Service(
                 '{}/stop'.format(self.name.lower()),
                 Empty, 
@@ -559,9 +568,9 @@ class ROSRobot(rtb.Robot):
             )
 
             rospy.Service(
-                '{}/recover_move'.format(self.name.lower()),
-                Empty,
-                self.recover_move_cb
+                '{}/enable_collision_debug'.format(self.name.lower()),
+                SetBool,
+                self.enable_collision_debug_cb
             )
 
     # --------------------------------------------------------------------- #
@@ -1500,7 +1509,7 @@ class ROSRobot(rtb.Robot):
     
     def recover_move_cb(self, req: EmptyRequest) -> EmptyResponse:
         """
-        This will attempt to move the arm to a previous 'non-collision' state
+        This will attempt to move the arm to a previous 'non-collision/non-singularity' state
         NOTE: uses a set moving window of 'safe states' added every step of ARMer
         """
         # Attempt recovery
@@ -1857,6 +1866,17 @@ class ROSRobot(rtb.Robot):
         NOTE: check failure modes (i.e., not in link dict, etc.)
         """
         pass
+    
+    def enable_collision_debug_cb(self, req: SetBoolRequest) -> SetBoolResponse:
+        """
+        Enables collision debugging via RVIZ. Displays current target shapes
+        NOTE: this does slow down execution if enabled
+        """
+        self.collision_debug_enabled = req.data
+        if self.collision_debug_enabled:
+            return SetBoolResponse(success=True, message="Collision Debug is Enabled")
+        else:
+            return SetBoolResponse(success=True, message="Collision Debug is Disabled")
 
     def add_collision_obj_cb(self, req: AddCollisionObjectRequest) -> AddCollisionObjectResponse:
         """
@@ -2177,7 +2197,7 @@ class ROSRobot(rtb.Robot):
 
         return target_list + external_list
 
-    def query_kd_nn_collision_tree(self, sliced_links: list = [], dim: int = 5, debug: bool = False) -> list:
+    def query_kd_nn_collision_tree(self, sliced_links: list = [], dim: int = 4) -> list:
         """
         Given a list of links (sliced), this method returns nearest neighbor links for collision checking
         Aims to improve efficiency by identifying dim closest objects for collision checking per link
@@ -2220,12 +2240,6 @@ class ROSRobot(rtb.Robot):
             # print(f"dist: {dist} | links: {[list(translation_dict.keys())[i] for i in ind[0]]} | ind[0]: {ind[0]}")
 
             check_links.append([list(translation_dict.keys())[i] for i in ind[0]])
-       
-        if debug:
-            self.collision_marker_debugger(
-                sliced_link_names=[link.name for link in sliced_links],
-                check_link_names=check_links
-            )
 
         return check_links
 

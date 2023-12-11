@@ -308,11 +308,17 @@ class Armer:
         check_links = robot.query_kd_nn_collision_tree(
             sliced_links=robot.collision_sliced_links, 
             dim=4,
-            debug=True
         )
         end = timeit.default_timer()
-        # print(f"[KD Setup] full collision check: {1/(end-start)} hz")
-        # print(f"[Check Links] -> {check_links}")
+        print(f"[KD Setup] full collision check: {1/(end-start)} hz")
+
+        # Output collision debugging information (RVIZ) if enabled
+        # NOTE: disabled by default
+        if robot.collision_debug_enabled:
+            robot.collision_marker_debugger(
+                sliced_link_names=[link.name for link in robot.collision_sliced_links],
+                check_link_names=check_links
+            )
 
         # Alternative Method
         # NOTE: this has between 1-6% increase in speed of execution
