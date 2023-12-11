@@ -310,7 +310,7 @@ class Armer:
             dim=4,
         )
         end = timeit.default_timer()
-        print(f"[KD Setup] full collision check: {1/(end-start)} hz")
+        # print(f"[KD Setup] full collision check: {1/(end-start)} hz")
 
         # Output collision debugging information (RVIZ) if enabled
         # NOTE: disabled by default
