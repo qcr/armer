@@ -791,15 +791,10 @@ class ROSRobot(rtb.Robot):
             self.preempt()
 
         with self.lock:     
-
-            # Check for singularity on end solution:
-            # TODO: prevent motion on this bool? Needs to be thought about
-            if self.check_singularity(goal.joints):
-                rospy.logwarn(f"IK solution within singularity threshold [{self.singularity_thresh}] -> ill-advised motion")
-            
             # NOTE: checks for collisions and workspace violations
-            # NOTE: can continue if workspace is not defined
-            if self.general_executor(q=goal.joints):
+            # NOTE: checks for singularity violations
+            # NOTE: can continue if workspace is not defined (ignored as no pose is defined)
+            if self.general_executor(q=goal.joints, workspace_ignore=True):
                 self.joint_pose_server.set_succeeded(MoveToJointPoseResult(success=True))
             else:
                 self.joint_pose_server.set_aborted(MoveToJointPoseResult(success=False))
