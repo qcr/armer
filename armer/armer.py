@@ -102,15 +102,6 @@ class Armer:
             self.global_collision_dict[robot.name] = robot.get_link_collision_dict()
             # print(f"Current robot [{robot.name}] has collision dictionary of: {self.global_collision_dict[robot.name]}")
 
-            # # TESTING
-            # # Add dummy object for testing
-            # s0 = sg.Sphere(radius=0.05, pose=sm.SE3(0.0, -0.5, 0.15))
-            # s1 = sg.Sphere(radius=0.05, pose=sm.SE3(0.5, 0, 0.1))
-            # robot.add_collision_obj(s0)
-            # robot.add_collision_obj(s1)
-            # self.backend.add(s0)
-            # self.backend.add(s1)
-        
         # Handle any hardware required initialisation if available
         if hasattr(self.backend, 'hw_initialise'):
             self.backend.hw_initialise()
@@ -123,17 +114,6 @@ class Armer:
 
         # Logging
         self.log_frequency = logging and 'frequency' in logging and logging['frequency']
-
-    # def reset_backend(self):
-    #     """
-    #     Resets the backend correctly
-    #     """
-    #     # Check for error
-    #     for robot in self.robots:
-    #         self.backend.remove(robot)
-
-    #     # for robot in self.robots:
-    #     #     self.backend.add(robot)
 
     def close(self):
         """
