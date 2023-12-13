@@ -24,6 +24,7 @@ Welcome to Armer's documentation!
    set_cartesian_position
    guarded_motion
    use_named_poses
+   collision_handling
    creating_a_hardware_package
    create_an_RTB_model
    custom_robot
