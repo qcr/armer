@@ -90,6 +90,8 @@ class ROSRobot(rtb.Robot):
                  name: str = None,
                  joint_state_topic: str = None,
                  joint_velocity_topic: str = None,
+                 velocity_controller: str = None,
+                 trajectory_controller: str = None,
                  origin=None,
                  config_path=None,
                  readonly=False,
@@ -118,6 +120,14 @@ class ROSRobot(rtb.Robot):
         self.tfBuffer = tf2_ros.Buffer()
         self.listener = tf2_ros.TransformListener(self.tfBuffer)
         self.backend_reset = False
+
+        # Setup the names of each controller as configured by config file per robot
+        # NOTE: this can be differently named based on the type of robot
+        self.velocity_controller = velocity_controller
+        self.trajectory_controller = trajectory_controller
+        # DEBUGGING
+        rospy.loginfo(f"[INITIALISATION] -> configured position controller name: {self.trajectory_controller}")
+        rospy.loginfo(f"[INITIALISATION] -> configured joint vel controller name: {self.velocity_controller}")
 
         # Update with ustom qlim (joint limits) if specified in robot config
         if qlim_min and qlim_max:
@@ -2807,12 +2817,18 @@ class ROSRobot(rtb.Robot):
             rospy.logerr(f"[CONTROLLER SELECT] -> invalid controller type: {controller_type}")
             return False
         
+        if self.trajectory_controller == None or self.velocity_controller == None:
+            rospy.logerr(f"[CONTROLLER SELECT] -> controller names not configured correctly")
+            rospy.logwarn(f"[CONTROLLER SELECT] -> configured trajectory controller: {self.trajectory_controller}")
+            rospy.logwarn(f"[CONTROLLER SELECT] -> controller velocity controller: {self.velocity_controller}")
+            return False
+        
         if controller_type == ControllerType.JOINT_GROUP_VEL and controller_type != self.controller_type:
             try:
                self.controller_switch_service("/controller_manager/switch_controller",
                        SwitchController,
-                       start_controllers=["joint_group_velocity_controller"],
-                       stop_controllers=["position_joint_trajectory_controller"],
+                       start_controllers=[self.velocity_controller],
+                       stop_controllers=[self.trajectory_controller],
                        strictness=1, start_asap=False, timeout=0.0)
                
                self.controller_type = ControllerType.JOINT_GROUP_VEL
@@ -2823,8 +2839,8 @@ class ROSRobot(rtb.Robot):
             try:
                self.controller_switch_service("/controller_manager/switch_controller",
                        SwitchController,
-                       start_controllers=["position_joint_trajectory_controller"],
-                       stop_controllers=["joint_group_velocity_controller"],
+                       start_controllers=[self.trajectory_controller],
+                       stop_controllers=[self.velocity_controller],
                        strictness=1, start_asap=False, timeout=0.0)
                self.controller_type = ControllerType.JOINT_TRAJECTORY
             except rospy.ServiceException as e:
@@ -2839,9 +2855,11 @@ class ROSRobot(rtb.Robot):
         Executes a ros_control trajectory implementation
         NOTE: only works when ros_control backend is available
         """
+        controller_action = "/" + self.trajectory_controller + "/follow_joint_trajectory"
+        print(f"controller action: {controller_action}")
         # Create a client to loaded controller
         client = actionlib.SimpleActionClient(
-            '/position_joint_trajectory_controller/follow_joint_trajectory', 
+            controller_action, 
             FollowJointTrajectoryAction
         )
 
