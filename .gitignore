@@ -145,3 +145,7 @@ docs/build
 
 #tests
 tests/*
+
+#Cython packages
+armer/cython/collision_handler.cpp
+armer/cython/collision_handler.html
