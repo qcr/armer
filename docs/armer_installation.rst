@@ -10,13 +10,13 @@ Requirements
 * `QCR repos <https://qcr.github.io/armer/add_qcr_repos.html>`_
 
 Robot Specific Requirements
--------------
+---------------------------
 
 * ROS drivers with joint group velocity controllers (ros_control)
 * Robotics Toolbox model or URDF (loaded as a robot_description parameter)
 
 Quickstart Installation (Native Linux)
---------------------------------
+--------------------------------------
 
 Copy and paste the following code snippet into a terminal to create a new catkin workspace and install the Armer drivers to it. Note this script will also add the workspace to be sourced every time a bash terminal is opened.
 
@@ -45,7 +45,7 @@ Copy and paste the following code snippet into a terminal to create a new catkin
     If the ``rosdep`` command is failing to find dependencies, make sure the QCR Robotic Vision repos have been added. See `Adding QCR Robotic Vision Repos <add_qcr_repos.html>`_
         
 RoboStack Installation (Linux, Mac, Windows)
---------------------------------
+--------------------------------------------
 
 To enable easy use of ROS on these operating systems, it is recommended to use `RoboStack <https://robostack.github.io/>`_; note that ROS 1 (noetic) is recommended at this stage. Please ensure you have `mamba <https://mamba.readthedocs.io/en/latest/installation.html>`_ installed before proceeding. Please follow all required steps for the RoboStack install (as per their instructions) to enable the smoothest setup on your particular OS.
 

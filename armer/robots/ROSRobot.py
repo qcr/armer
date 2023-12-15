@@ -606,6 +606,11 @@ class ROSRobot(rtb.Robot):
     # --------- ROS Topic Callback Methods -------------------------------- #
     # --------------------------------------------------------------------- #
     def _state_cb(self, msg):
+        """Updates the current joint state of the robot (from hardware)
+
+        :param msg: Message containing joint data
+        :type msg: JointState
+        """
         if not self.joint_indexes:
             for joint_name in self.joint_names:
                 self.joint_indexes.append(msg.name.index(joint_name))
@@ -614,8 +619,7 @@ class ROSRobot(rtb.Robot):
         self.joint_states = msg
         
     def velocity_cb(self, msg: TwistStamped) -> None:
-        """
-        ROS velocity callback:
+        """ROS velocity callback:
         Moves the arm at the specified cartesian velocity
         w.r.t. a target frame
 
@@ -634,8 +638,7 @@ class ROSRobot(rtb.Robot):
             self.__vel_move(msg)
 
     def joint_velocity_cb(self, msg: JointVelocity) -> None:
-        """
-        ROS joint velocity callback:
+        """ROS joint velocity callback:
         Moves the joints of the arm at the specified velocities
 
         :param msg: [description]
@@ -661,8 +664,7 @@ class ROSRobot(rtb.Robot):
     # --------- Traditional ROS Action Callback Methods ------------------- #
     # --------------------------------------------------------------------- #
     def guarded_velocity_cb(self, msg: GuardedVelocityGoal) -> None:
-        """
-        ROS Guarded velocity callback
+        """ROS Guarded velocity callback
         Moves the end-effector in cartesian space with respect to guards (time or force)
         
         :param msg: [description]
@@ -692,8 +694,7 @@ class ROSRobot(rtb.Robot):
                 self.velocity_server.set_aborted(GuardedVelocityResult())
 
     def servo_cb(self, msg) -> None:
-        """
-        ROS Servoing Action Callback:
+        """ROS Servoing Action Callback:
         Servos the end-effector to the cartesian pose given by msg
         
         :param msg: [description]
@@ -764,8 +765,7 @@ class ROSRobot(rtb.Robot):
         self.cartesian_servo_publisher.publish(arrived)
 
     def pose_cb(self, goal: MoveToPoseGoal) -> None:
-        """
-        ROS Action Server callback:
+        """ROS Action Server callback:
         Moves the end-effector to the
         cartesian pose indicated by goal
 
@@ -807,12 +807,10 @@ class ROSRobot(rtb.Robot):
             self.moving = False
     
     def joint_pose_cb(self, goal: MoveToJointPoseGoal) -> None:
-        """
-        ROS Action Server callback:
+        """ROS Action Server callback:
         Moves the arm the named pose indicated by goal
 
-        :param goal: Goal message containing the name of
-        the joint configuration to which the arm should move
+        :param goal: Goal message containing the name of the joint configuration to which the arm should move
         :type goal: MoveToNamedPoseGoal
         """
         if self.moving:
@@ -831,12 +829,10 @@ class ROSRobot(rtb.Robot):
             self.moving = False
 
     def named_pose_cb(self, goal: MoveToNamedPoseGoal) -> None:
-        """
-        ROS Action Server callback:
+        """ROS Action Server callback:
         Moves the arm the named pose indicated by goal
 
-        :param goal: Goal message containing the name of
-        the joint configuration to which the arm should move
+        :param goal: Goal message containing the name of the joint configuration to which the arm should move
         :type goal: MoveToNamedPoseGoal
         """
         if self.moving:
@@ -1674,13 +1670,11 @@ class ROSRobot(rtb.Robot):
     def set_cartesian_impedance_cb(  # pylint: disable=no-self-use
             self,
             request: SetCartesianImpedanceRequest) -> SetCartesianImpedanceResponse:
-        """
-        ROS Service Callback
+        """ROS Service Callback
         Set the 6-DOF impedance of the end-effector. Higher values should increase the stiffness
         of the robot while lower values should increase compliance
 
-        :param request: The numeric values representing the EE impedance (6-DOF) that
-        should be set on the arm
+        :param request: The numeric values representing the EE impedance (6-DOF) that should be set on the arm
         :type request: GetNamedPoseConfigsRequest
         :return: True if the impedence values were updated successfully
         :rtype: GetNamedPoseConfigsResponse
@@ -1903,16 +1897,20 @@ class ROSRobot(rtb.Robot):
             return SetBoolResponse(success=True, message="Collision Debug is Disabled")
 
     def add_collision_obj_cb(self, req: AddCollisionObjectRequest) -> AddCollisionObjectResponse:
-        """
-        Adds a collision primative (sphere, cylinder, cuboid) to existing collision dictionary at runtime
+        """Adds a collision primative (sphere, cylinder, cuboid) to existing collision dictionary at runtime
         Expected input:
-            -> name (string): to define the key within the collision dictionary
-            -> type (string): to define basic primatives (as part of the sg.Shape class)
-            -> TODO: base_link (string): link name to attach object to
-            -> radius (float): used to define radius of sphere or cylinder
-            -> length (float): used to define length of cylinder
-            -> pose (Pose): to define the shape's location
-            -> overwrite (bool): True means the same key name (if in the dictionary) can be overwritten
+        -> name (string): to define the key within the collision dictionary
+        -> type (string): to define basic primatives (as part of the sg.Shape class)
+        -> TODO: base_link (string): link name to attach object to
+        -> radius (float): used to define radius of sphere or cylinder
+        -> length (float): used to define length of cylinder
+        -> pose (Pose): to define the shape's location
+        -> overwrite (bool): True means the same key name (if in the dictionary) can be overwritten
+
+        :param req: Service request for name, type of object, radius, length or scale, as well as pose
+        :type req: AddCollisionObjectRequest
+        :return: Service response for success (True) or failure (False)
+        :rtype: AddCollisionObjectResponse
         """
         # Handle early termination on input error for name and type
         if req.name == None or req.name == ''\
@@ -1997,10 +1995,9 @@ class ROSRobot(rtb.Robot):
         return AddCollisionObjectResponse(success=True)
     
     def remove_collision_obj_cb(self, req: RemoveCollisionObjectRequest) -> RemoveCollisionObjectResponse:
-        """
-        This will take a given key and (if it exists) and removes said key object as a collision shape
+        """This will take a given key and (if it exists) and removes said key object as a collision shape
         NOTE: currently expects the following
-            -> name (string) to access object in question
+        -> name (string) to access object in question
         """
         # Handle early termination on input error for name and type
         if req.name == None or req.name == '':
@@ -2429,11 +2426,10 @@ class ROSRobot(rtb.Robot):
             return go_signal 
     
     def update_link_collision_window(self):
-        """
-        This method updates a sliced list of links (member variable)
+        """This method updates a sliced list of links (member variable)
         as determined by the class method variables:
-            collision_check_start_link
-            collision_check_stop_link
+        - collision_check_start_link
+        - collision_check_stop_link
         """
         with Timer("Link Slicing Check", enabled=False):
             # Prepare sliced link based on a defined stop link 
@@ -2470,13 +2466,16 @@ class ROSRobot(rtb.Robot):
                 self.collision_sliced_links.reverse()
 
     def characterise_collision_overlaps(self, debug: bool = False) -> bool:
-        """
-        Characterises the existing robot tree and tracks overlapped links in collision handling
+        """Characterises the existing robot tree and tracks overlapped links in collision handling
         NOTE: needed to do collision checking, when joints are typically (neighboring) overlapped
-        NOTE: this is quite an intensive run at the moment, 
-            however, it is only expected to be run in single intervals (not continuous)
-            [2023-10-27] approx. time frequency is 1hz (Panda simulated)
-            [2023-10-31] approx. time frequency is 40Hz and 21Hz (UR10 and Panda simulated with better method, respectively)
+        NOTE: this is quite an intensive run at the moment, however, it is only expected to be run in single intervals (not continuous)
+        - [2023-10-27] approx. time frequency is 1hz (Panda simulated)
+        - [2023-10-31] approx. time frequency is 40Hz and 21Hz (UR10 and Panda simulated with better method, respectively)
+
+        :param debug: True to output debugging information on collision overlaps, defaults to False
+        :type debug: bool, optional
+        :return: True if successfully completed or False if in error
+        :rtype: bool
         """
         # Running timer to get frequency of run. Set enabled to True for debugging output to stdout
         with Timer(name="Characterise Collision Overlaps", enabled=True):
@@ -2916,14 +2915,23 @@ class ROSRobot(rtb.Robot):
     # --------------------------------------------------------------------- #
     # --------- Standard Methods ------------------------------------------ #
     # --------------------------------------------------------------------- #
-    def general_executor(self, q, pose: Pose = None, collision_ignore: bool =False, workspace_ignore: bool = False):
-        """
-        A general executor that performs the following on a given joint state goal
+    def general_executor(self, q, pose: Pose = None, collision_ignore: bool =False, workspace_ignore: bool = False) -> bool:
+        """A general executor that performs the following on a given joint state goal
         - Workspace check prior to move. Setting workspace_ignore to True skips this (for cases where a pose is not defined or needed)
         - Singularity checking and termination on failure
         - Collision checking and termination on failure. Setting collision_ignore to True skips this check
-        - Execution of a ros_control or standard execution (real/sim) depending on what
-            is available
+        - Execution of a ros_control or standard execution (real/sim) depending on what is available
+
+        :param q: array like joint state of the arm
+        :type q: np.ndarray
+        :param pose: Pose requested to move to, defaults to None
+        :type pose: Pose, optional
+        :param collision_ignore: True to ignore collision checking, defaults to False
+        :type collision_ignore: bool, optional
+        :param workspace_ignore: True to ignore workspace checking, defaults to False
+        :type workspace_ignore: bool, optional
+        :return: True on success or False
+        :rtype: bool
         """
         result = False
         if self.pose_within_workspace(pose) == False and not workspace_ignore:
@@ -3397,14 +3405,12 @@ class ROSRobot(rtb.Robot):
         quaternion_msg.w *= s
 
     def interactive_marker_creation(self):
-        """
-        NOTE: updated and implemented from the tutorials here: 
-            https://github.com/ros-visualization/visualization_tutorials/tree/noetic-devel
+        """NOTE: updated and implemented from the tutorials here: https://github.com/ros-visualization/visualization_tutorials/tree/noetic-devel
         Publishes interactive marker versions of added shape objects
         Currently handles only: 
-            - Sphere 
-            - Cylinder
-            - Cuboid
+        - Sphere 
+        - Cylinder
+        - Cuboid
         """
         dyn_col_dict_cp = self.dynamic_collision_dict.copy()
         for obj in list(dyn_col_dict_cp.values()):

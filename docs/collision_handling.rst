@@ -5,31 +5,9 @@ Armer implements collision handling features that extend the capabilities provid
 A description of each core functionality is provided below. 
 
 URDF Parsed Collision Objects
----------------------
-
-Simply navigate a manipulator into any pose by any means and call the service ``/arm/set_named_pose``. The pose is saved locally to a config file in YAML format and automatically loaded each time Armer is launched.
-
-The service can be summoned via Python:
-
-.. code-block:: python
-
-    from armer_msgs.srv import AddNamedPose
-    import rospy
-
-    rospy.init_node('armer_example', disable_signals=True)
-    add_pose_service = rospy.ServiceProxy('/arm/set_named_pose', AddNamedPose)
-    
-    named_pose="my_pose"
-    add_pose_service(named_pose, True)
+------------------------------
 
 
-Or via bash command line:
-
-.. code-block:: bash
-
-    rosservice call /arm/set_named_pose "pose_name: {DESIRED_POSE_NAME}"
-
-The pose is now saved and the robot can navigate to the saved pose by making a request to the action server. 
 
 Moving to a Named Pose
 ------------------------

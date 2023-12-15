@@ -242,15 +242,19 @@ class Armer:
             logging=logging
         )
 
-    def global_collision_check(self, robot: ROSRobot):
-        """
-        Conducts a full check for collisions
+    def global_collision_check(self, robot: ROSRobot) -> bool:
+        """Conducts a full check for collisions
         NOTE: takes a given robot object and runs its collision check (of its own dictionary) against the global dictionary
-                the global dictionary may have collision data from multiple robots (with different link data)
+        the global dictionary may have collision data from multiple robots (with different link data)
         TODO: currently each robot is checked against its own link data. This is needed for self collision checking
-            but could be possibly optimised in some way as to not be overloaded with multiple instances
+        but could be possibly optimised in some way as to not be overloaded with multiple instances
         NOTE: [2023-10-31] Identified that this component is very inefficient for the panda (real test). Implemented 
-                a start and stop link (e.g., terminating search from end-effector to panda_link8, rather than full tree)
+        a start and stop link (e.g., terminating search from end-effector to panda_link8, rather than full tree)
+
+        :param robot: ROSRobot object for checking against
+        :type robot: ROSRobot
+        :return: True if collision is found, else False
+        :rtype: bool
         """
         # Error handling on gripper name
         if robot.gripper == None or robot.gripper == "":
@@ -323,11 +327,12 @@ class Armer:
             # No collisions found with no errors identified.
             return False
     
-    def archived_global_collision_check(self, robot: ROSRobot):
-        """
-        Conducts a full check for collisions
-        NOTE: [2023-11-03] archieved as cython implementation is being used
-            kept for debugging purposes
+    def archived_global_collision_check(self, robot: ROSRobot) -> bool:
+        """Conducts a full check for collisions 
+        NOTE: [2023-11-03] archived as cython implementation is being used - kept for debugging purposes
+
+        :return: True if collision is found, or False
+        :rtype: bool
         """
         # Error handling on gripper name
         if robot.gripper == None or robot.gripper == "":
