@@ -56,7 +56,6 @@ from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryG
 
 # TESTING NEW IMPORTS FOR KD TREE COLLISION SEARCH METHOD
 from sklearn.neighbors import KDTree
-from armer.cython import collision_handler
 import math
 
 import tf2_ros
@@ -81,10 +80,9 @@ class DynamicCollisionObj:
     marker_created: bool = False
 
 class ROSRobot(rtb.Robot):
+    """The ROSRobot class wraps the rtb.Robot implementing basic ROS functionality
     """
-    The ROSRobot class wraps the rtb.ERobot implementing basic ROS functionality
-    """
-
+    
     def __init__(self,
                  robot: rtb.robot.Robot,
                  name: str = None,
@@ -308,14 +306,22 @@ class ROSRobot(rtb.Robot):
             self.tf_listener = tf.TransformListener()
 
             # --- Setup Configuration for ARMer --- #
-            # NOTE: this path (if not set in the cfg/ARM_real.yaml) does not find the user when run
-            #       with systemd. This param must be loaded in via the specific robot_real.yaml file.
+            # NOTE: this path (if not set in the cfg/<robot>_real.yaml) does not find the user when run
+            #       with systemd. This param must be loaded in via the specific <robot>_real.yaml file.
             self.config_path = config_path if config_path else os.path.join(
                 os.getenv('HOME', '/home'),
                 '.ros/configs/system_named_poses.yaml'
             )
             self.custom_configs: List[str] = []
             self.__load_config()
+
+            # Load in default path to collision scene
+            self.collision_scene_default_path = os.path.join(
+                os.getenv('HOME', '/home'),
+                '.ros/configs/armer_collision_scene.yaml'
+            )
+            # Load the default path
+            self.load_collision_scene_config()
 
             # --- Publishes trajectory to run as marker list --- #
             self.display_traj_publisher: rospy.Publisher = rospy.Publisher(
@@ -582,6 +588,18 @@ class ROSRobot(rtb.Robot):
                 '{}/enable_collision_debug'.format(self.name.lower()),
                 SetBool,
                 self.enable_collision_debug_cb
+            )
+
+            rospy.Service(
+                '{}/save_collision_objects'.format(self.name.lower()),
+                CollisionSceneConfig,
+                self.save_collision_config_cb
+            )
+
+            rospy.Service(
+                '{}/load_collision_config_path'.format(self.name.lower()),
+                CollisionSceneConfig,
+                self.load_collision_config_path_cb
             )
 
     # --------------------------------------------------------------------- #
@@ -2023,6 +2041,32 @@ class ROSRobot(rtb.Robot):
         # return GetCollisionObjectsResponse(list(self.dynamic_collision_dict.keys()))
         return GetCollisionObjectsResponse(out_list)
     
+    def save_collision_config_cb(self, req: CollisionSceneConfigRequest) -> CollisionSceneConfigResponse:
+        """Attempts to save the current dynamic collision object dictionary
+
+        :param req: A service request with a config_path (if empty, defaults to initialised path)
+        :type req: CollisionSceneConfigRequest
+        :return: True on Success or False
+        :rtype: CollisionSceneConfigResponse
+        """
+        if self.write_collision_scene_config(config_path=req.config_path):
+            return CollisionSceneConfigResponse(success=True)
+        else:
+            return CollisionSceneConfigResponse(success=False)
+
+    def load_collision_config_path_cb(self, req: CollisionSceneConfigRequest) -> CollisionSceneConfigResponse:
+        """Attempts to load a collision scene config from a given path
+
+        :param req: Service containing a request for the 'config_path'
+        :type req: AddCollisionSceneConfigRequest
+        :return: Service containing a response to the activity 'bool' on success or failure
+        :rtype: AddCollisionSceneConfigResponse
+        """
+        if self.load_collision_scene_config(config_path=req.config_path):
+            return CollisionSceneConfigResponse(success=True)
+        else:
+            return CollisionSceneConfigResponse(success=False)
+    
     # --------------------------------------------------------------------- #
     # --------- Collision and Singularity Checking Methods ---------------- #
     # --------------------------------------------------------------------- #
@@ -2589,7 +2633,7 @@ class ROSRobot(rtb.Robot):
     def neo(self, Tep, velocities):
         """
         Runs a version of Jesse H.'s NEO controller
-        <IN DEVELOPMENT
+        <IN DEVELOPMENT>
         """
         ##### Determine Slack #####
         # Transform from the end-effector to desired pose
@@ -2699,10 +2743,12 @@ class ROSRobot(rtb.Robot):
             return False
 
     def check_collision(self) -> bool:
-        """
-        High-level check of collision
+        """High-level check of collision
         NOTE: this is called by loop to verify preempt of robot
         NOTE: This may not be needed as main armer class (high-level) will check collisions per robot
+
+        :return: True if Collision is Found, else False
+        :rtype: bool
         """
         # Check for collisions
         # NOTE: optimise this as much as possible
@@ -2719,6 +2765,9 @@ class ROSRobot(rtb.Robot):
             return False
         
     def set_safe_state(self):
+        """Updates a moving window of safe states 
+        NOTE: only updated when arm is not in collision 
+        """
         # Account for pointer location
         if self.q_safe_window_p < len(self.q_safe_window):
             # Add current target bar x value
@@ -2730,6 +2779,139 @@ class ROSRobot(rtb.Robot):
             self.q_safe_window = np.roll(self.q_safe_window, shift=-1, axis=0)
             # add value to end
             self.q_safe_window[-1] = self.q  
+
+    def load_collision_scene_config(self, config_path: str = ''):
+        """Attempts to load in a collision scene from a config
+        """
+        if config_path == '' or config_path == None:
+            rospy.logwarn(f"[LOAD COLLISION SCENE] -> Provided path is invalid. Defaulting to [{self.collision_scene_default_path}]")
+            config_path = self.collision_scene_default_path
+
+        # Check if the path exists (initialised from ARMer) and loads data
+        if os.path.exists(config_path):
+            try:
+                config = yaml.load(open(config_path),
+                                   Loader=yaml.SafeLoader)
+                if config:
+                    for key, value in config.items():
+                        # Convert geometry_msgs/Pose and SE3 object
+                        pose = Pose()
+                        pose.position.x = value['pos_x']
+                        pose.position.y = value['pos_y']
+                        pose.position.z = value['pos_z']
+                        pose.orientation.w = value['rot_w']
+                        pose.orientation.x = value['rot_x']
+                        pose.orientation.y = value['rot_y']
+                        pose.orientation.z = value['rot_z']
+
+                        pose_se3 = SE3(value['pos_x'], 
+                                        value['pos_y'],
+                                        value['pos_z']) * UnitQuaternion(value['rot_w'], [
+                                                                                value['rot_x'], 
+                                                                                value['rot_y'],
+                                                                                value['rot_z']]).SE3()
+                        # Handle type selection or error
+                        shape: sg.Shape = None
+                        if value['shape'] == "sphere":
+                            shape = sg.Sphere(radius=value['radius'], pose=pose_se3)
+                        elif value['shape'] == "cylinder":
+                            shape = sg.Cylinder(radius=value['radius'], length=value['length'], pose=pose_se3)
+                        elif value['shape'] == "cuboid" or value['shape'] == "cube":
+                            shape = sg.Cuboid(scale=[value['scale_x'], value['scale_y'], value['scale_z']], pose=pose_se3)
+                        elif value['shape'] == "mesh":
+                            rospy.logwarn(f"In progress -> not yet implemented. Exiting...")
+                            break
+                        else:
+                            rospy.logerr(f"Collision shape type [{value['shape']}] is invalid -> exiting...")
+                            break
+                        
+                        # Create a Dynamic Collision Object and add the configured shape to the scene
+                        dynamic_obj = DynamicCollisionObj(shape=shape, key=key, pose=pose, is_added=False)
+                        # NOTE: these dictionaries are accessed and checked by Armer's main loop for addition to a backend.
+                        with self.lock:
+                            self.dynamic_collision_dict[key] = dynamic_obj
+                            self.collision_dict[key] = [dynamic_obj.shape]
+
+                        # Add to list of objects for NEO
+                        self.collision_obj_list.append(dynamic_obj.shape)
+
+                    # Re-update the collision overlaps on insertion
+                    # Needed so links expected to be in collision with shape are correctly captured
+                    self.characterise_collision_overlaps()
+    
+                    # print(f"Current collision objects: {self.collision_obj_list}")
+                    # Add the shape as an interactive marker for easy re-updating
+                    # NOTE: handle to not add if overwrite requested
+                    # NOTE: wait for shape to be added to backend
+                    rospy.sleep(rospy.Duration(secs=0.5))
+                    self.interactive_marker_creation()
+                    rospy.loginfo(f"[LOAD COLLISION SCENE] -> Scene Loaded Successfully")
+                else:
+                    rospy.logwarn(f"[LOAD COLLISION SCENE] -> Nothing to Load for Collision Scene...")
+            except IOError:
+                pass
+        else:
+            rospy.logerr(f"[LOAD COLLISION SCENE] -> Provided Path [{self.collision_scene_default_path}] is Invalid")
+
+    def write_collision_scene_config(self, config_path: str = '') -> bool:
+        """Attempts to write out a collision shape configuration for reloading if needed
+        NOTE: currently only handles the default config path (as set at initialisation)
+        NOTE: this performs an overwrite of the collision shapes (only when called)
+        """
+        if config_path == '':
+            config_path = self.collision_scene_default_path
+            rospy.logwarn(f"[SAVE COLLISION SCENE] -> Collision Shape Config Path Empty, defaulting to {self.collision_scene_default_path}")
+
+        # Create the path if not in existance        
+        if not os.path.exists(os.path.dirname(config_path)):
+            os.makedirs(os.path.dirname(config_path))
+
+        # Create a new Dictionary to Overwrite Current Config
+        config = {}
+        for key, value in self.dynamic_collision_dict.items():
+            # New Dict of Items to Populate
+            dict_items = {}
+
+            # Setup the shape type for saving in a simple manner
+            dict_items['shape'] = value.shape.stype
+            if hasattr(value.shape, 'radius'):
+                dict_items['radius'] = value.shape.radius
+            if hasattr(value.shape, 'length'):
+                dict_items['length'] = value.shape.length
+            if hasattr(value.shape, 'scale'):
+                dict_items['scale_x'] = float(value.shape.scale[0])
+                dict_items['scale_y'] = float(value.shape.scale[1])
+                dict_items['scale_z'] = float(value.shape.scale[2])
+
+            # Save the shape ID (should be unique)
+            dict_items['id'] = value.id
+
+            # Save the Physical Position of Object in Scene 
+            # NOTE: currently only supports poses from base_link
+            current_shape_se3 = sm.SE3(self.collision_dict[key][0].T)
+            uq = UnitQuaternion(current_shape_se3)
+            shape_pose = Pose(
+                position=Point(*current_shape_se3.t), 
+                orientation=Quaternion(*np.concatenate([uq.vec3, [uq.s]]))
+            )
+            dict_items['pos_x'] = float(shape_pose.position.x) 
+            dict_items['pos_y'] = float(shape_pose.position.y)
+            dict_items['pos_z'] = float(shape_pose.position.z)
+            dict_items['rot_w'] = float(shape_pose.orientation.w)
+            dict_items['rot_x'] = float(shape_pose.orientation.x)
+            dict_items['rot_y'] = float(shape_pose.orientation.y)
+            dict_items['rot_z'] = float(shape_pose.orientation.z)
+
+            # Update output dictionary with a dictionary of items
+            # NOTE: key is the actual shape's key
+            config[key] = dict_items
+
+        # Dump the current shape dictionary (configured for saving) to nominated path
+        with open(config_path, 'w') as handle:
+            handle.write(yaml.dump(config))
+
+        rospy.loginfo(f"[SAVE COLLISION SCENE] -> Collision Scene Written to: [{config_path}]")
+        return True
 
     # --------------------------------------------------------------------- #
     # --------- Standard Methods ------------------------------------------ #
@@ -2802,8 +2984,13 @@ class ROSRobot(rtb.Robot):
 
         return result
     
-    # Implementation from: https://github.com/ros-controls/ros_control/issues/511 
     def controller_switch_service(self, ns, cls, **kwargs):
+        """Sends data to a ROS service
+            Credit: https://github.com/ros-controls/ros_control/issues/511 
+
+        Args:
+            ns (str): namepsace of service
+        """
         rospy.wait_for_service(ns)
         service = rospy.ServiceProxy(ns, cls)
         response = service(**kwargs)
@@ -2813,6 +3000,15 @@ class ROSRobot(rtb.Robot):
             rospy.loginfo(f"[CONTROLLER SWITCHER] -> Controller switched successfully")
 
     def controller_select(self, controller_type: int = 0) -> bool:
+        """Attempts to select a provided controller type via controller_manager service
+
+        Args:
+            controller_type (int, optional): Enumerated value defining a controller type 
+            (only 0 [joint velocity], and 1 [trajectory] are supported). Defaults to 0.
+
+        Returns:
+            bool: True if successfully switched, otherwise False
+        """
         if controller_type == None or controller_type > 1 or controller_type < 0:
             rospy.logerr(f"[CONTROLLER SELECT] -> invalid controller type: {controller_type}")
             return False
@@ -2855,6 +3051,7 @@ class ROSRobot(rtb.Robot):
         Executes a ros_control trajectory implementation
         NOTE: only works when ros_control backend is available
         """
+        # TODO: needs to handle a namespace in the topic (dependent on robot type)
         controller_action = "/" + self.trajectory_controller + "/follow_joint_trajectory"
         print(f"controller action: {controller_action}")
         # Create a client to loaded controller
@@ -3212,7 +3409,8 @@ class ROSRobot(rtb.Robot):
         dyn_col_dict_cp = self.dynamic_collision_dict.copy()
         for obj in list(dyn_col_dict_cp.values()):
             # Ensure object has been successfully added to backend first
-            if obj.is_added and not obj.marker_created:
+            # print(f"here: {obj}")
+            if not obj.marker_created:
                 # Default interactive marker setup
                 marker = Marker()
                 if obj.shape.stype == 'sphere':
@@ -3438,12 +3636,6 @@ class ROSRobot(rtb.Robot):
         self.state_publisher.publish(self.state)
 
         self.event.set()
-
-    def _load_shape_config(self):
-        """
-        TODO: Attempts to load in any configured collision shapes
-        """
-        pass
 
     def __load_config(self):
         """[summary]
