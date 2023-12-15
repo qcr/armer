@@ -1,138 +1,137 @@
 Collision Handling
 =====================
 
-Armer implements collision handling features that extend the capabilities provided by the roboticstoolbox-python and spatialgeometry libraries.
-A description of each core functionality is provided below. 
+Armer implements collision handling features that extend the capabilities provided by the roboticstoolbox-python and spatialgeometry libraries. 
+Upon launch of Armer, the default robot_description (i.e., robot model) is parsed, with each collision shape associated with each link captured in a collision dictionary for checking.
+If a valid collision is found in every step of the Armer driver, a preemption occurs to safely stop the robot.
+
+The following high-level features are now available:
+- Cython build of the global checking method for fast execution
+- A slice of target links (named slice links) that can be configured by user input for limiting the number of links to be evaluated per time step.
+- K-Dimensional (KD) tree creation is conducted each step to: (a) capture the distance between all links to target slice links; and (b) find the closest 4 links per each slice link to confirm for collision. This ensures that the collision checking process remains stable even with an increase in the number of shapes in the scene. 
+- Multiple arm instances per Armer driver (two tested) can be conducted with the global collision checking method, where each individual arm checks and preempts upon collision in a common scene.
+- A new recover_move service to move the arm back to a pre-defined safe joint state along its recently conducted trajectory. This ensures the arm comes free of collision preemption for fast recovery.
+- The dynamic addition/removal of collision objects (simple primitives, such as spheres, cuboids, or cylinders) during runtime for custom collision object setup
+- Each added collision object is interactive through RVIZ for easy positioning/orienting based on the use case.
+- A collision scene (list of added dynamic collision shapes) can be saved to a config yaml file for easy reload on a new run 
 
 URDF Parsed Collision Objects
 ------------------------------
 
+Armer supports loading in a robot_description; and as such, will parse and extract collision shapes to conduct collision checking.
 
+Note that, these collision shapes will not be interactive and are a part of the robot's collision tree. This is especially useful when considering
+the end-effector's collision shapes (in a custom configuration for example). Please refer to https://wiki.ros.org/urdf/Tutorials for an indepth explanation on
+what a URDF is and how to create a custom version.
 
-Moving to a Named Pose
+Adding Collision Objects
 ------------------------
 
-The Armer interface uses a ROS action server to listen for requests to move to a named pose.
+Collision primitives (i.e., spheres, cylinders, and cuboids) can be added in at runtime via the ``/arm/add_collision_object`` service. 
 
-Requests to the ROS action server can be made by creating a ROS action client in Python. This client is used to send requests to the action server.
-
-This example shows a request to move to named pose `my_pose`:
+This can be called via Python:
 
 .. code-block:: python
 
-    from armer_msgs.msg import MoveToNamedPoseAction, MoveToNamedPoseGoal 
-    import actionlib
+    from armer_msgs.srv import AddCollisionObject
     import rospy
 
     rospy.init_node('armer_example', disable_signals=True)
-
-    named_pose="my_pose"
-
-    servo_cli = actionlib.SimpleActionClient('/arm/joint/named', MoveToNamedPoseAction)
-    servo_cli.wait_for_server()
-
-    goal = MoveToNamedPoseGoal()
-    goal.pose_name=named_pose
-
-    # Send goal and wait for it to finish
-    servo_cli.send_goal(goal)
-    servo_cli.wait_for_result()
-    servo_cli.get_result()
-
-Removing a Named Pose
------------------------
-
-Named poses can be removed via the ``/arm/remove_named_pose`` service. This can be called via Python:
-
-.. code-block:: python
-
-    from armer_msgs.srv import RemoveNamedPose
-    import rospy
-
-    rospy.init_node('armer_example', disable_signals=True)
-    remove_pose_service = rospy.ServiceProxy('/arm/remove_named_pose', RemoveNamedPose)
+    service = rospy.ServiceProxy('/arm/add_collision_object', AddCollisionObject)
+    # Create a pose object and populate
+    pose = Pose()
+    pose.position.x = 0.3
+    pose.position.y = 0
+    pose.position.z = 0.15
+    pose.orientation.w = 0
+    pose.orientation.x = 1
+    pose.orientation.y = 0
+    pose.orientation.z = 0
     
-    named_pose="my_pose"
-    remove_pose_service(named_pose)    
+    # Configure Shape Properties
+    name="test_object"
+    shape_type='cylinder'
+    length=0.3
+    radius=0.05
 
-Or bash: 
+    # Send via service
+    service(name, shape_type, length, radius, pose)  
+
+Or via Bash:
 
 .. code-block:: bash
 
-    rosservice call /arm/remove_named_pose "pose_name: {POSE_TO_REMOVE}"
+    rosservice call /arm/add_collision_object "name: 'test_object'
+    type: 'cylinder'
+    radius: 0.05
+    length: 0.3
+    scale_x: 0.0
+    scale_y: 0.0
+    scale_z: 0.0
+    pose:
+        position: {x: 0.3, y: 0.0, z: 0.15}
+        orientation: {x: 1.0, y: 0.0, z: 0.0, w: 0.0}
+    overwrite: false" 
 
-Getting Saved Named Poses
+Getting Collision Object Details
+----------------------------------
+
+Added collision object details (specifically the ``name``, its ``type``, and the ``x,y,z translation``) can be requested through the ``/arm/get_collision_objects`` service.
+
+This can be called via Bash:
+
+.. code-block:: bash
+
+    rosservice call /arm/get_collision_objects "{}"
+
+which will return a list of information. As an example, you may see the following:
+
+.. code-block:: bash
+
+    rosservice call /arm/get_collision_objects "{}"
+    objects: 
+        - 'block_1 -> (shape: cylinder, pose (x,y,z): [0.43330675 0.         0.16029578])'
+        - 'ceil -> (shape: cuboid, pose (x,y,z): [0.90051776 0.         0.55649769])'
+        - 'floor -> (shape: cuboid, pose (x,y,z): [3.72529030e-09 0.00000000e+00 2.11520195e-02]
+
+Interacting with Collision Objects
+----------------------------------
+
+With RVIZ open, simply add the ``RobotModel`` and the ``InteractiveMarkers`` modules to view currently configured shapes.
+
+Removing Collision Objects
 --------------------------
 
-To see a list of poses are saved, use the ``/arm/get_named_poses`` service.
+Added objects (excluding those that are a part of the robot_description) can be done through the ``/arm/remove_collision_object`` service.
 
-Via Python:
-
-.. code-block:: python
-
-    from armer_msgs.srv import GetNamedPoses
-    import rospy
-
-    rospy.init_node('armer_example', disable_signals=True)
-    get_poses_service = rospy.ServiceProxy('/arm/get_named_poses', GetNamedPoses)
-
-    get_poses_service()    
-
-Bash: 
-
-.. code-block:: bash
-
-    rosservice call /arm/get_named_poses
-
-
-Loading Named Poses from Config files
----------------------------------------
-
-To load configs from a YAML other than the default Armer config, the ``/arm/add_named_pose_config`` service can be used.
-
-It can be summoned via Python or Bash.
-
-Python:
+This can be called via Python:
 
 .. code-block:: python
 
-    from armer_msgs.srv import AddNamedPoseConfig
+    from armer_msgs.srv import RemoveCollisionObject
     import rospy
 
     rospy.init_node('armer_example', disable_signals=True)
-    save_config_service = rospy.ServiceProxy('/arm/add_named_pose_config', AddNamedPoseConfig)
+    service = rospy.ServiceProxy('/arm/remove_collision_object', RemoveCollisionObject)
     
-    config_path="/home/user/saved_poses.yaml"
-    save_config_service(config_path)    
+    # Set the name of the object to be removed
+    name="test_object"
 
-Bash: 
+    # Send via service
+    service(name)  
 
-.. code-block:: bash
-
-    rosservice call /arm/add_named_pose_config "config_path: {PATH_TO_CONFIG.yaml}"
-
-
-Removing Named Poses from Config files
------------------------------------------
-
-To remove the config poses, the ``/arm/remove_named_pose_config`` service can be called. 
-
-Via Python:
-
-.. code-block:: python
-
-    from armer_msgs.srv import RemoveNamedPoseConfig
-    import rospy
-
-    rospy.init_node('armer_example', disable_signals=True)
-    remove_config_service = rospy.ServiceProxy('/arm/remove_named_pose_config', RemoveNamedPoseConfig)
-    
-    config_path="/home/user/saved_poses.yaml"
-    remove_config_service(config_path)    
-
-Bash: 
+Or via Bash:
 
 .. code-block:: bash
 
-    rosservice call /arm/remove_named_pose_config "config_path: {PATH_TO_CONFIG.yaml}"
+    rosservice call /arm/remove_collision_object "name: 'test_object'"
+
+NOTE: that the name must be within the existing dictionary of collision objects added. If this name is not in this dictionary, then you will receive an error.
+
+Saving a Collision Scene
+------------------------
+
+Loading a Collision Scene
+-------------------------
+
 
