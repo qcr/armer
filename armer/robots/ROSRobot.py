@@ -43,7 +43,6 @@ from armer_msgs.srv import *
 
 # TESTING NEW IMPORTS FOR TRAJ DISPLAY (MOVEIT)
 from trajectory_msgs.msg import JointTrajectoryPoint, JointTrajectory
-from moveit_msgs.msg import DisplayTrajectory
 
 # TESTING NEW IMPORTS FOR DYNAMIC OBJECT MARKER DISPLAY (RVIZ)
 from visualization_msgs.msg import Marker, MarkerArray, InteractiveMarker, InteractiveMarkerControl
