@@ -41,7 +41,7 @@ from std_msgs.msg import Float64MultiArray
 from armer_msgs.msg import *
 from armer_msgs.srv import *
 
-# TESTING NEW IMPORTS FOR TRAJ DISPLAY (MOVEIT)
+# TESTING NEW IMPORTS FOR TRAJ DISPLAY 
 from trajectory_msgs.msg import JointTrajectoryPoint, JointTrajectory
 
 # TESTING NEW IMPORTS FOR DYNAMIC OBJECT MARKER DISPLAY (RVIZ)
@@ -210,10 +210,11 @@ class ROSRobot(rtb.Robot):
         # Initialise a 'ghost' robot instance for trajectory collision checking prior to execution
         # NOTE: Used to visualise the trajectory as a simple marker list in RVIZ for debugging
         # NOTE: there was an issue identified around using the latest franka-emika panda description
+        # NOTE: the urdf_rtb_path is set by URDFRobot on initialisation if a path to the toolbox descriptions is specified
         self.robot_ghost = URDFRobot(
             wait_for_description=False, 
             gripper=self.gripper,
-            urdf_file=self.urdf_filepath,
+            urdf_file=self.urdf_rtb_path,
             collision_check_start_link=self.collision_sliced_links[-1].name, 
             collision_check_stop_link=self.collision_sliced_links[0].name
         )

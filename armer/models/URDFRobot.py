@@ -30,6 +30,8 @@ class URDFRobot(Robot):
                **kwargs):
 
     if urdf_file:
+      # Update a common variable for the specific toolbox (rtb) path for use as a ghost
+      self.urdf_rtb_path = urdf_file
       links, name, urdf_string, urdf_filepath = self.URDF_read(urdf_file)
     else:
       links, name, urdf_string, urdf_filepath = URDFRobot.URDF_read_description(wait=wait_for_description)
