@@ -1,7 +1,7 @@
 robots:
   - name: arm # default namespace
     model:
-      urdf_file: ur_description/urdf/ur5_robot.urdf.xacro
+      urdf_file: ur_description/urdf/ur10_robot.urdf.xacro
       qr: [-1.57, -0.96, -2.18, -1.57, 1.57, 3.14]
       gripper: tool0
       collision_check_start_link: wrist_3_link

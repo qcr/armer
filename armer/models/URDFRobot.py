@@ -34,7 +34,13 @@ class URDFRobot(Robot):
       self.urdf_rtb_path = urdf_file
       links, name, urdf_string, urdf_filepath = self.URDF_read(urdf_file)
     else:
+      self.urdf_rtb_path = None
       links, name, urdf_string, urdf_filepath = URDFRobot.URDF_read_description(wait=wait_for_description)
+
+    # Error handling on missing links (no description was validly provided)
+    if not links:
+      rospy.logerr(f"Could not define links (description error)")
+      return None
 
     self.gripper = gripper if gripper else URDFRobot.resolve_gripper(links)
     gripper_link = list(filter(lambda link: link.name == self.gripper, links))
