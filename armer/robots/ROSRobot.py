@@ -786,6 +786,12 @@ class ROSRobot(rtb.Robot):
                 goal_pose,
             )
             pose = goal_pose.pose
+
+            # Handle zero time input (or negative)
+            move_time = goal.time 
+            if goal.time <= 0.0:
+                # Default to 5 seconds
+                move_time = 5.0
             
             # Attempt to get valid solution
             # NOTE: on failure, returns existing state as solution for 0 movement
@@ -797,7 +803,7 @@ class ROSRobot(rtb.Robot):
             else:
                 # NOTE: checks and preempts if collision or workspace violation
                 # NOTE: can proceed if workspace not defined
-                if self.general_executor(q=solution.q, pose=pose, collision_ignore=False, workspace_ignore=False):
+                if self.general_executor(q=solution.q, pose=pose, collision_ignore=False, workspace_ignore=False, move_time_sec=move_time):
                     self.pose_server.set_succeeded(MoveToPoseResult(success=True))
                 else:
                     self.pose_server.set_aborted(MoveToPoseResult(success=False), 'Executor Failed in Action')
@@ -817,10 +823,16 @@ class ROSRobot(rtb.Robot):
             self.preempt()
 
         with self.lock:     
+            # Handle zero time input (or negative)
+            move_time = goal.time 
+            if goal.time <= 0.0:
+                # Default to 5 seconds
+                move_time = 5.0
+
             # NOTE: checks for collisions and workspace violations
             # NOTE: checks for singularity violations
             # NOTE: can continue if workspace is not defined (ignored as no pose is defined)
-            if self.general_executor(q=goal.joints, workspace_ignore=True):
+            if self.general_executor(q=goal.joints, workspace_ignore=True, move_time_sec=move_time):
                 self.joint_pose_server.set_succeeded(MoveToJointPoseResult(success=True))
             else:
                 self.joint_pose_server.set_aborted(MoveToJointPoseResult(success=False))
@@ -857,9 +869,15 @@ class ROSRobot(rtb.Robot):
             goal_pose.position.y = goal_pose_se3.t[1]
             goal_pose.position.z = goal_pose_se3.t[2]
 
+            # Handle zero time input (or negative)
+            move_time = goal.time 
+            if goal.time <= 0.0:
+                # Default to 5 seconds
+                move_time = 5.0
+
             # NOTE: Checks collisions prior to executing
             # NOTE: Checks workspace (if defined), continues if not
-            if self.general_executor(q=q, pose=goal_pose):
+            if self.general_executor(q=q, pose=goal_pose, move_time_sec=move_time):
                 self.named_pose_server.set_succeeded(MoveToNamedPoseResult(success=True))
             else:
                 self.named_pose_server.set_aborted(MoveToNamedPoseResult(success=False))
@@ -883,9 +901,15 @@ class ROSRobot(rtb.Robot):
             # Prep end goal state (q) for home joint positions
             q = np.array(self.qr) if hasattr(self, 'qr') else self.q
             
+            # Handle zero time input (or negative)
+            move_time = goal.time 
+            if goal.time <= 0.0:
+                # Default to 5 seconds
+                move_time = 5.0
+
             # Run the general executor (checks for collisions)
             # NOTE: ignores workspace on homing
-            if self.general_executor(q=q, workspace_ignore=True):
+            if self.general_executor(q=q, workspace_ignore=True, move_time_sec=move_time):
                 self.home_server.set_succeeded(HomeResult(success=True))
             else:
                 self.home_server.set_aborted(HomeResult(success=False))
@@ -2383,14 +2407,14 @@ class ROSRobot(rtb.Robot):
         # Output go based on passing collision check
         return go
     
-    def get_link_collision_dict(self) -> dict():
+    def get_link_collision_dict(self) -> dict:
         """
         Returns a dictionary of all associated links (names) which lists their respective collision data
         To be used by high-level armer class for collision handling
         """
         return self.collision_dict
     
-    def check_collision_per_state(self, q: list() = []) -> bool():
+    def check_collision_per_state(self, q: list = []) -> bool:
         """
         Given a robot state (q) this method checks if the links (of a ghost robot) will result in a collision
         If a collision is found, then the output is True, else False
@@ -2915,7 +2939,7 @@ class ROSRobot(rtb.Robot):
     # --------------------------------------------------------------------- #
     # --------- Standard Methods ------------------------------------------ #
     # --------------------------------------------------------------------- #
-    def general_executor(self, q, pose: Pose = None, collision_ignore: bool =False, workspace_ignore: bool = False) -> bool:
+    def general_executor(self, q, pose: Pose = None, collision_ignore: bool =False, workspace_ignore: bool = False, move_time_sec: float = 5.0) -> bool:
         """A general executor that performs the following on a given joint state goal
         - Workspace check prior to move. Setting workspace_ignore to True skips this (for cases where a pose is not defined or needed)
         - Singularity checking and termination on failure
@@ -2930,6 +2954,8 @@ class ROSRobot(rtb.Robot):
         :type collision_ignore: bool, optional
         :param workspace_ignore: True to ignore workspace checking, defaults to False
         :type workspace_ignore: bool, optional
+        :param move_time_sec: Time to take to move to pose, defaults to 5 seconds
+        :type move_time_sec: float, optional
         :return: True on success or False
         :rtype: bool
         """
@@ -2943,7 +2969,8 @@ class ROSRobot(rtb.Robot):
             return result
 
         # Generate trajectory from successful solution
-        traj = self.traj_generator(self, qf=q)
+        rospy.loginfo(f"time to move: {move_time_sec}")
+        traj = self.traj_generator(self, qf=q, move_time_sec=move_time_sec)
 
         if traj.name == 'invalid':
             rospy.logwarn(f"[GENERAL EXECUTOR] -> Invalid trajectory detected, existing safely")
